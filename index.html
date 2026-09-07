@@ -166,26 +166,31 @@
     const SUPABASE_URL = 'https://iproktvvetsbxxmpptuj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwcm9rdHZ2ZXRzYnh4bXBwdHVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyOTU3NDEsImV4cCI6MjEwMjg3MTc0MX0.Kc0USo30u4gvZNJ1bsOdD9k6nwEBcY7lNMAQxWEFzqw'; // 🔴 นำ anon key จาก Supabase มาใส่ตรงนี้
 
-    // ✅ เปลี่ยนชื่อตัวแปรเป็น supabaseClient
+    // ----------------------------------------------------
+    // 1. ตั้งค่าการเชื่อมต่อและตัวแปร Global
+    // ----------------------------------------------------
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let chartInstance = null;
+    let globalAssetDetails = []; // เก็บข้อมูลสินทรัพย์สำหรับค้นหาด้วย ID
 
-    // ตัวช่วยจัดรูปแบบตัวเลขเงินบาท
+    // ตัวช่วยจัดรูปแบบตัวเลข
     const formatTHB = (val) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(val || 0);
     const formatNumber = (val, decimals = 2) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(val || 0);
 
     // ----------------------------------------------------
-    // 2. ฟังก์ชันดึงข้อมูลทั้งหมดมาแสดงบน Dashboard
+    // 2. ฟังก์ชันหลักในการรีโหลดและดึงข้อมูล Dashboard
     // ----------------------------------------------------
-    async function loadDashboardData() {
-      await Promise.all([
-        fetchSummary(),
-        fetchAppAllocation(),
-        fetchAssetDetails()
-      ]);
+    function refreshDashboard() {
+      fetchSummary();
+      fetchAppAllocation();
+      fetchAssetDetails();
     }
 
-    // ดึงสรุปภาพรวม
+    async function loadDashboardData() {
+      refreshDashboard();
+    }
+
+    // 2.1 ดึงสรุปภาพรวมพอร์ต
     async function fetchSummary() {
       const { data, error } = await supabaseClient.from('v_dashboard_summary').select('*').single();
       if (error) return console.error('Error fetching summary:', error);
@@ -214,18 +219,19 @@
       }
     }
 
-    // ดึงสัดส่วนแยกตามแอป
+    // 2.2 ดึงสัดส่วนแยกตามแอป
     async function fetchAppAllocation() {
       const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
       if (error) return console.error('Error fetching allocation:', error);
 
       const listEl = document.getElementById('app-allocation-list');
+      if (!listEl) return;
       listEl.innerHTML = '';
 
       const labels = [];
       const chartValues = [];
 
-      data.forEach(item => {
+      (data || []).forEach(item => {
         labels.push(item.app_source.toUpperCase());
         chartValues.push(item.total_wealth_thb);
 
@@ -233,7 +239,7 @@
         const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
 
         listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition">
+          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
             <td class="py-3 font-semibold text-white uppercase">${item.app_source}</td>
             <td class="py-3">${formatTHB(item.total_wealth_thb)}</td>
             <td class="py-3 text-slate-400">${formatTHB(item.total_cost_thb)}</td>
@@ -246,229 +252,201 @@
       renderChart(labels, chartValues);
     }
 
-let globalAssetDetails = []; // ตัวแปรเก็บข้อมูลสินทรัพย์ทั้งหมด
+    // 2.3 ดึงข้อมูลรายละเอียดสินทรัพย์
+    async function fetchAssetDetails() {
+      const { data, error } = await supabaseClient.from('v_asset_details').select('*');
+      if (error) return console.error('Error fetching asset details:', error);
 
-// 1. ดึงข้อมูลสินทรัพย์จาก Supabase View
-async function fetchAssetDetails() {
-  const { data, error } = await supabaseClient.from('v_asset_details').select('*');
-  if (error) return console.error('Error fetching asset details:', error);
-
-  globalAssetDetails = data || [];
-  
-  // ตรวจสอบว่ามี Filter ค้างอยู่ไหม ถ้าไม่มีให้แสดงทั้งหมด
-  const activeBtn = document.querySelector('.filter-btn.bg-indigo-600');
-  const activeApp = activeBtn ? activeBtn.dataset.app : 'ALL';
-  
-  filterAssetDetails(activeApp);
-}
-
-// 2. ฟังก์ชันกรองข้อมูลตามแอปพลิเคชันที่คลิกเลือก
-function filterAssetDetails(appSource) {
-  // สลับการไฮไลต์สีปุ่มกด
-  document.querySelectorAll('.filter-btn').forEach(btn => {
-    if (btn.dataset.app === appSource) {
-      btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-md transition filter-btn";
-    } else {
-      btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn";
+      globalAssetDetails = data || [];
+      
+      const activeBtn = document.querySelector('.filter-btn.bg-indigo-600');
+      const activeApp = activeBtn ? activeBtn.dataset.app : 'ALL';
+      
+      filterAssetDetails(activeApp);
     }
-  });
 
-  // กรองรายการข้อมูล
-  if (appSource === 'ALL') {
-    renderAssetDetailsTable(globalAssetDetails);
-  } else {
-    const filtered = globalAssetDetails.filter(item => item.app_source.toUpperCase() === appSource);
-    renderAssetDetailsTable(filtered);
-  }
-}
+    // ----------------------------------------------------
+    // 3. ฟังก์ชันกรองข้อมูล และ แปลงชื่อสินทรัพย์
+    // ----------------------------------------------------
+    function filterAssetDetails(appSource) {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.dataset.app === appSource) {
+          btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-md transition filter-btn";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn";
+        }
+      });
 
-// เพิ่มฟังก์ชันแปลงชื่อสินทรัพย์อ่านง่าย
-function getReadableAssetName(item) {
-  if (!item) return '';
-  
-  if (item.app_source && item.app_source.toLowerCase() === 'gpf') {
-    if (item.asset_code && item.asset_code.includes('1788631314182')) return 'แผนหุ้นไทย';
-    if (item.asset_code && item.asset_code.includes('1788632129596')) return 'แผนหุ้นต่างประเทศ';
-    if (item.asset_code && item.asset_code.includes('1788632247228')) return 'แผนอสังหาริมทรัพย์ไทย';
-    if (item.asset_name && item.asset_name !== item.asset_code) return item.asset_name;
-  }
-  
-  return item.asset_code || item.asset_name || '';
-}
-    
-// 1. วาดตารางแสดงผลพร้อมปุ่มจัดการ
-function renderAssetDetailsTable(data) {
-  const listEl = document.getElementById('asset-details-list');
-  if (!listEl) return;
-  listEl.innerHTML = '';
-
-  if (!data || data.length === 0) {
-    listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
-    return;
-  }
-
-  // จัดเรียงตาม % กำไร/ขาดทุน จากมากไปน้อย
-  const sortedData = [...data].sort((a, b) => {
-    const pctA = a.unrealized_pnl_pct || 0;
-    const pctB = b.unrealized_pnl_pct || 0;
-    return pctB - pctA;
-  });
-
-  sortedData.forEach(item => {
-    const pnlPct = item.unrealized_pnl_pct || 0;
-    const isProfit = pnlPct >= 0;
-    const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-    const sign = isProfit ? '+' : '';
-
-    const actualPct = item.actual_pct || 0;
-    const targetPct = item.target_pct || 0;
-    const diffPct = actualPct - targetPct;
-
-    let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
-    if (targetPct > 0) {
-      if (diffPct < -1) {
-        statusBadge = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
-      } else if (diffPct > 1) {
-        statusBadge = `<span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
+      if (appSource === 'ALL') {
+        renderAssetDetailsTable(globalAssetDetails);
       } else {
-        statusBadge = `<span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
+        const filtered = globalAssetDetails.filter(item => item.app_source.toUpperCase() === appSource);
+        renderAssetDetailsTable(filtered);
       }
     }
 
-    listEl.innerHTML += `
-      <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-        <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
-        <td class="py-3 font-medium text-white">${getReadableAssetName(item)}</td>
-        <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
-        <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
-        <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
-        <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
-        
-        <td class="py-3">
-          <div class="text-xs font-semibold text-white">${formatNumber(actualPct, 1)}% <span class="text-slate-400 font-normal">/ ${formatNumber(targetPct, 1)}%</span></div>
-          <div class="mt-0.5">${statusBadge}</div>
-        </td>
+    function getReadableAssetName(item) {
+      if (!item) return '';
+      if (item.app_source && item.app_source.toLowerCase() === 'gpf') {
+        if (item.asset_code && item.asset_code.includes('1788631314182')) return 'แผนหุ้นไทย';
+        if (item.asset_code && item.asset_code.includes('1788632129596')) return 'แผนหุ้นต่างประเทศ';
+        if (item.asset_code && item.asset_code.includes('1788632247228')) return 'แผนอสังหาริมทรัพย์ไทย';
+        if (item.asset_name && item.asset_name !== item.asset_code) return item.asset_name;
+      }
+      return item.asset_code || item.asset_name || '';
+    }
 
-        <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
-        <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
-        
-        <!-- ส่งเฉพาะ ID เข้าไป ไม่ต้องส่งชื่อภาษาไทยผ่าน HTML onclick เพื่อกัน Syntax Error -->
-        <td class="py-3 text-center">
-          <div class="flex items-center justify-center gap-2">
-            <button onclick="openEditModalById('${item.id}')" 
-                    class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" 
-                    title="แก้ไขรายการ">
-              ✏️
-            </button>
-            <button onclick="deleteAssetById('${item.id}')" 
-                    class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" 
-                    title="ลบรายการ">
-              🗑️
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-  });
-}
+    // ----------------------------------------------------
+    // 4. ฟังก์ชันแสดงตารางสินทรัพย์ (เรียง % กำไร + Rebalance)
+    // ----------------------------------------------------
+    function renderAssetDetailsTable(data) {
+      const listEl = document.getElementById('asset-details-list');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      if (!data || data.length === 0) {
+        listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
+        return;
+      }
+
+      const sortedData = [...data].sort((a, b) => (b.unrealized_pnl_pct || 0) - (a.unrealized_pnl_pct || 0));
+
+      sortedData.forEach(item => {
+        const pnlPct = item.unrealized_pnl_pct || 0;
+        const isProfit = pnlPct >= 0;
+        const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+        const sign = isProfit ? '+' : '';
+
+        const actualPct = item.actual_pct || 0;
+        const targetPct = item.target_pct || 0;
+        const diffPct = actualPct - targetPct;
+
+        let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
+        if (targetPct > 0) {
+          if (diffPct < -1) {
+            statusBadge = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
+          } else if (diffPct > 1) {
+            statusBadge = `<span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
+          } else {
+            statusBadge = `<span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
+          }
+        }
+
+        listEl.innerHTML += `
+          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+            <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
+            <td class="py-3 font-medium text-white">${getReadableAssetName(item)}</td>
+            <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
+            <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
+            <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
+            <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
+            
+            <td class="py-3">
+              <div class="text-xs font-semibold text-white">${formatNumber(actualPct, 1)}% <span class="text-slate-400 font-normal">/ ${formatNumber(targetPct, 1)}%</span></div>
+              <div class="mt-0.5">${statusBadge}</div>
+            </td>
+
+            <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+            <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+            
+            <td class="py-3 text-center">
+              <div class="flex items-center justify-center gap-2">
+                <button onclick="openEditModalById('${item.id}')" 
+                        class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" 
+                        title="แก้ไขรายการ">
+                  ✏️
+                </button>
+                <button onclick="deleteAssetById('${item.id}')" 
+                        class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" 
+                        title="ลบรายการ">
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    // ----------------------------------------------------
+    // 5. ฟังก์ชันจัดการ Modal (แก้ไข / บันทึก / ลบ)
+    // ----------------------------------------------------
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function openEditModalById(id) {
+      const item = globalAssetDetails.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('edit-id').value = item.id;
+      document.getElementById('edit-asset-code').value = getReadableAssetName(item);
+      document.getElementById('edit-units').value = item.units || 0;
+      document.getElementById('edit-avg-nav').value = item.avg_nav || 0;
+      document.getElementById('edit-target-pct').value = item.target_pct || 0;
       
-// 1. ปรับฟังก์ชันเปิด Modal ให้รับค่า targetPct เพิ่ม
-function openEditModal(id, code, units, avgNav, targetPct = 0) {
-  document.getElementById('edit-id').value = id;
-  document.getElementById('edit-asset-code').value = code;
-  document.getElementById('edit-units').value = units;
-  document.getElementById('edit-avg-nav').value = avgNav;
-  document.getElementById('edit-target-pct').value = targetPct;
-  document.getElementById('edit-modal').classList.remove('hidden');
-}
-
-function closeEditModal() {
-  document.getElementById('edit-modal').classList.add('hidden');
-}
-
-// ฟังก์ชันเปิด Modal แก้ไขโดยค้นจาก ID ปลอดภัย 100% ไม่พังเรื่องอักขระภาษาไทย
-function openEditModalById(id) {
-  const item = globalAssetDetails.find(i => i.id === id);
-  if (!item) return;
-
-  document.getElementById('edit-id').value = item.id;
-  document.getElementById('edit-asset-code').value = getReadableAssetName(item);
-  document.getElementById('edit-units').value = item.units || 0;
-  document.getElementById('edit-avg-nav').value = item.avg_nav || 0;
-  document.getElementById('edit-target-pct').value = item.target_pct || 0;
-  
-  document.getElementById('edit-modal').classList.remove('hidden');
-}
-
-// ฟังก์ชันลบสินทรัพย์โดยค้นจาก ID ปลอดภัยจาก Syntax Error
-async function deleteAssetById(id) {
-  const item = globalAssetDetails.find(i => i.id === id);
-  const codeName = item ? getReadableAssetName(item) : 'รายการนี้';
-
-  if (!confirm(`คุณต้องการลบรายการ [${codeName}] ออกจากพอร์ตใช่หรือไม่?`)) return;
-
-  const { error } = await supabaseClient
-    .from('user_portfolios')
-    .delete()
-    .eq('id', id);
-
-async function saveAssetEdit() {
-  try {
-    const id = document.getElementById('edit-id').value;
-    const units = parseFloat(document.getElementById('edit-units').value);
-    const avgNav = parseFloat(document.getElementById('edit-avg-nav').value);
-    const targetPct = parseFloat(document.getElementById('edit-target-pct').value) || 0;
-
-    if (isNaN(units) || isNaN(avgNav)) {
-      alert('กรุณากรอกตัวเลขจำนวนหน่วยและ NAV ต้นทุนให้ถูกต้อง');
-      return;
+      document.getElementById('edit-modal').classList.remove('hidden');
     }
 
-    const totalCost = units * avgNav;
+    async function saveAssetEdit() {
+      try {
+        const id = document.getElementById('edit-id').value;
+        const units = parseFloat(document.getElementById('edit-units').value);
+        const avgNav = parseFloat(document.getElementById('edit-avg-nav').value);
+        const targetPct = parseFloat(document.getElementById('edit-target-pct').value) || 0;
 
-    const { error } = await supabaseClient
-      .from('user_portfolios')
-      .update({ 
-        units: units, 
-        avg_nav: avgNav, 
-        total_cost: totalCost,
-        target_pct: targetPct,
-        updated_at: new Date()
-      })
-      .eq('id', id);
+        if (isNaN(units) || isNaN(avgNav)) {
+          alert('กรุณากรอกตัวเลขจำนวนหน่วยและ NAV ต้นทุนให้ถูกต้อง');
+          return;
+        }
 
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + error.message);
-      return;
+        const totalCost = units * avgNav;
+
+        const { error } = await supabaseClient
+          .from('user_portfolios')
+          .update({ 
+            units: units, 
+            avg_nav: avgNav, 
+            total_cost: totalCost,
+            target_pct: targetPct,
+            updated_at: new Date()
+          })
+          .eq('id', id);
+
+        if (error) {
+          alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + error.message);
+          return;
+        }
+
+        closeEditModal();
+        refreshDashboard();
+      } catch (err) {
+        alert('System Error: ' + err.message);
+      }
     }
 
-    closeEditModal();
-    refreshDashboard(); // 👈 เรียกใช้ฟังก์ชันกลางสั้นๆ ตรงนี้ได้เลย
-    
-  } catch (err) {
-    alert('System Error: ' + err.message);
-  }
-}
-async function deleteAssetById(id) {
-  const item = globalAssetDetails.find(i => i.id === id);
-  const codeName = item ? getReadableAssetName(item) : 'รายการนี้';
+    async function deleteAssetById(id) {
+      const item = globalAssetDetails.find(i => i.id === id);
+      const codeName = item ? getReadableAssetName(item) : 'รายการนี้';
 
-  if (!confirm(`คุณต้องการลบรายการ [${codeName}] ออกจากพอร์ตใช่หรือไม่?`)) return;
+      if (!confirm(`คุณต้องการลบรายการ [${codeName}] ออกจากพอร์ตใช่หรือไม่?`)) return;
 
-  const { error } = await supabaseClient
-    .from('user_portfolios')
-    .delete()
-    .eq('id', id);
+      const { error } = await supabaseClient
+        .from('user_portfolios')
+        .delete()
+        .eq('id', id);
 
-  if (error) {
-    alert('เกิดข้อผิดพลาดในการลบรายการ: ' + error.message);
-    return;
-  }
+      if (error) {
+        alert('เกิดข้อผิดพลาดในการลบรายการ: ' + error.message);
+        return;
+      }
 
-  refreshDashboard(); // 👈 เรียกใช้ฟังก์ชันกลางสั้นๆ ตรงนี้ได้เลย
-}
-    
-    // วาดกราฟ Donut
+      refreshDashboard();
+    }
+
+    // ----------------------------------------------------
+    // 6. ฟังก์ชันวาดกราฟ Donut
+    // ----------------------------------------------------
     function renderChart(labels, dataValues) {
       const ctx = document.getElementById('allocationChart').getContext('2d');
       if (chartInstance) chartInstance.destroy();
@@ -495,5 +473,5 @@ async function deleteAssetById(id) {
     // เริ่มโหลดข้อมูลเมื่อเปิดหน้าเว็บ
     window.onload = loadDashboardData;
   </script>
-</body>
+  </body>
 </html>
