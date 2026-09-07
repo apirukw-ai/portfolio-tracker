@@ -27,32 +27,29 @@ HEADERS = {
 # 2. ฟังก์ชันดึง NAV แต่ละแหล่งข้อมูล
 # ----------------------------------------------------
 
-# [MFC] ใช้ Logic ค้นหาจาก HTML ของคุณโดยตรง
-def get_nav_from_mfc_page(fund_code, fund_name, html_content):
-    if not html_content:
-        return None
+# ----------------------------------------------------
+# ฟังก์ชันดึง NAV ของ MFC จาก Firebase โดยตรง (แม่นยำ 100%)
+# ----------------------------------------------------
+def get_mfc_nav_from_firebase():
+    """ ดึงข้อมูล NAV ของ MFC ที่บันทึกไว้ใน Firebase Realtime Database """
+    mfc_map = {}
     try:
-        soup = BeautifulSoup(html_content, 'html.parser')
-        clean_code = fund_code.replace(' ', '').lower() if fund_code else ""
-        clean_name = fund_name.replace(' ', '').lower() if fund_name else ""
-
-        for row in soup.find_all('tr'):
-            row_text = row.get_text(strip=True)
-            clean_row = row_text.replace(' ', '').lower()
-            
-            is_match = False
-            if clean_code and clean_code in clean_row:
-                is_match = True
-            elif clean_name and clean_name in clean_row:
-                is_match = True
-
-            if is_match:
-                numbers = re.findall(r'\d+\.\d{4}', row_text)
-                if numbers:
-                    return float(numbers[0])
+        url = "https://scb-e-class-default-rtdb.asia-southeast1.firebasedatabase.app/mfc_ports.json"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            # รองรับทั้งแบบ List หรือ Dict
+            items = data if isinstance(data, list) else data.get('funds', []) if isinstance(data, dict) else []
+            for item in items:
+                if isinstance(item, dict):
+                    code = item.get('code')
+                    nav = item.get('nav') or item.get('currentNav')
+                    if code and nav:
+                        mfc_map[code.strip().upper()] = float(nav)
+            print(f"✅ โหลดข้อมูล NAV MFC จาก Firebase สำเร็จ ({len(mfc_map)} รายการ)")
     except Exception as e:
-        print(f"⚠️ เกิดข้อผิดพลาดในการแกะข้อมูล MFC ({fund_code} / {fund_name}): {e}")
-    return None
+        print(f"⚠️ ดึงข้อมูล MFC จาก Firebase ไม่สำเร็จ: {e}")
+    return mfc_map
 
 # [SCB] ดึงผ่าน WealthX
 def get_scb_nav_wealthx(code):
@@ -124,29 +121,22 @@ def fetch_and_update():
         now_thai_dt = datetime.now(thai_tz)
         now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
 
-        # 1. โหลด HTML ของ MFC มาเตรียมไว้ล่วงหน้า
-        print("🌐 กำลังโหลดข้อมูลจาก https://mfcfund.com/unit-value/...")
-        mfc_res = requests.get("https://mfcfund.com/unit-value/", headers=HEADERS, timeout=20)
-        mfc_html_content = mfc_res.text if mfc_res.status_code == 200 else ""
+        # 1. โหลดข้อมูล MFC จาก Firebase
+        mfc_firebase_data = get_mfc_nav_from_firebase()
 
         # 2. โหลดข้อมูล GPF
         gpf_nav_data = get_gpf_nav_direct()
 
-        # 3. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios ใน Supabase
+        # 3. ดึงรายการสินทรัพย์ทั้งหมดจาก Supabase
         db_res = supabase.table('user_portfolios').select('*').execute()
         portfolio_items = db_res.data or []
-
-        mfc_total = 0.0
-        gpf_total = 0.0
-        scb_total = 0.0
-        dime_total = 0.0
 
         print(f"📦 พบรายการสินทรัพย์ทั้งหมด {len(portfolio_items)} รายการ")
 
         for item in portfolio_items:
             item_id = item["id"]
             app = item.get("app_source", "").lower()
-            code = item.get("asset_code", "")
+            code = item.get("asset_code", "").strip().upper()
             name = item.get("asset_name", "")
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
@@ -155,7 +145,8 @@ def fetch_and_update():
             print(f"🔄 กำลังดึง NAV ของ [{app.upper()}] {code} - {name}...")
 
             if app == "mfc":
-                latest_nav = get_nav_from_mfc_page(code, name, mfc_html_content)
+                # ดึงตรงจาก Firebase Map
+                latest_nav = mfc_firebase_data.get(code)
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
@@ -163,7 +154,7 @@ def fetch_and_update():
             elif app == "dime":
                 latest_nav = get_us_stock_price(code)
 
-            # อัปเดตราคาล่าสุดลง Supabase
+            # อัปเดตราคาลง Supabase user_portfolios
             final_nav = latest_nav if (latest_nav and latest_nav > 0) else current_nav
             
             if latest_nav and latest_nav != current_nav:
@@ -178,33 +169,6 @@ def fetch_and_update():
                     'updated_at': now_thai
                 }).eq('id', item_id).execute()
                 print(f"ℹ️ {code} ราคาล่าสุด: {final_nav} (ไม่เปลี่ยนแปลง)")
-
-            # คำนวณยอดรวมรายแอป
-            item_val = units * final_nav
-            if app == "mfc":
-                mfc_total += item_val
-            elif app == "gpf":
-                gpf_total += item_val
-            elif app == "scb":
-                scb_total += item_val
-            elif app == "dime":
-                dime_total += item_val
-
-        # 4. บันทึก Snapshot ลง portfolio_history
-        try:
-            total_wealth = mfc_total + gpf_total + scb_total + dime_total
-            record_payload = {
-                'record_date': str(date.today()),
-                'mfc_val': round(mfc_total, 2),
-                'gpf_val': round(gpf_total, 2),
-                'scb_val': round(scb_total, 2),
-                'dime_val': round(dime_total, 2),
-                'total_wealth': round(total_wealth, 2)
-            }
-            supabase.table('portfolio_history').upsert(record_payload, on_conflict='record_date').execute()
-            print(f"📈 บันทึกประวัติสมบูรณ์! Total Wealth: ฿{total_wealth:,.2f}")
-        except Exception as hist_err:
-            print(f"⚠️ บันทึกประวัติลง portfolio_history ไม่สำเร็จ: {hist_err}")
 
         print(f"✅ อัปเดตระบบเสร็จสิ้นเมื่อ: {now_thai}")
 
