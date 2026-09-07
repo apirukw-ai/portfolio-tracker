@@ -27,24 +27,39 @@ HEADERS = {
 # 2. ฟังก์ชันดึง NAV แต่ละแหล่งข้อมูล
 # ----------------------------------------------------
 
-# [MFC] ดึง NAV ล่าสุดตรงจากตาราง policies ใน Supabase
-def get_mfc_nav_from_supabase_policies():
-    mfc_map = {}
+# ----------------------------------------------------
+# ฟังก์ชันดึง NAV ของ MFC ผ่าน API เดียวกับหน้าเว็บเดิม (แม่นยำ 100%)
+# ----------------------------------------------------
+MFC_SYMBOL_MAP = {
+    'MPF07': 'IGOLD-G',
+    'MPF15': 'MGTECH',
+    'MPF18': 'M-EM',
+    'MPF19': 'MEURO-G',
+    'MPF23': 'MGFPVD',
+    'MPF27': 'M-ASIA',
+    'MPF16': 'M-FM'
+}
+
+def get_mfc_nav_from_api(code):
+    """ ยิงดึง NAV MFC ผ่าน API เดียวกับหน้าเว็บเดิม """
+    # แปลงรหัส เช่น MPF07 -> IGOLD-G
+    search_symbol = MFC_SYMBOL_MAP.get(code.upper(), code)
+    
     try:
-        res = supabase.table('policies').select('code, nav, updated_at').execute()
-        if res.data:
-            for item in res.data:
-                code = item.get('code')
-                nav = item.get('nav')
-                if code and nav:
-                    mfc_map[code.strip().upper()] = {
-                        'nav': float(nav),
-                        'nav_date': item.get('updated_at', '')
-                    }
-            print(f"✅ โหลดข้อมูล NAV MFC จากตาราง policies สำเร็จ ({len(mfc_map)} รายการ)")
+        # ดึง domain จาก origin ของหน้าเว็บเดิม
+        url = f"https://apirukw-ai.github.io/MFCN-tracker/get-nav?fund={search_symbol}"
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        
+        if res.status_code == 200:
+            data = res.json()
+            # รองรับโครงสร้าง Response ของ API
+            nav_val = data.get('nav') or data.get('price') or data.get('value')
+            if nav_val:
+                return float(nav_val)
     except Exception as e:
-        print(f"⚠️ ดึงข้อมูล MFC จากตาราง policies ไม่สำเร็จ: {e}")
-    return mfc_map
+        print(f"⚠️ ดึง API MFC ({search_symbol}) ไม่สำเร็จ: {e}")
+    
+    return None
 
 # [SCB] ดึงผ่าน WealthX
 def get_scb_nav_wealthx(code):
@@ -140,10 +155,7 @@ def fetch_and_update():
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
             if app == "mfc":
-                mfc_info = mfc_policies_data.get(code, {})
-                latest_nav = mfc_info.get('nav')
-                if mfc_info.get('nav_date'):
-                    nav_date = mfc_info.get('nav_date')
+                latest_nav = get_mfc_nav_from_api(code)
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
