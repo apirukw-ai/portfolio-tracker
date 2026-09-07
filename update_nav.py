@@ -170,7 +170,7 @@ def fetch_and_update():
     try:
         thai_tz = timezone(timedelta(hours=7))
         now_thai_dt = datetime.now(thai_tz)
-        now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
+        now_thai = now_thai_dt.strftime('%Y-%m-%dT%H:%M:%S+07:00')
         today_date_str = now_thai_dt.strftime('%d/%m/%Y')
 
         # 1. โหลดข้อมูล GPF ล่วงหน้า
