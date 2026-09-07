@@ -8,7 +8,7 @@ from supabase import create_client, Client
 # 1. เชื่อมต่อ Supabase
 # ----------------------------------------------------
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://iproktvvetsbxxmpptuj.supabase.co')
-SUPABASE_SERVICE_ROLE_KEY = os.environ.getos.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwcm9rdHZ2ZXRzYnh4bXBwdHVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzI5NTc0MSwiZXhwIjoyMTAyODcxNzQxfQ.THAP7rEfCRacre7gDGsQxKmjw-DHbUf6kIoimDQl2Wk')
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get.('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwcm9rdHZ2ZXRzYnh4bXBwdHVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzI5NTc0MSwiZXhwIjoyMTAyODcxNzQxfQ.THAP7rEfCRacre7gDGsQxKmjw-DHbUf6kIoimDQl2Wk')
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "da22fjpr01qp0a26e6ugda22fjpr01qp0a26e6v0")
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
