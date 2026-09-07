@@ -85,8 +85,23 @@
     </div>
 
     <!-- 3. Asset Details Table (รายการกองทุนทั้งหมด) -->
-    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
-      <h3 class="text-lg font-bold text-white mb-4">รายการกองทุน / สินทรัพย์ย่อย</h3>
+<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
+  
+  <!-- หัวข้อ และ ปุ่ม Filter กรองแอปพลิเคชัน -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+    <h3 class="text-lg font-bold text-white">รายการกองทุน / สินทรัพย์ย่อย</h3>
+    
+    <!-- ปุ่มแท็บเลือกดูพอร์ต -->
+    <div class="flex flex-wrap gap-2" id="app-filter-buttons">
+      <button onclick="filterAssetDetails('ALL')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition filter-btn" data-app="ALL">ทั้งหมด</button>
+      <button onclick="filterAssetDetails('GPF')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="GPF">GPF</button>
+      <button onclick="filterAssetDetails('DIME')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="DIME">Dime</button>
+      <button onclick="filterAssetDetails('MFC')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="MFC">MFC</button>
+      <button onclick="filterAssetDetails('SCB')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="SCB">SCB</button>
+    </div>
+  </div>
+
+  <!-- ตารางข้อมูลอยู่ด้านล่างต่อตรงนี้ตามเดิม -->
       <table class="w-full text-left text-sm">
         <thead class="text-slate-400 border-b border-slate-700">
           <tr>
@@ -195,34 +210,73 @@
       renderChart(labels, chartValues);
     }
 
-    // ดึงรายการกองทุนย่อย
-  async function fetchAssetDetails() {
+let globalAssetDetails = []; // ตัวแปรเก็บข้อมูลสินทรัพย์ทั้งหมด
+
+// 1. ดึงข้อมูลสินทรัพย์จาก Supabase View
+async function fetchAssetDetails() {
   const { data, error } = await supabaseClient.from('v_asset_details').select('*');
   if (error) return console.error('Error fetching asset details:', error);
 
+  globalAssetDetails = data || [];
+  
+  // ตรวจสอบว่ามี Filter ค้างอยู่ไหม ถ้าไม่มีให้แสดงทั้งหมด
+  const activeBtn = document.querySelector('.filter-btn.bg-indigo-600');
+  const activeApp = activeBtn ? activeBtn.dataset.app : 'ALL';
+  
+  filterAssetDetails(activeApp);
+}
+
+// 2. ฟังก์ชันกรองข้อมูลตามแอปพลิเคชันที่คลิกเลือก
+function filterAssetDetails(appSource) {
+  // สลับการไฮไลต์สีปุ่มกด
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    if (btn.dataset.app === appSource) {
+      btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-md transition filter-btn";
+    } else {
+      btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn";
+    }
+  });
+
+  // กรองรายการข้อมูล
+  if (appSource === 'ALL') {
+    renderAssetDetailsTable(globalAssetDetails);
+  } else {
+    const filtered = globalAssetDetails.filter(item => item.app_source.toUpperCase() === appSource);
+    renderAssetDetailsTable(filtered);
+  }
+}
+
+// 3. ฟังก์ชันวาดตารางแสดงผล
+function renderAssetDetailsTable(data) {
   const listEl = document.getElementById('asset-details-list');
+  if (!listEl) return;
   listEl.innerHTML = '';
+
+  if (data.length === 0) {
+    listEl.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
+    return;
+  }
 
   data.forEach(item => {
     const pnlPct = item.unrealized_pnl_pct || 0;
     const isProfit = pnlPct >= 0;
-    const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+    const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+    const sign = isProfit ? '+' : '';
 
     listEl.innerHTML += `
       <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
         <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
         <td class="py-3 font-medium text-white">${item.asset_code}</td>
-        <td class="py-3">${formatNumber(item.units, 4)}</td>
-        <td class="py-3">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
-        <td class="py-3 font-semibold">${formatTHB(item.current_value_thb)}</td>
-        <td class="py-3 ${pnlClass} font-medium">${isProfit ? '+' : ''}${formatNumber(pnlPct, 2)}%</td>
+        <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
+        <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
+        <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
+        <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
         <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
         <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
       </tr>
     `;
   });
 }
-
     // วาดกราฟ Donut
     function renderChart(labels, dataValues) {
       const ctx = document.getElementById('allocationChart').getContext('2d');
