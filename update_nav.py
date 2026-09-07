@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta, date
 from supabase import create_client, Client
 
 # ----------------------------------------------------
-# 1. เชื่อมต่อ Supabase และรับค่า Secrets
+# 1. เชื่อมต่อ Supabase
 # ----------------------------------------------------
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
@@ -27,20 +27,20 @@ HEADERS = {
 # 2. ฟังก์ชันดึง NAV แต่ละแหล่งข้อมูล
 # ----------------------------------------------------
 
-# ----------------------------------------------------
-# ฟังก์ชันดึง NAV ของ MFC จากตาราง policies บน Supabase
-# ----------------------------------------------------
+# [MFC] ดึง NAV ล่าสุดตรงจากตาราง policies ใน Supabase
 def get_mfc_nav_from_supabase_policies():
-    """ ดึงข้อมูล NAV ของ MFC จากตาราง policies บน Supabase โดยตรง """
     mfc_map = {}
     try:
-        res = supabase.table('policies').select('code, nav').execute()
+        res = supabase.table('policies').select('code, nav, updated_at').execute()
         if res.data:
             for item in res.data:
                 code = item.get('code')
                 nav = item.get('nav')
                 if code and nav:
-                    mfc_map[code.strip().upper()] = float(nav)
+                    mfc_map[code.strip().upper()] = {
+                        'nav': float(nav),
+                        'nav_date': item.get('updated_at', '')
+                    }
             print(f"✅ โหลดข้อมูล NAV MFC จากตาราง policies สำเร็จ ({len(mfc_map)} รายการ)")
     except Exception as e:
         print(f"⚠️ ดึงข้อมูล MFC จากตาราง policies ไม่สำเร็จ: {e}")
@@ -108,21 +108,20 @@ def get_us_stock_price(symbol):
     return None
 
 # ----------------------------------------------------
-# 3. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง Supabase
+# 3. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง user_portfolios
 # ----------------------------------------------------
 def fetch_and_update():
     try:
         thai_tz = timezone(timedelta(hours=7))
         now_thai_dt = datetime.now(thai_tz)
         now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
+        today_date_str = now_thai_dt.strftime('%d/%m/%Y')
 
-        # 1. โหลด NAV MFC จากตาราง policies ใน Supabase
+        # 1. โหลดข้อมูลเตรียมไว้ก่อน
         mfc_policies_data = get_mfc_nav_from_supabase_policies()
-
-        # 2. โหลดข้อมูล GPF
         gpf_nav_data = get_gpf_nav_direct()
 
-        # 3. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios ใน Supabase
+        # 2. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
         db_res = supabase.table('user_portfolios').select('*').execute()
         portfolio_items = db_res.data or []
 
@@ -136,12 +135,15 @@ def fetch_and_update():
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
             latest_nav = None
+            nav_date = today_date_str
 
-            print(f"🔄 กำลังดึง NAV ของ [{app.upper()}] {code} - {name}...")
+            print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
             if app == "mfc":
-                # ดึงค่าตรงจากตาราง policies
-                latest_nav = mfc_policies_data.get(code)
+                mfc_info = mfc_policies_data.get(code, {})
+                latest_nav = mfc_info.get('nav')
+                if mfc_info.get('nav_date'):
+                    nav_date = mfc_info.get('nav_date')
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
@@ -149,23 +151,28 @@ def fetch_and_update():
             elif app == "dime":
                 latest_nav = get_us_stock_price(code)
 
-            # อัปเดตราคาลง Supabase user_portfolios
             final_nav = latest_nav if (latest_nav and latest_nav > 0) else current_nav
             
+            # อัปเดตราคาและวันที่ประกาศ NAV ลง user_portfolios
             if latest_nav and latest_nav != current_nav:
                 supabase.table('user_portfolios').update({
                     'current_nav': final_nav,
                     'current_value': units * final_nav,
+                    'nav_date': nav_date,
                     'updated_at': now_thai
                 }).eq('id', item_id).execute()
-                print(f"✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav}")
+                print(f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav}")
             else:
                 supabase.table('user_portfolios').update({
+                    'nav_date': nav_date,
                     'updated_at': now_thai
                 }).eq('id', item_id).execute()
-                print(f"ℹ️ {code} ราคาล่าสุด: {final_nav} (ไม่เปลี่ยนแปลง)")
+                print(f" ℹ️ {code} ราคาล่าสุด: {final_nav} (อัปเดตสถานะเสร็จสิ้น)")
 
         print(f"✅ อัปเดตระบบเสร็จสิ้นเมื่อ: {now_thai}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
+
+if __name__ == "__main__":
+    fetch_and_update()
