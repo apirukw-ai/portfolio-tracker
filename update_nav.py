@@ -26,46 +26,45 @@ HEADERS = {
 # ----------------------------------------------------
 # 2. ฟังก์ชันดึง NAV ปัจจุบันจากเว็บ MFC (https://mfcfund.com/unit-value/)
 # ----------------------------------------------------
-def fetch_mfc_html_content():
-    target_url = "https://mfcfund.com/unit-value/"
-    try:
-        print("🌐 กำลังโหลดข้อมูลจาก https://mfcfund.com/unit-value/...")
-        res = requests.get(target_url, headers=HEADERS, timeout=20)
-        if res.status_code == 200:
-            return res.text
-        else:
-            print(f"❌ ไม่สามารถเข้าถึงหน้าเว็บ MFC ได้ Status Code: {res.status_code}")
-    except Exception as e:
-        print(f"❌ Error fetching MFC Website: {e}")
-    return ""
+# ----------------------------------------------------
+# ฟังก์ชันแกะ NAV จากหน้าเว็บ mfcfund.com/unit-value/
+# ----------------------------------------------------
+# แมป Asset Code บน Supabase เข้ากับ ชื่อย่อกองทุน บนหน้าเว็บ MFC
+MFC_SYMBOL_MAP = {
+    'MPF07': 'IGOLD-G',
+    'MPF15': 'MGTECH',
+    'MPF18': 'M-EM',
+    'MPF19': 'MEURO-G',
+    'MPF23': 'MGFPVD',
+    'MPF27': 'M-ASIA',
+    'MPF16': 'M-FM'
+}
 
-def get_nav_from_mfc_page(fund_code, fund_name, html_content):
-    """ ค้นหาตัวเลข NAV โดยใช้ทั้งรหัสกองทุน และ ชื่อกองทุน จากหน้าเว็บ MFC """
+def get_mfc_nav_from_web(fund_code, html_content):
     if not html_content:
         return None
     try:
+        # แปลงรหัส เช่น MPF15 -> MGTECH
+        target_symbol = MFC_SYMBOL_MAP.get(fund_code.upper(), fund_code).upper()
         soup = BeautifulSoup(html_content, 'html.parser')
-        clean_code = fund_code.replace(' ', '').lower() if fund_code else ""
-        clean_name = fund_name.replace(' ', '').lower() if fund_name else ""
 
-        for row in soup.find_all('tr'):
-            row_text = row.get_text(strip=True)
-            clean_row = row_text.replace(' ', '').lower()
+        # วนลูปหาบล็อก/แถวที่มีชื่อกองทุนอยู่
+        for element in soup.find_all(['tr', 'div']):
+            text = element.get_text(separator=' ', strip=True)
             
-            is_match = False
-            if clean_code and clean_code in clean_row:
-                is_match = True
-            elif clean_name and clean_name in clean_row:
-                is_match = True
-
-            if is_match:
-                numbers = re.findall(r'\d+\.\d{4}', row_text)
+            # เช็กว่ามีชื่อกองทุนตรงๆ เช่น "MGTECH" หรือ "MGFPVD"
+            if target_symbol in text.split():
+                # ดึงตัวเลขทศนิยม 4 ตำแหน่งทั้งหมดในบล็อกนั้น
+                # โครงสร้างตาราง MFC: [วันที่] [NAV] [เปลี่ยนแปลง] [ราคาเสนอขาย] [ราคาขายคืน]
+                numbers = re.findall(r'\b\d+\.\d{4}\b', text)
                 if numbers:
-                    return float(numbers[0])
+                    # ตัวเลขชุดแรกของบล็อกคือค่า NAV ปัจจุบันเสมอ (เช่น 14.0630)
+                    nav_val = float(numbers[0])
+                    print(f"  🎯 ดึงสำเร็จ MFC [{fund_code} ➔ {target_symbol}]: {nav_val}")
+                    return nav_val
     except Exception as e:
-        print(f"⚠️ เกิดข้อผิดพลาดในการแกะข้อมูล MFC ({fund_code} / {fund_name}): {e}")
+        print(f"⚠️ เกิดข้อผิดพลาดในการแกะ MFC [{fund_code}]: {e}")
     return None
-
 # ----------------------------------------------------
 # 3. ฟังก์ชันดึง NAV แอปอื่นๆ (SCB / GPF / Dime)
 # ----------------------------------------------------
@@ -160,8 +159,7 @@ def fetch_and_update():
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
             if app == "mfc":
-                # ดึง NAV ปัจจุบันจากเว็บ MFC
-                latest_nav = get_nav_from_mfc_page(code, name, mfc_html)
+                latest_nav = get_mfc_nav_from_web(code, mfc_html)
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
