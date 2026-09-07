@@ -104,18 +104,19 @@
   <!-- ตารางข้อมูลอยู่ด้านล่างต่อตรงนี้ตามเดิม -->
       <table class="w-full text-left text-sm">
             <thead class="bg-slate-800/50">
-              <tr class="text-left text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
-                <th class="pb-3">แอป</th>
-                <th class="pb-3">รหัสสินทรัพย์</th>
-                <th class="pb-3">จำนวนหน่วย</th>
-                <th class="pb-3">NAV ปัจจุบัน</th>
-                <th class="pb-3">มูลค่ารวม (THB)</th>
-                <th class="pb-3">กำไร/ขาดทุน (%)</th>
-                <th class="pb-3">3M (%)</th>
-                <th class="pb-3">YTD (%)</th>
-                <th class="pb-3 text-center">จัดการ</th>
-              </tr>
-            </thead>
+  <tr class="text-left text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
+    <th class="pb-3">แอป</th>
+    <th class="pb-3">รหัสสินทรัพย์</th>
+    <th class="pb-3">จำนวนหน่วย</th>
+    <th class="pb-3">NAV ปัจจุบัน</th>
+    <th class="pb-3">มูลค่ารวม (THB)</th>
+    <th class="pb-3">กำไร/ขาดทุน (%)</th>
+    <th class="pb-3">สัดส่วน (จริง/เป้า)</th> <!-- 👈 แทรกคอลัมน์นี้เพิ่ม -->
+    <th class="pb-3">3M (%)</th>
+    <th class="pb-3">YTD (%)</th>
+    <th class="pb-3 text-center">จัดการ</th>
+  </tr>
+</thead>
             <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
               <!-- Data Rows injected here -->
             </tbody>
@@ -266,7 +267,7 @@ function renderAssetDetailsTable(data) {
   listEl.innerHTML = '';
 
   if (!data || data.length === 0) {
-    listEl.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
+    listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
     return;
   }
 
@@ -283,6 +284,22 @@ function renderAssetDetailsTable(data) {
     const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
     const sign = isProfit ? '+' : '';
 
+    // คำนวณ Rebalance Badge
+    const actualPct = item.actual_pct || 0;
+    const targetPct = item.target_pct || 0;
+    const diffPct = actualPct - targetPct;
+
+    let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
+    if (targetPct > 0) {
+      if (diffPct < -1) {
+        statusBadge = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
+      } else if (diffPct > 1) {
+        statusBadge = `<span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
+      } else {
+        statusBadge = `<span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
+      }
+    }
+
     listEl.innerHTML += `
       <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
         <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
@@ -291,11 +308,18 @@ function renderAssetDetailsTable(data) {
         <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
         <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
         <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
+        
+        <!-- แสดงสัดส่วน จริง % vs เป้า % และป้ายเตือน Rebalance -->
+        <td class="py-3">
+          <div class="text-xs font-semibold text-white">${formatNumber(actualPct, 1)}% <span class="text-slate-400 font-normal">/ ${formatNumber(targetPct, 1)}%</span></div>
+          <div class="mt-0.5">${statusBadge}</div>
+        </td>
+
         <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
         <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
         <td class="py-3 text-center">
           <div class="flex items-center justify-center gap-2">
-            <button onclick="openEditModal('${item.id}', '${item.asset_code}', ${item.units}, ${item.avg_nav})" 
+            <button onclick="openEditModal('${item.id}', '${item.asset_code}', ${item.units}, ${item.avg_nav}, ${item.target_pct || 0})" 
                     class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" 
                     title="แก้ไขรายการ">
               ✏️
@@ -308,34 +332,69 @@ function renderAssetDetailsTable(data) {
           </div>
         </td>
       </tr>
+      <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
+<div id="edit-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+  <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+    <h3 class="text-lg font-bold text-white mb-4" id="modal-title">แก้ไขรายการสินทรัพย์</h3>
+    
+    <input type="hidden" id="edit-id" />
+    
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">รหัสสินทรัพย์ / กองทุน</label>
+        <input type="text" id="edit-asset-code" disabled class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 text-sm focus:outline-none" />
+      </div>
+      <div>
+  <label class="block text-xs font-semibold text-slate-400 mb-1">สัดส่วนเป้าหมาย (Target %)</label>
+  <input type="number" step="any" id="edit-target-pct" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" placeholder="เช่น 20" />
+</div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">จำนวนหน่วย (Units)</label>
+        <input type="number" step="any" id="edit-units" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" />
+      </div>
+      
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">NAV ต้นทุนเฉลี่ย (Avg NAV)</label>
+        <input type="number" step="any" id="edit-avg-nav" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1">สัดส่วนเป้าหมาย (Target %)</label>
+        <input type="number" step="any" id="edit-target-pct" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" placeholder="เช่น 20" />
+      </div>
+    </div>
+    
+    <div class="flex justify-end gap-3 mt-6">
+      <button onclick="closeEditModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">ยกเลิก</button>
+      <button onclick="saveAssetEdit()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition">บันทึกข้อมูล</button>
+    </div>
+  </div>
+</div>
     `;
   });
 }
-// 2. ฟังก์ชันเปิด/ปิด Modal แก้ไข
-function openEditModal(id, code, units, avgNav) {
+// 1. ปรับฟังก์ชันเปิด Modal ให้รับค่า targetPct เพิ่ม
+function openEditModal(id, code, units, avgNav, targetPct = 0) {
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-asset-code').value = code;
   document.getElementById('edit-units').value = units;
   document.getElementById('edit-avg-nav').value = avgNav;
+  document.getElementById('edit-target-pct').value = targetPct;
   document.getElementById('edit-modal').classList.remove('hidden');
 }
 
-function closeEditModal() {
-  document.getElementById('edit-modal').classList.add('hidden');
-}
-
-// 3. ฟังก์ชันบันทึกการแก้ไขไปยัง Supabase
+// 2. ปรับฟังก์ชัน saveAssetEdit ส่งค่า target_pct ไปบันทึก
 async function saveAssetEdit() {
   const id = document.getElementById('edit-id').value;
   const units = parseFloat(document.getElementById('edit-units').value);
   const avgNav = parseFloat(document.getElementById('edit-avg-nav').value);
+  const targetPct = parseFloat(document.getElementById('edit-target-pct').value) || 0;
 
   if (isNaN(units) || isNaN(avgNav)) {
     alert('กรุณากรอกตัวเลขจำนวนหน่วยและ NAV ต้นทุนให้ถูกต้อง');
     return;
   }
 
-  // คำนวณต้นทุนรวมใหม่
   const totalCost = units * avgNav;
 
   const { error } = await supabaseClient
@@ -344,6 +403,7 @@ async function saveAssetEdit() {
       units: units, 
       avg_nav: avgNav, 
       total_cost: totalCost,
+      target_pct: targetPct,
       updated_at: new Date()
     })
     .eq('id', id);
@@ -354,7 +414,6 @@ async function saveAssetEdit() {
   }
 
   closeEditModal();
-  // โหลดข้อมูลภาพรวมพอร์ตใหม่ทันที
   fetchSummary();
   fetchAppAllocation();
   fetchAssetDetails();
