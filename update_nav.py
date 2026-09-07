@@ -24,12 +24,22 @@ HEADERS = {
 }
 
 # ----------------------------------------------------
-# 2. ฟังก์ชันดึง NAV ปัจจุบันจากเว็บ MFC (https://mfcfund.com/unit-value/)
+# 2. ฟังก์ชันดึงและแกะ NAV จากหน้าเว็บ MFC (https://mfcfund.com/unit-value/)
 # ----------------------------------------------------
-# ----------------------------------------------------
-# ฟังก์ชันแกะ NAV จากหน้าเว็บ mfcfund.com/unit-value/
-# ----------------------------------------------------
-# แมป Asset Code บน Supabase เข้ากับ ชื่อย่อกองทุน บนหน้าเว็บ MFC
+def fetch_mfc_html_content():
+    target_url = "https://mfcfund.com/unit-value/"
+    try:
+        print("🌐 กำลังโหลดข้อมูลจาก https://mfcfund.com/unit-value/...")
+        res = requests.get(target_url, headers=HEADERS, timeout=20)
+        if res.status_code == 200:
+            return res.text
+        else:
+            print(f"❌ ไม่สามารถเข้าถึงหน้าเว็บ MFC ได้ Status Code: {res.status_code}")
+    except Exception as e:
+        print(f"❌ Error fetching MFC Website: {e}")
+    return ""
+
+# แมป Asset Code บน Supabase เข้ากับ ชื่อกองทุนบนหน้าเว็บ MFC
 MFC_SYMBOL_MAP = {
     'MPF07': 'IGOLD-G',
     'MPF15': 'MGTECH',
@@ -44,27 +54,25 @@ def get_mfc_nav_from_web(fund_code, html_content):
     if not html_content:
         return None
     try:
-        # แปลงรหัส เช่น MPF15 -> MGTECH
         target_symbol = MFC_SYMBOL_MAP.get(fund_code.upper(), fund_code).upper()
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # วนลูปหาบล็อก/แถวที่มีชื่อกองทุนอยู่
+        # วนลูปหาแถวหรือบล็อกที่มีชื่อกองทุนอยู่
         for element in soup.find_all(['tr', 'div']):
             text = element.get_text(separator=' ', strip=True)
             
-            # เช็กว่ามีชื่อกองทุนตรงๆ เช่น "MGTECH" หรือ "MGFPVD"
             if target_symbol in text.split():
-                # ดึงตัวเลขทศนิยม 4 ตำแหน่งทั้งหมดในบล็อกนั้น
-                # โครงสร้างตาราง MFC: [วันที่] [NAV] [เปลี่ยนแปลง] [ราคาเสนอขาย] [ราคาขายคืน]
+                # ดึงตัวเลขทศนิยม 4 ตำแหน่งทั้งหมดในแถวนั้น
                 numbers = re.findall(r'\b\d+\.\d{4}\b', text)
                 if numbers:
-                    # ตัวเลขชุดแรกของบล็อกคือค่า NAV ปัจจุบันเสมอ (เช่น 14.0630)
+                    # ตัวเลขชุดแรกของบล็อกคือค่า NAV ปัจจุบัน (เช่น 14.0630)
                     nav_val = float(numbers[0])
-                    print(f"  🎯 ดึงสำเร็จ MFC [{fund_code} ➔ {target_symbol}]: {nav_val}")
+                    print(f"  🎯 แกะสำเร็จ MFC [{fund_code} ➔ {target_symbol}]: {nav_val}")
                     return nav_val
     except Exception as e:
         print(f"⚠️ เกิดข้อผิดพลาดในการแกะ MFC [{fund_code}]: {e}")
     return None
+
 # ----------------------------------------------------
 # 3. ฟังก์ชันดึง NAV แอปอื่นๆ (SCB / GPF / Dime)
 # ----------------------------------------------------
@@ -136,7 +144,7 @@ def fetch_and_update():
         now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
         today_date_str = now_thai_dt.strftime('%d/%m/%Y')
 
-        # 1. โหลดหน้า HTML ของ MFC และข้อมูล GPF
+        # 1. โหลดข้อมูลล่วงหน้า
         mfc_html = fetch_mfc_html_content()
         gpf_nav_data = get_gpf_nav_direct()
 
@@ -167,9 +175,9 @@ def fetch_and_update():
             elif app == "dime":
                 latest_nav = get_us_stock_price(code)
 
-            # อัปเดตเฉพาะ current_nav และ current_value (ไม่กระทบต้นทุนและหน่วย)
             final_nav = latest_nav if (latest_nav and latest_nav > 0) else current_nav
             
+            # อัปเดตเฉพาะ current_nav และ current_value ลง user_portfolios
             if latest_nav and latest_nav != current_nav:
                 supabase.table('user_portfolios').update({
                     'current_nav': final_nav,
