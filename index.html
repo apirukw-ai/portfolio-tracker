@@ -263,13 +263,14 @@ function filterAssetDetails(appSource) {
 function renderAssetDetailsTable(data) {
   const listEl = document.getElementById('asset-details-list');
   if (!listEl) return;
-  listEl.innerHTML = '';
+  listEl.innerHTML = ''; // ล้างข้อมูลเก่าก่อนวาดใหม่
 
   if (data.length === 0) {
     listEl.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
     return;
   }
 
+  // วาดเฉพาะแถวข้อมูลสินทรัพย์ลงใน <tbody> (ห้ามเขียนหัวตารางซ้ำในนี้)
   data.forEach(item => {
     const pnlPct = item.unrealized_pnl_pct || 0;
     const isProfit = pnlPct >= 0;
@@ -286,8 +287,6 @@ function renderAssetDetailsTable(data) {
         <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
         <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
         <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
-        
-        <!-- ปุ่มแก้ไข / ลบ -->
         <td class="py-3 text-center">
           <div class="flex items-center justify-center gap-2">
             <button onclick="openEditModal('${item.id}', '${item.asset_code}', ${item.units}, ${item.avg_nav})" 
@@ -306,7 +305,6 @@ function renderAssetDetailsTable(data) {
     `;
   });
 }
-
 // 2. ฟังก์ชันเปิด/ปิด Modal แก้ไข
 function openEditModal(id, code, units, avgNav) {
   document.getElementById('edit-id').value = id;
