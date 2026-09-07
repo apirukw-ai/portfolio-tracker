@@ -24,35 +24,51 @@ HEADERS = {
 }
 
 # ----------------------------------------------------
-# 2. ฟังก์ชันดึง NAV แต่ละแหล่งข้อมูล
+# 2. ฟังก์ชันดึง NAV ปัจจุบันจากเว็บ MFC (https://mfcfund.com/unit-value/)
 # ----------------------------------------------------
-
-# [MFC] ดึง NAV MFC ผ่าน API เดียวกับหน้าเว็บเดิม
-MFC_SYMBOL_MAP = {
-    'MPF07': 'IGOLD-G',
-    'MPF15': 'MGTECH',
-    'MPF18': 'M-EM',
-    'MPF19': 'MEURO-G',
-    'MPF23': 'MGFPVD',
-    'MPF27': 'M-ASIA',
-    'MPF16': 'M-FM'
-}
-
-def get_mfc_nav_from_api(code):
-    search_symbol = MFC_SYMBOL_MAP.get(code.upper(), code)
+def fetch_mfc_html_content():
+    target_url = "https://mfcfund.com/unit-value/"
     try:
-        url_target = f"https://apirukw-ai.github.io/MFCN-tracker/get-nav?fund={search_symbol}"
-        res = requests.get(url_target, headers=HEADERS, timeout=10)
+        print("🌐 กำลังโหลดข้อมูลจาก https://mfcfund.com/unit-value/...")
+        res = requests.get(target_url, headers=HEADERS, timeout=20)
         if res.status_code == 200:
-            data = res.json()
-            nav_val = data.get('nav') or data.get('price') or data.get('value')
-            if nav_val:
-                return float(nav_val)
+            return res.text
+        else:
+            print(f"❌ ไม่สามารถเข้าถึงหน้าเว็บ MFC ได้ Status Code: {res.status_code}")
     except Exception as e:
-        print(f"⚠️ ดึง API MFC ({search_symbol}) ไม่สำเร็จ: {e}")
+        print(f"❌ Error fetching MFC Website: {e}")
+    return ""
+
+def get_nav_from_mfc_page(fund_code, fund_name, html_content):
+    """ ค้นหาตัวเลข NAV โดยใช้ทั้งรหัสกองทุน และ ชื่อกองทุน จากหน้าเว็บ MFC """
+    if not html_content:
+        return None
+    try:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        clean_code = fund_code.replace(' ', '').lower() if fund_code else ""
+        clean_name = fund_name.replace(' ', '').lower() if fund_name else ""
+
+        for row in soup.find_all('tr'):
+            row_text = row.get_text(strip=True)
+            clean_row = row_text.replace(' ', '').lower()
+            
+            is_match = False
+            if clean_code and clean_code in clean_row:
+                is_match = True
+            elif clean_name and clean_name in clean_row:
+                is_match = True
+
+            if is_match:
+                numbers = re.findall(r'\d+\.\d{4}', row_text)
+                if numbers:
+                    return float(numbers[0])
+    except Exception as e:
+        print(f"⚠️ เกิดข้อผิดพลาดในการแกะข้อมูล MFC ({fund_code} / {fund_name}): {e}")
     return None
 
-# [SCB] ดึงผ่าน WealthX
+# ----------------------------------------------------
+# 3. ฟังก์ชันดึง NAV แอปอื่นๆ (SCB / GPF / Dime)
+# ----------------------------------------------------
 def get_scb_nav_wealthx(code):
     clean = code.strip()
     variations = [clean, clean.replace('(', '').replace(')', ''), clean.replace('(E)', '-E')]
@@ -73,7 +89,6 @@ def get_scb_nav_wealthx(code):
             pass
     return None
 
-# [GPF] ดึงหน้าเว็บ กบข.
 def get_gpf_nav_direct():
     nav_map = {}
     try:
@@ -102,7 +117,6 @@ def get_gpf_nav_direct():
         print(f"⚠️ GPF Fetch Error: {e}")
     return nav_map
 
-# [DIME] ดึงราคาหุ้น US
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
@@ -114,7 +128,7 @@ def get_us_stock_price(symbol):
     return None
 
 # ----------------------------------------------------
-# 3. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง user_portfolios
+# 4. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง user_portfolios
 # ----------------------------------------------------
 def fetch_and_update():
     try:
@@ -123,10 +137,11 @@ def fetch_and_update():
         now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
         today_date_str = now_thai_dt.strftime('%d/%m/%Y')
 
-        # โหลดข้อมูล GPF
+        # 1. โหลดหน้า HTML ของ MFC และข้อมูล GPF
+        mfc_html = fetch_mfc_html_content()
         gpf_nav_data = get_gpf_nav_direct()
 
-        # ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
+        # 2. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
         db_res = supabase.table('user_portfolios').select('*').execute()
         portfolio_items = db_res.data or []
 
@@ -135,7 +150,7 @@ def fetch_and_update():
         for item in portfolio_items:
             item_id = item["id"]
             app = item.get("app_source", "").lower()
-            code = item.get("asset_code", "").strip().upper()
+            code = item.get("asset_code", "").strip()
             name = item.get("asset_name", "")
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
@@ -145,7 +160,8 @@ def fetch_and_update():
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
             if app == "mfc":
-                latest_nav = get_mfc_nav_from_api(code)
+                # ดึง NAV ปัจจุบันจากเว็บ MFC
+                latest_nav = get_nav_from_mfc_page(code, name, mfc_html)
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
@@ -153,9 +169,9 @@ def fetch_and_update():
             elif app == "dime":
                 latest_nav = get_us_stock_price(code)
 
+            # อัปเดตเฉพาะ current_nav และ current_value (ไม่กระทบต้นทุนและหน่วย)
             final_nav = latest_nav if (latest_nav and latest_nav > 0) else current_nav
             
-            # อัปเดตราคาและวันที่ประกาศ NAV ลง user_portfolios
             if latest_nav and latest_nav != current_nav:
                 supabase.table('user_portfolios').update({
                     'current_nav': final_nav,
@@ -171,7 +187,7 @@ def fetch_and_update():
                 }).eq('id', item_id).execute()
                 print(f" ℹ️ {code} ราคาล่าสุด: {final_nav} (อัปเดตสถานะเสร็จสิ้น)")
 
-        print(f"✅ อัปเดตระบบเสร็จสิ้นเมื่อ: {now_thai}")
+        print(f"✅ อัปเดต NAV ปัจจุบันเสร็จสิ้นเมื่อ: {now_thai}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
