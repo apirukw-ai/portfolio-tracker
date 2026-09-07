@@ -170,20 +170,17 @@ def fetch_and_update():
     try:
         thai_tz = timezone(timedelta(hours=7))
         now_thai_dt = datetime.now(thai_tz)
-        now_thai = now_thai_dt.strftime("%d/%m/%Y %H:%M:%S")
-        today_date_str = now_thai_dt.strftime("%d/%m/%Y")
+        now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
+        today_date_str = now_thai_dt.strftime('%d/%m/%Y')
 
-        # 1. โหลดข้อมูลล่วงหน้า
-        mfc_html = fetch_mfc_html_content()
+        # 1. โหลดข้อมูล GPF ล่วงหน้า
         gpf_nav_data = get_gpf_nav_direct()
 
         # 2. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
-        db_res = supabase.table("user_portfolios").select("*").execute()
+        db_res = supabase.table('user_portfolios').select('*').execute()
         portfolio_items = db_res.data or []
 
-        print(
-            f"📦 พบรายการสินทรัพย์ทั้งหมด {len(portfolio_items)} รายการ"
-        )
+        print(f"📦 พบรายการสินทรัพย์ทั้งหมด {len(portfolio_items)} รายการ")
 
         for item in portfolio_items:
             item_id = item["id"]
@@ -197,11 +194,14 @@ def fetch_and_update():
 
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
+            # ดึง NAV และ วันที่ ตามประเภทแอป
             if app in ["mfc", "mfc_fund"]:
-                # อ่านราคา NAV ที่ถูกต้องของ MFC จากตาราง policies ใน Supabase
-                p_res = supabase.table('policies').select('nav').eq('code', code).execute()
+                p_res = supabase.table('policies').select('nav, updated_at').eq('code', code).execute()
                 if p_res.data and len(p_res.data) > 0:
                     latest_nav = float(p_res.data[0]['nav'])
+                    policy_date = p_res.data[0].get('updated_at')
+                    if policy_date:
+                        nav_date = policy_date
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
@@ -209,39 +209,28 @@ def fetch_and_update():
             elif app == "dime":
                 latest_nav = get_us_stock_price(code)
 
-            final_nav = (
-                latest_nav
-                if (latest_nav and latest_nav > 0)
-                else current_nav
-            )
-
-            # อัปเดตเฉพาะ current_nav และ current_value ลง user_portfolios
+            final_nav = latest_nav if (latest_nav and latest_nav > 0) else current_nav
+            
+            # อัปเดตทั้ง current_nav, current_value และ nav_date ลง user_portfolios
             if latest_nav and latest_nav != current_nav:
-                supabase.table("user_portfolios").update(
-                    {
-                        "current_nav": final_nav,
-                        "current_value": units * final_nav,
-                        "nav_date": nav_date,
-                        "updated_at": now_thai,
-                    }
-                ).eq("id", item_id).execute()
-                print(
-                    f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav}"
-                )
+                supabase.table('user_portfolios').update({
+                    'current_nav': final_nav,
+                    'current_value': units * final_nav,
+                    'nav_date': nav_date,
+                    'updated_at': now_thai
+                }).eq('id', item_id).execute()
+                print(f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav} ({nav_date})")
             else:
-                supabase.table("user_portfolios").update(
-                    {"nav_date": nav_date, "updated_at": now_thai}
-                ).eq("id", item_id).execute()
-                print(
-                    f" ℹ️ {code} ราคาล่าสุด: {final_nav}"
-                    " (อัปเดตสถานะเสร็จสิ้น)"
-                )
+                supabase.table('user_portfolios').update({
+                    'nav_date': nav_date,
+                    'updated_at': now_thai
+                }).eq('id', item_id).execute()
+                print(f" ℹ️ {code} ราคาล่าสุด: {final_nav} ({nav_date}) (อัปเดตสถานะเสร็จสิ้น)")
 
         print(f"✅ อัปเดต NAV ปัจจุบันเสร็จสิ้นเมื่อ: {now_thai}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
-
 
 if __name__ == "__main__":
     fetch_and_update()
