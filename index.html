@@ -284,7 +284,6 @@ function renderAssetDetailsTable(data) {
     const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
     const sign = isProfit ? '+' : '';
 
-    // คำนวณ Rebalance Badge
     const actualPct = item.actual_pct || 0;
     const targetPct = item.target_pct || 0;
     const diffPct = actualPct - targetPct;
@@ -309,7 +308,6 @@ function renderAssetDetailsTable(data) {
         <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
         <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
         
-        <!-- แสดงสัดส่วน จริง % vs เป้า % และป้ายเตือน Rebalance -->
         <td class="py-3">
           <div class="text-xs font-semibold text-white">${formatNumber(actualPct, 1)}% <span class="text-slate-400 font-normal">/ ${formatNumber(targetPct, 1)}%</span></div>
           <div class="mt-0.5">${statusBadge}</div>
@@ -317,14 +315,16 @@ function renderAssetDetailsTable(data) {
 
         <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
         <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+        
+        <!-- ส่งเฉพาะ ID เข้าไป ไม่ต้องส่งชื่อภาษาไทยผ่าน HTML onclick เพื่อกัน Syntax Error -->
         <td class="py-3 text-center">
           <div class="flex items-center justify-center gap-2">
-            <button onclick="openEditModal('${item.id}', '${item.asset_code}', ${item.units}, ${item.avg_nav}, ${item.target_pct || 0})" 
+            <button onclick="openEditModalById('${item.id}')" 
                     class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" 
                     title="แก้ไขรายการ">
               ✏️
             </button>
-            <button onclick="deleteAsset('${item.id}', '${item.asset_code}')" 
+            <button onclick="deleteAssetById('${item.id}')" 
                     class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" 
                     title="ลบรายการ">
               🗑️
@@ -332,6 +332,9 @@ function renderAssetDetailsTable(data) {
           </div>
         </td>
       </tr>
+    `;
+  });
+}
       <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
 <div id="edit-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
   <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -381,6 +384,32 @@ function closeEditModal() {
   document.getElementById('edit-modal').classList.add('hidden');
 }
 
+// ฟังก์ชันเปิด Modal แก้ไขโดยค้นจาก ID ปลอดภัย 100% ไม่พังเรื่องอักขระภาษาไทย
+function openEditModalById(id) {
+  const item = globalAssetDetails.find(i => i.id === id);
+  if (!item) return;
+
+  document.getElementById('edit-id').value = item.id;
+  document.getElementById('edit-asset-code').value = getReadableAssetName(item);
+  document.getElementById('edit-units').value = item.units || 0;
+  document.getElementById('edit-avg-nav').value = item.avg_nav || 0;
+  document.getElementById('edit-target-pct').value = item.target_pct || 0;
+  
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+// ฟังก์ชันลบสินทรัพย์โดยค้นจาก ID ปลอดภัยจาก Syntax Error
+async function deleteAssetById(id) {
+  const item = globalAssetDetails.find(i => i.id === id);
+  const codeName = item ? getReadableAssetName(item) : 'รายการนี้';
+
+  if (!confirm(`คุณต้องการลบรายการ [${codeName}] ออกจากพอร์ตใช่หรือไม่?`)) return;
+
+  const { error } = await supabaseClient
+    .from('user_portfolios')
+    .delete()
+    .eq('id', id);
+
 async function saveAssetEdit() {
   try {
     const id = document.getElementById('edit-id').value;
@@ -395,7 +424,7 @@ async function saveAssetEdit() {
 
     const totalCost = units * avgNav;
 
-    const { data, error } = await supabaseClient
+    const { error } = await supabaseClient
       .from('user_portfolios')
       .update({ 
         units: units, 
@@ -412,19 +441,17 @@ async function saveAssetEdit() {
     }
 
     closeEditModal();
-    
-    // รีโหลดข้อมูลใหม่ทั้งหมด
-    if (typeof fetchSummary === 'function') fetchSummary();
-    if (typeof fetchAppAllocation === 'function') fetchAppAllocation();
-    if (typeof fetchAssetDetails === 'function') fetchAssetDetails();
+    refreshDashboard(); // 👈 เรียกใช้ฟังก์ชันกลางสั้นๆ ตรงนี้ได้เลย
     
   } catch (err) {
     alert('System Error: ' + err.message);
   }
 }
-// 4. ฟังก์ชันลบสินทรัพย์จาก Supabase
-async function deleteAsset(id, code) {
-  if (!confirm(`คุณต้องการลบรายการ [${code}] ออกจากพอร์ตใช่หรือไม่?`)) return;
+async function deleteAssetById(id) {
+  const item = globalAssetDetails.find(i => i.id === id);
+  const codeName = item ? getReadableAssetName(item) : 'รายการนี้';
+
+  if (!confirm(`คุณต้องการลบรายการ [${codeName}] ออกจากพอร์ตใช่หรือไม่?`)) return;
 
   const { error } = await supabaseClient
     .from('user_portfolios')
@@ -436,11 +463,9 @@ async function deleteAsset(id, code) {
     return;
   }
 
-  // โหลดข้อมูลภาพรวมพอร์ตใหม่ทันที
-  fetchSummary();
-  fetchAppAllocation();
-  fetchAssetDetails();
+  refreshDashboard(); // 👈 เรียกใช้ฟังก์ชันกลางสั้นๆ ตรงนี้ได้เลย
 }
+    
     // วาดกราฟ Donut
     function renderChart(labels, dataValues) {
       const ctx = document.getElementById('allocationChart').getContext('2d');
