@@ -103,39 +103,25 @@
 
   <!-- ตารางข้อมูลอยู่ด้านล่างต่อตรงนี้ตามเดิม -->
       <table class="w-full text-left text-sm">
-        <thead class="text-slate-400 border-b border-slate-700">
-          <tr>
-            <th class="pb-3">แอป</th>
-            <th class="pb-3">รหัสสินทรัพย์</th>
-            <th class="pb-3">จำนวนหน่วย</th>
-            <th class="pb-3">NAV ปัจจุบัน</th>
-            <th class="pb-3">มูลค่ารวม (THB)</th>
-            <th class="pb-3">กำไร/ขาดทุน (%)</th>
-            <th class="pb-3">3M (%)</th>
-            <th class="pb-3">YTD (%)</th>
-          </tr>
-        </thead>
-        <thead class="bg-slate-800/50">
-  <tr class="text-left text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
-    <th class="pb-3">แอป</th>
-    <th class="pb-3">รหัสสินทรัพย์</th>
-    <th class="pb-3">จำนวนหน่วย</th>
-    <th class="pb-3">NAV ปัจจุบัน</th>
-    <th class="pb-3">มูลค่ารวม (THB)</th>
-    <th class="pb-3">กำไร/ขาดทุน (%)</th>
-    <th class="pb-3">3M (%)</th>
-    <th class="pb-3">YTD (%)</th>
-    <th class="pb-3 text-center">จัดการ</th>
-  </tr>
-</thead>
-        <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
-          <!-- Data Rows injected here -->
-        </tbody>
-      </table>
-    </div>
-
-  </div>
-
+            <thead class="bg-slate-800/50">
+              <tr class="text-left text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
+                <th class="pb-3">แอป</th>
+                <th class="pb-3">รหัสสินทรัพย์</th>
+                <th class="pb-3">จำนวนหน่วย</th>
+                <th class="pb-3">NAV ปัจจุบัน</th>
+                <th class="pb-3">มูลค่ารวม (THB)</th>
+                <th class="pb-3">กำไร/ขาดทุน (%)</th>
+                <th class="pb-3">3M (%)</th>
+                <th class="pb-3">YTD (%)</th>
+                <th class="pb-3 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
+              <!-- Data Rows injected here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
   <script>
     // ----------------------------------------------------
     // 1. ตั้งค่าการเชื่อมต่อ Supabase
