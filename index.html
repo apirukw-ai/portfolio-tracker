@@ -115,6 +115,19 @@
             <th class="pb-3">YTD (%)</th>
           </tr>
         </thead>
+        <thead class="bg-slate-800/50">
+  <tr class="text-left text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
+    <th class="pb-3">แอป</th>
+    <th class="pb-3">รหัสสินทรัพย์</th>
+    <th class="pb-3">จำนวนหน่วย</th>
+    <th class="pb-3">NAV ปัจจุบัน</th>
+    <th class="pb-3">มูลค่ารวม (THB)</th>
+    <th class="pb-3">กำไร/ขาดทุน (%)</th>
+    <th class="pb-3">3M (%)</th>
+    <th class="pb-3">YTD (%)</th>
+    <th class="pb-3 text-center">จัดการ</th>
+  </tr>
+</thead>
         <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
           <!-- Data Rows injected here -->
         </tbody>
@@ -246,14 +259,14 @@ function filterAssetDetails(appSource) {
   }
 }
 
-// 3. ฟังก์ชันวาดตารางแสดงผล
+// 1. วาดตารางแสดงผลพร้อมปุ่มจัดการ
 function renderAssetDetailsTable(data) {
   const listEl = document.getElementById('asset-details-list');
   if (!listEl) return;
   listEl.innerHTML = '';
 
   if (data.length === 0) {
-    listEl.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
+    listEl.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
     return;
   }
 
@@ -273,9 +286,94 @@ function renderAssetDetailsTable(data) {
         <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
         <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
         <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+        
+        <!-- ปุ่มแก้ไข / ลบ -->
+        <td class="py-3 text-center">
+          <div class="flex items-center justify-center gap-2">
+            <button onclick="openEditModal('${item.id}', '${item.asset_code}', ${item.units}, ${item.avg_nav})" 
+                    class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" 
+                    title="แก้ไขรายการ">
+              ✏️
+            </button>
+            <button onclick="deleteAsset('${item.id}', '${item.asset_code}')" 
+                    class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" 
+                    title="ลบรายการ">
+              🗑️
+            </button>
+          </div>
+        </td>
       </tr>
     `;
   });
+}
+
+// 2. ฟังก์ชันเปิด/ปิด Modal แก้ไข
+function openEditModal(id, code, units, avgNav) {
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-asset-code').value = code;
+  document.getElementById('edit-units').value = units;
+  document.getElementById('edit-avg-nav').value = avgNav;
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.add('hidden');
+}
+
+// 3. ฟังก์ชันบันทึกการแก้ไขไปยัง Supabase
+async function saveAssetEdit() {
+  const id = document.getElementById('edit-id').value;
+  const units = parseFloat(document.getElementById('edit-units').value);
+  const avgNav = parseFloat(document.getElementById('edit-avg-nav').value);
+
+  if (isNaN(units) || isNaN(avgNav)) {
+    alert('กรุณากรอกตัวเลขจำนวนหน่วยและ NAV ต้นทุนให้ถูกต้อง');
+    return;
+  }
+
+  // คำนวณต้นทุนรวมใหม่
+  const totalCost = units * avgNav;
+
+  const { error } = await supabaseClient
+    .from('user_portfolios')
+    .update({ 
+      units: units, 
+      avg_nav: avgNav, 
+      total_cost: totalCost,
+      updated_at: new Date()
+    })
+    .eq('id', id);
+
+  if (error) {
+    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + error.message);
+    return;
+  }
+
+  closeEditModal();
+  // โหลดข้อมูลภาพรวมพอร์ตใหม่ทันที
+  fetchSummary();
+  fetchAppAllocation();
+  fetchAssetDetails();
+}
+
+// 4. ฟังก์ชันลบสินทรัพย์จาก Supabase
+async function deleteAsset(id, code) {
+  if (!confirm(`คุณต้องการลบรายการ [${code}] ออกจากพอร์ตใช่หรือไม่?`)) return;
+
+  const { error } = await supabaseClient
+    .from('user_portfolios')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    alert('เกิดข้อผิดพลาดในการลบรายการ: ' + error.message);
+    return;
+  }
+
+  // โหลดข้อมูลภาพรวมพอร์ตใหม่ทันที
+  fetchSummary();
+  fetchAppAllocation();
+  fetchAssetDetails();
 }
     // วาดกราฟ Donut
     function renderChart(labels, dataValues) {
