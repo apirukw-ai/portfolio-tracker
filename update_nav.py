@@ -27,9 +27,7 @@ HEADERS = {
 # 2. ฟังก์ชันดึง NAV แต่ละแหล่งข้อมูล
 # ----------------------------------------------------
 
-# ----------------------------------------------------
-# ฟังก์ชันดึง NAV ของ MFC ผ่าน API เดียวกับหน้าเว็บเดิม (แม่นยำ 100%)
-# ----------------------------------------------------
+# [MFC] ดึง NAV MFC ผ่าน API เดียวกับหน้าเว็บเดิม
 MFC_SYMBOL_MAP = {
     'MPF07': 'IGOLD-G',
     'MPF15': 'MGTECH',
@@ -41,24 +39,17 @@ MFC_SYMBOL_MAP = {
 }
 
 def get_mfc_nav_from_api(code):
-    """ ยิงดึง NAV MFC ผ่าน API เดียวกับหน้าเว็บเดิม """
-    # แปลงรหัส เช่น MPF07 -> IGOLD-G
     search_symbol = MFC_SYMBOL_MAP.get(code.upper(), code)
-    
     try:
-        # ดึง domain จาก origin ของหน้าเว็บเดิม
-        url = f"https://apirukw-ai.github.io/MFCN-tracker/get-nav?fund={search_symbol}"
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        
+        url_target = f"https://apirukw-ai.github.io/MFCN-tracker/get-nav?fund={search_symbol}"
+        res = requests.get(url_target, headers=HEADERS, timeout=10)
         if res.status_code == 200:
             data = res.json()
-            # รองรับโครงสร้าง Response ของ API
             nav_val = data.get('nav') or data.get('price') or data.get('value')
             if nav_val:
                 return float(nav_val)
     except Exception as e:
         print(f"⚠️ ดึง API MFC ({search_symbol}) ไม่สำเร็จ: {e}")
-    
     return None
 
 # [SCB] ดึงผ่าน WealthX
@@ -132,11 +123,10 @@ def fetch_and_update():
         now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
         today_date_str = now_thai_dt.strftime('%d/%m/%Y')
 
-        # 1. โหลดข้อมูลเตรียมไว้ก่อน
-        mfc_policies_data = get_mfc_nav_from_supabase_policies()
+        # โหลดข้อมูล GPF
         gpf_nav_data = get_gpf_nav_direct()
 
-        # 2. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
+        # ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
         db_res = supabase.table('user_portfolios').select('*').execute()
         portfolio_items = db_res.data or []
 
