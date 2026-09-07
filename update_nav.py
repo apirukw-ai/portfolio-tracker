@@ -197,8 +197,11 @@ def fetch_and_update():
 
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
-            if app == "mfc":
-                latest_nav = get_mfc_nav_from_web(code, mfc_html)
+            if app in ["mfc", "mfc_fund"]:
+                # อ่านราคา NAV ที่ถูกต้องของ MFC จากตาราง policies ใน Supabase
+                p_res = supabase.table('policies').select('nav').eq('code', code).execute()
+                if p_res.data and len(p_res.data) > 0:
+                    latest_nav = float(p_res.data[0]['nav'])
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
