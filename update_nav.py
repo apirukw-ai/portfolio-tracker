@@ -28,27 +28,22 @@ HEADERS = {
 # ----------------------------------------------------
 
 # ----------------------------------------------------
-# ฟังก์ชันดึง NAV ของ MFC จาก Firebase โดยตรง (แม่นยำ 100%)
+# ฟังก์ชันดึง NAV ของ MFC จากตาราง policies บน Supabase
 # ----------------------------------------------------
-def get_mfc_nav_from_firebase():
-    """ ดึงข้อมูล NAV ของ MFC ที่บันทึกไว้ใน Firebase Realtime Database """
+def get_mfc_nav_from_supabase_policies():
+    """ ดึงข้อมูล NAV ของ MFC จากตาราง policies บน Supabase โดยตรง """
     mfc_map = {}
     try:
-        url = "https://scb-e-class-default-rtdb.asia-southeast1.firebasedatabase.app/mfc_ports.json"
-        res = requests.get(url, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            # รองรับทั้งแบบ List หรือ Dict
-            items = data if isinstance(data, list) else data.get('funds', []) if isinstance(data, dict) else []
-            for item in items:
-                if isinstance(item, dict):
-                    code = item.get('code')
-                    nav = item.get('nav') or item.get('currentNav')
-                    if code and nav:
-                        mfc_map[code.strip().upper()] = float(nav)
-            print(f"✅ โหลดข้อมูล NAV MFC จาก Firebase สำเร็จ ({len(mfc_map)} รายการ)")
+        res = supabase.table('policies').select('code, nav').execute()
+        if res.data:
+            for item in res.data:
+                code = item.get('code')
+                nav = item.get('nav')
+                if code and nav:
+                    mfc_map[code.strip().upper()] = float(nav)
+            print(f"✅ โหลดข้อมูล NAV MFC จากตาราง policies สำเร็จ ({len(mfc_map)} รายการ)")
     except Exception as e:
-        print(f"⚠️ ดึงข้อมูล MFC จาก Firebase ไม่สำเร็จ: {e}")
+        print(f"⚠️ ดึงข้อมูล MFC จากตาราง policies ไม่สำเร็จ: {e}")
     return mfc_map
 
 # [SCB] ดึงผ่าน WealthX
@@ -121,13 +116,13 @@ def fetch_and_update():
         now_thai_dt = datetime.now(thai_tz)
         now_thai = now_thai_dt.strftime('%d/%m/%Y %H:%M:%S')
 
-        # 1. โหลดข้อมูล MFC จาก Firebase
-        mfc_firebase_data = get_mfc_nav_from_firebase()
+        # 1. โหลด NAV MFC จากตาราง policies ใน Supabase
+        mfc_policies_data = get_mfc_nav_from_supabase_policies()
 
         # 2. โหลดข้อมูล GPF
         gpf_nav_data = get_gpf_nav_direct()
 
-        # 3. ดึงรายการสินทรัพย์ทั้งหมดจาก Supabase
+        # 3. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios ใน Supabase
         db_res = supabase.table('user_portfolios').select('*').execute()
         portfolio_items = db_res.data or []
 
@@ -145,8 +140,8 @@ def fetch_and_update():
             print(f"🔄 กำลังดึง NAV ของ [{app.upper()}] {code} - {name}...")
 
             if app == "mfc":
-                # ดึงตรงจาก Firebase Map
-                latest_nav = mfc_firebase_data.get(code)
+                # ดึงค่าตรงจากตาราง policies
+                latest_nav = mfc_policies_data.get(code)
             elif app == "scb":
                 latest_nav = get_scb_nav_wealthx(code)
             elif app == "gpf":
@@ -174,6 +169,3 @@ def fetch_and_update():
 
     except Exception as e:
         print(f"❌ Error: {e}")
-
-if __name__ == "__main__":
-    fetch_and_update()
