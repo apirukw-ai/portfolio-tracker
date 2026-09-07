@@ -1,30 +1,41 @@
-name: Auto Update NAV & Stock Prices
+name: Auto Update NAV
 
 on:
   schedule:
-    - cron: '0 13 * * 1-5' # รันทุกวันจันทร์-ศุกร์ เวลา 20:00 น. ไทย
-  workflow_dispatch: # ปุ่มกดสั่งรันเอง
+    # 1. Dime: 05:00 น. เวลาไทย (ตลาดหุ้น US ปิดทำการ)
+    - cron: '0 22 * * *'
+    
+    # 2. GPF: 10:15 น. เวลาไทย
+    - cron: '15 3 * * *'
+    
+    # 3. MFC: 19:30 น. เวลาไทย
+    - cron: '30 12 * * *'
+    
+    # 4. SCB: 20:30 น. เวลาไทย (NAV กองทุนไทยประกาศ)
+    - cron: '30 13 * * *'
+
+  # รองรับการกดปุ่มสั่งรันด้วยตนเอง (Manual Trigger)
+  workflow_dispatch:
 
 jobs:
   update-nav:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests supabase yfinance beautifulsoup4
+          pip install supabase requests beautifulsoup4
 
       - name: Run NAV Update Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python update_nav.py
