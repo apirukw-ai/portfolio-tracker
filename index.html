@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3309/3309991.png">
   <title>Investment Portfolio Dashboard</title>
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -512,6 +517,15 @@ function formatThaiDateTime(isoString) {
 }
     // เริ่มโหลดข้อมูลเมื่อเปิดหน้าเว็บ
     window.onload = loadDashboardData;
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('✅ PWA Service Worker Registered!'))
+        .catch(err => console.log('❌ SW Registration Failed:', err));
+    });
+  }
+</script>
   </script>
   </body>
 </html>
