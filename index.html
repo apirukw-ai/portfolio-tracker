@@ -512,13 +512,10 @@ function formatThaiDateTime(isoString) {
   
   try {
     const date = new Date(isoString);
-    if (isNaN(date.getTime())) {
-      // ถ้าส่งมาเป็นสตริงธรรมดา เช่น "07/09/2026" ให้ส่งกลับค่าเดิม
-      return isoString;
-    }
+    if (isNaN(date.getTime())) return isoString;
     
-    // แปลงเป็นเวลาไทย (Asia/Bangkok)
-    const options = {
+    // แปลงเวลาให้เป็นโซนไทย (Asia/Bangkok) และแสดง พ.ศ.
+    return new Intl.DateTimeFormat('th-TH', {
       timeZone: 'Asia/Bangkok',
       day: '2-digit',
       month: '2-digit',
@@ -527,9 +524,7 @@ function formatThaiDateTime(isoString) {
       minute: '2-digit',
       second: '2-digit',
       hour12: false
-    };
-    
-    return new Intl.DateTimeFormat('th-TH', options).format(date).replace(',', '');
+    }).format(date).replace(',', '');
   } catch (e) {
     return isoString;
   }
@@ -662,7 +657,7 @@ function formatThaiDateTime(isoString) {
         .update({
           units: item.units,
           avg_nav: item.avgNav,
-          updated_at: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+          updated_at: new Date().toISOString()
         })
         .eq('asset_code', item.code);
     }
