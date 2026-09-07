@@ -135,7 +135,7 @@
 
     // ดึงสรุปภาพรวม
     async function fetchSummary() {
-      const { data, error } = await supabase.from('v_dashboard_summary').select('*').single();
+      const { data, error } = await supabaseClient.from('v_dashboard_summary').select('*').single();
       if (error) return console.error('Error fetching summary:', error);
 
       if (data) {
@@ -164,7 +164,7 @@
 
     // ดึงสัดส่วนแยกตามแอป
     async function fetchAppAllocation() {
-      const { data, error } = await supabase.from('v_app_allocation').select('*');
+      const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
       if (error) return console.error('Error fetching allocation:', error);
 
       const listEl = document.getElementById('app-allocation-list');
@@ -196,7 +196,7 @@
 
     // ดึงรายการกองทุนย่อย
     async function fetchAssetDetails() {
-      const { data, error } = await supabase.from('v_asset_details').select('*');
+      const { data, error } = await supabaseClient.from('v_asset_details').select('*');
       if (error) return console.error('Error fetching asset details:', error);
 
       const listEl = document.getElementById('asset-details-list');
