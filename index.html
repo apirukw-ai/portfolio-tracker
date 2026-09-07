@@ -121,6 +121,11 @@
               <!-- Data Rows injected here -->
             </tbody>
           </table>
+  <!-- แสดงเวลา Auto-Update ล่าสุด -->
+<div class="flex justify-end items-center text-xs text-slate-400 mt-3 px-2">
+  <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
+  🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
+</div>
         </div>
       </div>
 <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
@@ -303,7 +308,12 @@
       const listEl = document.getElementById('asset-details-list');
       if (!listEl) return;
       listEl.innerHTML = '';
-
+    // แสดงเวลา updated_at ล่าสุดที่มุมขวาใต้ตาราง
+  if (data && data.length > 0) {
+    const latestTime = data[0].updated_at || data[0].nav_date || '-';
+    const timeEl = document.getElementById('last-updated-time');
+    if (timeEl) timeEl.innerText = latestTime;
+  }
       if (!data || data.length === 0) {
         listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
         return;
@@ -337,10 +347,7 @@
             <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
             <td class="py-3 font-medium text-white">${getReadableAssetName(item)}</td>
             <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
-            <td class="py-3 text-slate-200">
-  <div class="font-medium text-white">${formatNumber(item.current_nav, 4)} ${item.currency || ''}</div>
-  <div class="text-[10px] text-slate-400 font-normal mt-0.5">${item.nav_date || '-'}</div>
-</td>
+            <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
             <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
             <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
             
