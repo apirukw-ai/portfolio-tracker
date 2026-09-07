@@ -707,7 +707,6 @@ function formatThaiDateTime(isoString) {
   // ==========================================
   let trendChartInstance = null;
 
-  // ฟังก์ชันสลับมุมมองระหว่าง Allocation และ Trend
   function switchChartView(view) {
     const allocView = document.getElementById('chart-view-allocation');
     const trendView = document.getElementById('chart-view-trend');
@@ -727,12 +726,10 @@ function formatThaiDateTime(isoString) {
       btnTrend.className = 'px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
       btnAlloc.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
       
-      // ดึงข้อมูลและวาดกราฟ Trend Line
       renderTrendChart();
     }
   }
 
-  // ฟังก์ชันดึงข้อมูล Snapshot จาก Supabase และวาดกราฟเส้น
   async function renderTrendChart() {
     if (typeof supabaseClient === 'undefined') return;
 
@@ -743,7 +740,6 @@ function formatThaiDateTime(isoString) {
 
     if (error || !data || data.length === 0) return;
 
-    // รวมมูลค่าพอร์ตรวมตามวันที่
     const groupedData = {};
     data.forEach(row => {
       const date = row.snapshot_date;
@@ -782,12 +778,11 @@ function formatThaiDateTime(isoString) {
         },
         scales: {
           x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } },
-        y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } }
+          y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } }
+        }
       }
-    }
-  });
-}
-}
+    });
+  }
 </script>
 </body>
 </html>
