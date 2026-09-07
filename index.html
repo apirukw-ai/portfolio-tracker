@@ -115,7 +115,8 @@
     const SUPABASE_URL = 'https://iproktvetsbxxmpptuj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwcm9rdHZ2ZXRzYnh4bXBwdHVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyOTU3NDEsImV4cCI6MjEwMjg3MTc0MX0.Kc0USo30u4gvZNJ1bsOdD9k6nwEBcY7lNMAQxWEFzqw'; // 🔴 นำ anon key จาก Supabase มาใส่ตรงนี้
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ✅ เปลี่ยนชื่อตัวแปรเป็น supabaseClient
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let chartInstance = null;
 
     // ตัวช่วยจัดรูปแบบตัวเลขเงินบาท
