@@ -245,6 +245,20 @@ function filterAssetDetails(appSource) {
   }
 }
 
+// เพิ่มฟังก์ชันแปลงชื่อสินทรัพย์อ่านง่าย
+function getReadableAssetName(item) {
+  if (!item) return '';
+  
+  if (item.app_source && item.app_source.toLowerCase() === 'gpf') {
+    if (item.asset_code && item.asset_code.includes('1788631314182')) return 'แผนหุ้นไทย';
+    if (item.asset_code && item.asset_code.includes('1788632129596')) return 'แผนหุ้นต่างประเทศ';
+    if (item.asset_code && item.asset_code.includes('1788632247228')) return 'แผนอสังหาริมทรัพย์ไทย';
+    if (item.asset_name && item.asset_name !== item.asset_code) return item.asset_name;
+  }
+  
+  return item.asset_code || item.asset_name || '';
+}
+    
 // 1. วาดตารางแสดงผลพร้อมปุ่มจัดการ
 function renderAssetDetailsTable(data) {
   const listEl = document.getElementById('asset-details-list');
@@ -256,14 +270,13 @@ function renderAssetDetailsTable(data) {
     return;
   }
 
-  // ✨ จัดเรียงข้อมูลตาม % กำไร/ขาดทุน (unrealized_pnl_pct) จากมากไปน้อย (Descending)
+  // จัดเรียงตาม % กำไร/ขาดทุน จากมากไปน้อย
   const sortedData = [...data].sort((a, b) => {
     const pctA = a.unrealized_pnl_pct || 0;
     const pctB = b.unrealized_pnl_pct || 0;
-    return pctB - pctA; // เรียงจากมากไปน้อย
+    return pctB - pctA;
   });
 
-  // วนลูปวาดตารางจากข้อมูลที่เรียงลำดับแล้ว (sortedData)
   sortedData.forEach(item => {
     const pnlPct = item.unrealized_pnl_pct || 0;
     const isProfit = pnlPct >= 0;
