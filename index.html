@@ -305,15 +305,18 @@
     // 4. ฟังก์ชันแสดงตารางสินทรัพย์ (เรียง % กำไร + Rebalance)
     // ----------------------------------------------------
     function renderAssetDetailsTable(data) {
-      const listEl = document.getElementById('asset-details-list');
-      if (!listEl) return;
-      listEl.innerHTML = '';
-    // แสดงเวลา updated_at ล่าสุดที่มุมขวาใต้ตาราง
+  const listEl = document.getElementById('asset-details-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  // แสดงเวลา updated_at ล่าสุดที่มุมขวาใต้ตาราง (แปลงเป็น Format ไทยอ่านง่าย)
   if (data && data.length > 0) {
-    const latestTime = data[0].updated_at || data[0].nav_date || '-';
+    const rawTime = data[0].updated_at || data[0].nav_date || '-';
+    const formattedTime = formatThaiDateTime(rawTime); // 👈 แปลงรูปแบบตรงนี้
     const timeEl = document.getElementById('last-updated-time');
-    if (timeEl) timeEl.innerText = latestTime;
+    if (timeEl) timeEl.innerText = formattedTime;
   }
+  
       if (!data || data.length === 0) {
         listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
         return;
@@ -479,7 +482,34 @@
         }
       });
     }
-
+// ฟังก์ชันแปลงรูปแบบ ISO Timestamp ให้เป็น DD/MM/YYYY HH:MM:SS (เวลาไทย)
+function formatThaiDateTime(isoString) {
+  if (!isoString || isoString === '-') return '-';
+  
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) {
+      // ถ้าส่งมาเป็นสตริงธรรมดา เช่น "07/09/2026" ให้ส่งกลับค่าเดิม
+      return isoString;
+    }
+    
+    // แปลงเป็นเวลาไทย (Asia/Bangkok)
+    const options = {
+      timeZone: 'Asia/Bangkok',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    };
+    
+    return new Intl.DateTimeFormat('th-TH', options).format(date).replace(',', '');
+  } catch (e) {
+    return isoString;
+  }
+}
     // เริ่มโหลดข้อมูลเมื่อเปิดหน้าเว็บ
     window.onload = loadDashboardData;
   </script>
