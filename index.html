@@ -127,18 +127,18 @@
 
   <!-- ตารางข้อมูลอยู่ด้านล่างต่อตรงนี้ตามเดิม -->
       <table class="w-full text-left text-sm">
-            <thead class="bg-slate-800/50">
-  <tr class="text-left text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
-    <th class="pb-3">แอป</th>
-    <th class="pb-3">รหัสสินทรัพย์</th>
-    <th class="pb-3">จำนวนหน่วย</th>
-    <th class="pb-3">NAV ปัจจุบัน</th>
-    <th class="pb-3">มูลค่ารวม (THB)</th>
-    <th class="pb-3">กำไร/ขาดทุน (%)</th>
-    <th class="pb-3">สัดส่วน (จริง/เป้า)</th> <!-- 👈 แทรกคอลัมน์นี้เพิ่ม -->
-    <th class="pb-3">3M (%)</th>
-    <th class="pb-3">YTD (%)</th>
-    <th class="pb-3 text-center">จัดการ</th>
+        <thead class="bg-slate-800/50">
+  <tr class="text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
+    <th class="py-3 text-left">แอป</th>
+    <th class="py-3 text-left">รหัสสินทรัพย์</th>
+    <th class="py-3 text-left">จำนวนหน่วย</th>
+    <th class="py-3 text-left">NAV ปัจจุบัน</th>
+    <th class="py-3 text-left">มูลค่ารวม (THB)</th>
+    <th class="py-3 text-left">กำไร/ขาดทุน (%)</th>
+    <th class="py-3 text-center">สัดส่วน (จริง/เป้า)</th> <!-- 📍 เปลี่ยนเป็น text-center -->
+    <th class="py-3 text-center">3M (%)</th> <!-- 📍 เปลี่ยนเป็น text-center -->
+    <th class="py-3 text-center">YTD (%)</th> <!-- 📍 เปลี่ยนเป็น text-center -->
+    <th class="py-3 text-center">จัดการ</th>
   </tr>
 </thead>
             <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
@@ -389,8 +389,9 @@
             <div class="mt-0.5">${statusBadge}</div>
             </td>
             
-            <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
-            <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+            <!-- 📍 เพิ่ม text-center ให้กับคอลัมน์ 3M % และ YTD % -->
+            <td class="py-3 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+            <td class="py-3 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
             
             <td class="py-3 text-center">
               <div class="flex items-center justify-center gap-2">
