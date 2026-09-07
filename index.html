@@ -151,9 +151,9 @@
     <th class="py-3 text-left">NAV ปัจจุบัน</th>
     <th class="py-3 text-left">มูลค่ารวม (THB)</th>
     <th class="py-3 text-left">กำไร/ขาดทุน (%)</th>
-    <th class="py-3 text-center">สัดส่วน (จริง/เป้า)</th> <!-- 📍 เปลี่ยนเป็น text-center -->
-    <th class="py-3 text-center">3M (%)</th> <!-- 📍 เปลี่ยนเป็น text-center -->
-    <th class="py-3 text-center">YTD (%)</th> <!-- 📍 เปลี่ยนเป็น text-center -->
+    <th class="py-3 text-center">สัดส่วน (จริง/เป้า)</th>
+    <th class="py-3 text-center">3M (%)</th>
+    <th class="py-3 text-center">YTD (%)</th>
     <th class="py-3 text-center">จัดการ</th>
   </tr>
 </thead>
@@ -418,45 +418,30 @@
           }
         }
 
-        listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
-            <td class="py-3 font-medium text-white">${getReadableAssetName(item)}</td>
-            <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
-            <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
-            <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
-            <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
-            
-            <td class="px-3 py-3 text-center font-mono">
-            <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
-            <span class="text-slate-500 mx-1">/</span>
-            <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
-            <div class="mt-0.5">${statusBadge}</div>
-            </td>
-            
-            <!-- 📍 เพิ่ม text-center ให้กับคอลัมน์ 3M % และ YTD % -->
-            <td class="py-3 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
-            <td class="py-3 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
-            
-            <td class="py-3 text-center">
-              <div class="flex items-center justify-center gap-2">
-                <button onclick="openEditModalById('${item.id}')" 
-                        class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" 
-                        title="แก้ไขรายการ">
-                  ✏️
-                </button>
-                <button onclick="deleteAssetById('${item.id}')" 
-                        class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" 
-                        title="ลบรายการ">
-                  🗑️
-                </button>
-              </div>
-            </td>
-          </tr>
-        `;
-      });
-    }
+        <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+        <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
+        <td class="py-3 text-left">${getReadableAssetName(item)}</td>
+        <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
+        <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
+        <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
+        <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
+        
+        <td class="px-3 py-3 text-center font-mono">
+          <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
+          <span class="text-slate-500 mx-1">/</span>
+          <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
+          <div class="mt-0.5">${statusBadge}</div>
+        </td>
 
+        <td class="py-3 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+        <td class="py-3 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+        <td class="py-3 text-center">
+          <div class="flex items-center justify-center gap-2">
+            <button onclick="openEditModalById('${item.id}')" class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
+            <button onclick="deleteAssetById('${item.id}')" class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
+          </div>
+        </td>
+      </tr>
     // ----------------------------------------------------
     // 5. ฟังก์ชันจัดการ Modal (แก้ไข / บันทึก / ลบ)
     // ----------------------------------------------------
