@@ -315,15 +315,44 @@
     }
 
     function getReadableAssetName(item) {
-      if (!item) return '';
-      if (item.app_source && item.app_source.toLowerCase() === 'gpf') {
-        if (item.asset_code && item.asset_code.includes('1788631314182')) return 'แผนหุ้นไทย';
-        if (item.asset_code && item.asset_code.includes('1788632129596')) return 'แผนหุ้นต่างประเทศ';
-        if (item.asset_code && item.asset_code.includes('1788632247228')) return 'แผนอสังหาริมทรัพย์ไทย';
-        if (item.asset_name && item.asset_name !== item.asset_code) return item.asset_name;
-      }
-      return item.asset_code || item.asset_name || '';
+  const code = item.asset_code || item.symbol || '';
+  
+  // Mapping ชื่อกองทุนจริงของ MFC จากรูปภาพ
+  const mfcFundNames = {
+    'MPF07': 'IGOLD-G',
+    'MPF15': 'MGTECH',
+    'MPF18': 'M-EM',
+    'MPF19': 'MEURO-G',
+    'MPF23': 'MGFPVD',
+    'MPF27': 'M-ASIA'
+  };
+
+  // หากเป็น MFC ให้ดึงชื่อกองทุนมาแสดงใต้รหัส MPF
+  if (item.app_source === 'MFC' || item.app_source === 'mfc') {
+    const fundName = mfcFundNames[code] || item.asset_name || '';
+    if (fundName) {
+      return `
+        <div>
+          <div class="font-medium text-white">${code}</div>
+          <div class="text-[11px] text-amber-400/90 font-medium mt-0.5">${fundName}</div>
+        </div>
+      `;
     }
+  }
+
+  // กรณีหุ้น หรือกองทุนแอปอื่น
+  const subName = item.asset_name || '';
+  if (subName && subName !== code) {
+    return `
+      <div>
+        <div class="font-medium text-white">${code}</div>
+        <div class="text-[11px] text-slate-400 font-normal mt-0.5">${subName}</div>
+      </div>
+    `;
+  }
+
+  return `<span class="font-medium text-white">${code}</span>`;
+}
 
     // ----------------------------------------------------
     // 4. ฟังก์ชันแสดงตารางสินทรัพย์ (เรียง % กำไร + Rebalance)
