@@ -11,9 +11,7 @@ import yfinance as yf
 # 1. เชื่อมต่อ Supabase
 # ----------------------------------------------------
 url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get(
-    "SUPABASE_KEY"
-)
+key = os.environ.get("SUPABASE_KEY")
 
 if not url or not key:
     print("❌ Missing Supabase Credentials")
