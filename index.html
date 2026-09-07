@@ -517,7 +517,7 @@ function formatThaiDateTime(isoString) {
 }
     // เริ่มโหลดข้อมูลเมื่อเปิดหน้าเว็บ
     window.onload = loadDashboardData;
-  <script>
+  
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js')
@@ -525,7 +525,7 @@ function formatThaiDateTime(isoString) {
         .catch(err => console.log('❌ SW Registration Failed:', err));
     });
   }
-</script>
+
   </script>
   </body>
 </html>
