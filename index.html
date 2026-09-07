@@ -17,6 +17,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Google Fonts (Prompt) -->
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- CDN สำหรับสแกน PDF และ รูปภาพ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { font-family: 'Prompt', sans-serif; }
   </style>
@@ -35,7 +38,20 @@
         <span>🔄</span> รีเฟรชข้อมูล
       </button>
     </div>
+<!-- ปุ่มสแกนเอกสาร DCA (PDF & Image) -->
+    <div class="flex flex-wrap gap-3 justify-end">
+      <!-- ปุ่มสแกน PDF -->
+      <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2 shadow-md">
+        📄 สแกน PDF (GPF / MFC Statement)
+        <input type="file" id="pdf-input" accept="application/pdf" class="hidden" onchange="handlePdfUpload(event)">
+      </label>
 
+      <!-- ปุ่มสแกน รูปภาพ/สลิป -->
+      <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2 shadow-md">
+        🖼️ สแกนรูป/สลิป (Dime / SCB)
+        <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+      </label>
+    </div>
     <!-- 1. Summary Cards (ภาพรวมพอร์ต) -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
@@ -525,7 +541,131 @@ function formatThaiDateTime(isoString) {
         .catch(err => console.log('❌ SW Registration Failed:', err));
     });
   }
+// ตั้งค่า PDF.js Worker
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
 
+  // 1. ฟังก์ชันจัดการเมื่ออัปโหลดไฟล์ PDF (GPF / MFC)
+  async function handlePdfUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(item => item.str).join(" ") + "\n";
+      }
+
+      if (fullText.includes("เอ็มเอฟซี") || fullText.includes("MPF")) {
+        parseMfcPdfStatement(fullText);
+      } else if (fullText.includes("แผนการลงทุน") || fullText.includes("กองทุนอสังหาริมทรัพย์ไทย")) {
+        parseGpfPdfStatement(fullText);
+      } else {
+        alert("❌ ไม่พบรูปแบบเอกสาร PDF ที่รองรับ");
+      }
+    } catch (err) {
+      console.error("PDF Parsing Error:", err);
+      alert("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ PDF");
+    }
+  }
+
+  // 2. ฟังก์ชันจัดการเมื่ออัปโหลดไฟล์รูปภาพ / สลิป (Dime / SCB)
+  async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const { data: { text } } = await Tesseract.recognize(file, 'eng+tha');
+
+      if (text.includes("Dime") || text.includes("Ticker") || text.includes("Avg. Cost")) {
+        parseDimeImage(text);
+      } else if (text.includes("SCB") || text.includes("ต้นทุนเฉลี่ย") || text.includes("จำนวนหน่วยลงทุน")) {
+        parseScbImage(text);
+      } else {
+        alert("❌ ไม่พบรูปแบบรูปภาพที่รองรับ");
+      }
+    } catch (err) {
+      console.error("Image OCR Error:", err);
+      alert("❌ เกิดข้อผิดพลาดในการอ่านรูปภาพ");
+    }
+  }
+
+  // --- ฟังก์ชัน Parser ย่อย ---
+  function parseMfcPdfStatement(text) {
+    const mfcRegex = /(MPF\d{2})[\s\S]*?([\d]+\.[\d]{4})[\s\S]*?([\d,]+\.[\d]{4})/g;
+    let match;
+    const updates = [];
+
+    while ((match = mfcRegex.exec(text)) !== null) {
+      const code = match[1];
+      const avgNav = parseFloat(match[2]);
+      const units = parseFloat(match[3].replace(/,/g, ''));
+      updates.push({ code, avgNav, units });
+    }
+
+    if (updates.length > 0) updateDatabaseUnitsAndCost(updates);
+    else alert("❌ ไม่พบข้อมูลรายการในเอกสาร MFC");
+  }
+
+  function parseGpfPdfStatement(text) {
+    alert("ℹ️ ได้รับไฟล์ GPF เรียบร้อยแล้ว (ระบบกำลังพัฒนารูปแบบการบันทึก)");
+  }
+
+  function parseScbImage(text) {
+    const codeMatch = text.match(/(SCB[A-Z0-9\(\)]+)/i);
+    const costMatch = text.match(/ต้นทุนเฉลี่ย\s*([\d.,]+)/);
+    const unitMatch = text.match(/จำนวนหน่วยลงทุน\s*([\d.,]+)/);
+
+    if (codeMatch && costMatch && unitMatch) {
+      const code = codeMatch[1];
+      const avgNav = parseFloat(costMatch[1].replace(/,/g, ''));
+      const units = parseFloat(unitMatch[1].replace(/,/g, ''));
+      updateDatabaseUnitsAndCost([{ code, avgNav, units }]);
+    } else {
+      alert("❌ สแกนรูป SCB ไม่สมบูรณ์ กรุณาใช้รูปถ่ายที่ชัดเจนขึ้น");
+    }
+  }
+
+  function parseDimeImage(text) {
+    const lines = text.split('\n');
+    const updates = [];
+
+    lines.forEach(line => {
+      const match = line.match(/([A-Z]{2,5})\s+[\w\s.]+\s+([\d.,]+)\s+([\d.,]+)/);
+      if (match) {
+        updates.push({
+          code: match[1],
+          units: parseFloat(match[2].replace(/,/g, '')),
+          avgNav: parseFloat(match[3].replace(/,/g, ''))
+        });
+      }
+    });
+
+    if (updates.length > 0) updateDatabaseUnitsAndCost(updates);
+    else alert("❌ ไม่พบข้อมูลหุ้นในรูป Dime");
+  }
+
+  // 3. ฟังก์ชันอัปเดตข้อมูลลง Supabase
+  async function updateDatabaseUnitsAndCost(updates) {
+    for (const item of updates) {
+      await supabaseClient
+        .from('user_portfolios')
+        .update({
+          units: item.units,
+          avg_nav: item.avgNav,
+          updated_at: new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+        })
+        .eq('asset_code', item.code);
+    }
+    alert("✅ บันทึกข้อมูลต้นทุนและหน่วยใหม่เรียบร้อยแล้ว!");
+    window.location.reload();
+  }
   </script>
   </body>
 </html>
