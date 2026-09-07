@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investment Portfolio Dashboard</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Chart.js สำหรับวาดกราฟ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Fonts (Prompt) -->
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Prompt', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-center bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-white">Investment Portfolio</h1>
+        <p class="text-slate-400 text-sm mt-1">ภาพรวมการลงทุนรวมทุกแอปพลิเคชัน</p>
+      </div>
+      <button onclick="loadDashboardData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm transition font-medium flex items-center gap-2">
+        <span>🔄</span> รีเฟรชข้อมูล
+      </button>
+    </div>
+
+    <!-- 1. Summary Cards (ภาพรวมพอร์ต) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-sm">มูลค่าพอร์ตรวมทั้งหมด</p>
+        <h2 id="total-wealth" class="text-3xl font-bold text-emerald-400 mt-2">฿0.00</h2>
+        <p id="app-count" class="text-xs text-slate-500 mt-2">จากทั้งหมด 0 แอปพลิเคชัน</p>
+      </div>
+
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-sm">เงินลงทุนรวม (ต้นทุน)</p>
+        <h2 id="total-cost" class="text-3xl font-bold text-slate-200 mt-2">฿0.00</h2>
+        <p class="text-xs text-slate-500 mt-2">ต้นทุนสะสม</p>
+      </div>
+
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-sm">กำไร / ขาดทุนรวมทั้งหมด</p>
+        <h2 id="total-pnl" class="text-3xl font-bold text-slate-200 mt-2">฿0.00</h2>
+        <p id="total-pnl-pct" class="text-xs font-semibold mt-2">0.00%</p>
+      </div>
+    </div>
+
+    <!-- 2. Allocation Table & Chart Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- สัดส่วนแต่ละแอป (Table) -->
+      <div class="lg:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
+        <h3 class="text-lg font-bold text-white mb-4">สัดส่วนแยกตามแอปพลิเคชัน</h3>
+        <table class="w-full text-left text-sm">
+          <thead class="text-slate-400 border-b border-slate-700">
+            <tr>
+              <th class="pb-3">แอป</th>
+              <th class="pb-3">มูลค่าปัจจุบัน</th>
+              <th class="pb-3">ต้นทุน</th>
+              <th class="pb-3">กำไร/ขาดทุน</th>
+              <th class="pb-3">สัดส่วนพอร์ต</th>
+            </tr>
+          </thead>
+          <tbody id="app-allocation-list" class="divide-y divide-slate-700/50">
+            <!-- Data Rows injected here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Donut Chart -->
+      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col items-center justify-center">
+        <h3 class="text-lg font-bold text-white mb-4 self-start">Asset Allocation</h3>
+        <div class="w-full max-w-[250px]">
+          <canvas id="allocationChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. Asset Details Table (รายการกองทุนทั้งหมด) -->
+    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
+      <h3 class="text-lg font-bold text-white mb-4">รายการกองทุน / สินทรัพย์ย่อย</h3>
+      <table class="w-full text-left text-sm">
+        <thead class="text-slate-400 border-b border-slate-700">
+          <tr>
+            <th class="pb-3">แอป</th>
+            <th class="pb-3">รหัสสินทรัพย์</th>
+            <th class="pb-3">จำนวนหน่วย</th>
+            <th class="pb-3">NAV ปัจจุบัน</th>
+            <th class="pb-3">มูลค่ารวม (THB)</th>
+            <th class="pb-3">กำไร/ขาดทุน (%)</th>
+            <th class="pb-3">3M (%)</th>
+            <th class="pb-3">YTD (%)</th>
+          </tr>
+        </thead>
+        <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
+          <!-- Data Rows injected here -->
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    // ----------------------------------------------------
+    // 1. ตั้งค่าการเชื่อมต่อ Supabase
+    // ----------------------------------------------------
+    const SUPABASE_URL = 'https://iproktvetsbxxmpptuj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwcm9rdHZ2ZXRzYnh4bXBwdHVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyOTU3NDEsImV4cCI6MjEwMjg3MTc0MX0.Kc0USo30u4gvZNJ1bsOdD9k6nwEBcY7lNMAQxWEFzqw'; // 🔴 นำ anon key จาก Supabase มาใส่ตรงนี้
+
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let chartInstance = null;
+
+    // ตัวช่วยจัดรูปแบบตัวเลขเงินบาท
+    const formatTHB = (val) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(val || 0);
+    const formatNumber = (val, decimals = 2) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(val || 0);
+
+    // ----------------------------------------------------
+    // 2. ฟังก์ชันดึงข้อมูลทั้งหมดมาแสดงบน Dashboard
+    // ----------------------------------------------------
+    async function loadDashboardData() {
+      await Promise.all([
+        fetchSummary(),
+        fetchAppAllocation(),
+        fetchAssetDetails()
+      ]);
+    }
+
+    // ดึงสรุปภาพรวม
+    async function fetchSummary() {
+      const { data, error } = await supabase.from('v_dashboard_summary').select('*').single();
+      if (error) return console.error('Error fetching summary:', error);
+
+      if (data) {
+        document.getElementById('total-wealth').innerText = formatTHB(data.total_wealth_thb);
+        document.getElementById('total-cost').innerText = formatTHB(data.total_cost_thb);
+        
+        const pnl = data.total_unrealized_pnl_thb || 0;
+        const pnlPct = data.total_unrealized_pnl_pct || 0;
+        const pnlEl = document.getElementById('total-pnl');
+        const pnlPctEl = document.getElementById('total-pnl-pct');
+
+        pnlEl.innerText = formatTHB(pnl);
+        pnlPctEl.innerText = `${pnlPct >= 0 ? '+' : ''}${formatNumber(pnlPct)}%`;
+
+        if (pnl >= 0) {
+          pnlEl.className = 'text-3xl font-bold text-emerald-400 mt-2';
+          pnlPctEl.className = 'text-xs font-semibold text-emerald-400 mt-2';
+        } else {
+          pnlEl.className = 'text-3xl font-bold text-rose-400 mt-2';
+          pnlPctEl.className = 'text-xs font-semibold text-rose-400 mt-2';
+        }
+
+        document.getElementById('app-count').innerText = `จากทั้งหมด ${data.total_apps || 0} แอปพลิเคชัน (${data.total_assets || 0} รายการ)`;
+      }
+    }
+
+    // ดึงสัดส่วนแยกตามแอป
+    async function fetchAppAllocation() {
+      const { data, error } = await supabase.from('v_app_allocation').select('*');
+      if (error) return console.error('Error fetching allocation:', error);
+
+      const listEl = document.getElementById('app-allocation-list');
+      listEl.innerHTML = '';
+
+      const labels = [];
+      const chartValues = [];
+
+      data.forEach(item => {
+        labels.push(item.app_source.toUpperCase());
+        chartValues.push(item.total_wealth_thb);
+
+        const isProfit = item.total_pnl_thb >= 0;
+        const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+
+        listEl.innerHTML += `
+          <tr class="hover:bg-slate-700/30 transition">
+            <td class="py-3 font-semibold text-white uppercase">${item.app_source}</td>
+            <td class="py-3">${formatTHB(item.total_wealth_thb)}</td>
+            <td class="py-3 text-slate-400">${formatTHB(item.total_cost_thb)}</td>
+            <td class="py-3 ${pnlClass}">${formatTHB(item.total_pnl_thb)} (${isProfit ? '+' : ''}${formatNumber(item.pnl_pct)}%)</td>
+            <td class="py-3 font-medium text-indigo-400">${formatNumber(item.portfolio_weight_pct)}%</td>
+          </tr>
+        `;
+      });
+
+      renderChart(labels, chartValues);
+    }
+
+    // ดึงรายการกองทุนย่อย
+    async function fetchAssetDetails() {
+      const { data, error } = await supabase.from('v_asset_details').select('*');
+      if (error) return console.error('Error fetching asset details:', error);
+
+      const listEl = document.getElementById('asset-details-list');
+      listEl.innerHTML = '';
+
+      data.forEach(item => {
+        const isProfit = item.unrealized_pnl >= 0;
+        const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+
+        listEl.innerHTML += `
+          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+            <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
+            <td class="py-3 font-medium text-white">${item.asset_code}</td>
+            <td class="py-3">${formatNumber(item.units, 4)}</td>
+            <td class="py-3">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
+            <td class="py-3 font-semibold">${formatTHB(item.current_value_thb)}</td>
+            <td class="py-3 ${pnlClass}">${isProfit ? '+' : ''}${formatNumber(item.unrealized_pnl_pct)}%</td>
+            <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m) + '%' : '-'}</td>
+            <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd) + '%' : '-'}</td>
+          </tr>
+        `;
+      });
+    }
+
+    // วาดกราฟ Donut
+    function renderChart(labels, dataValues) {
+      const ctx = document.getElementById('allocationChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataValues,
+            backgroundColor: ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#3b82f6'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Prompt' } } }
+          },
+          cutout: '70%'
+        }
+      });
+    }
+
+    // เริ่มโหลดข้อมูลเมื่อเปิดหน้าเว็บ
+    window.onload = loadDashboardData;
+  </script>
+</body>
+</html>
