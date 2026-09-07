@@ -98,15 +98,31 @@
         </table>
       </div>
 
-      <!-- Donut Chart -->
-      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col items-center justify-center">
-        <h3 class="text-lg font-bold text-white mb-4 self-start">Asset Allocation</h3>
-        <div class="w-full max-w-[250px]">
-          <canvas id="allocationChart"></canvas>
-        </div>
-      </div>
+<!-- กล่องแสดงกราฟ (สลับมุมมองได้) -->
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col justify-between">
+          <!-- Header พร้อมปุ่มสลับมุมมอง -->
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white">ภาพรวมการลงทุน</h3>
+            <div class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/50 text-xs">
+              <button id="btn-chart-allocation" onclick="switchChartView('allocation')" class="px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition">
+                สัดส่วนพอร์ต
+              </button>
+              <button id="btn-chart-trend" onclick="switchChartView('trend')" class="px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition">
+                แนวโน้มเติบโต
+              </button>
+            </div>
+          </div>
 
-    </div>
+          <!-- Area 1: กราฟ Donut เดิม -->
+          <div id="chart-view-allocation" class="w-full max-w-[250px] mx-auto flex items-center justify-center">
+            <canvas id="allocationChart"></canvas>
+          </div>
+
+          <!-- Area 2: กราฟ Trend Line เพิ่มใหม่ (ซ่อนไว้ก่อน) -->
+          <div id="chart-view-trend" class="h-64 relative hidden">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>      
 
     <!-- 3. Asset Details Table (รายการกองทุนทั้งหมด) -->
 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
@@ -700,6 +716,92 @@ function formatThaiDateTime(isoString) {
     alert("✅ บันทึกข้อมูลต้นทุนและหน่วยใหม่เรียบร้อยแล้ว!");
     window.location.reload();
   }
+  // ==========================================
+  // ส่วนควบคุมกราฟ Trend Line & สลับมุมมอง (Toggle View)
+  // ==========================================
+  let trendChartInstance = null;
+
+  // ฟังก์ชันสลับมุมมองระหว่าง Allocation และ Trend
+  function switchChartView(view) {
+    const allocView = document.getElementById('chart-view-allocation');
+    const trendView = document.getElementById('chart-view-trend');
+    const btnAlloc = document.getElementById('btn-chart-allocation');
+    const btnTrend = document.getElementById('btn-chart-trend');
+
+    if (!allocView || !trendView) return;
+
+    if (view === 'allocation') {
+      allocView.classList.remove('hidden');
+      trendView.classList.add('hidden');
+      btnAlloc.className = 'px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
+      btnTrend.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
+    } else {
+      allocView.classList.add('hidden');
+      trendView.classList.remove('hidden');
+      btnTrend.className = 'px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
+      btnAlloc.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
+      
+      // ดึงข้อมูลและวาดกราฟ Trend Line
+      renderTrendChart();
+    }
+  }
+
+  // ฟังก์ชันดึงข้อมูล Snapshot จาก Supabase และวาดกราฟเส้น
+  async function renderTrendChart() {
+    if (typeof supabaseClient === 'undefined') return;
+
+    const { data, error } = await supabaseClient
+      .from('portfolio_snapshots')
+      .select('snapshot_date, total_value_thb')
+      .order('snapshot_date', { ascending: true });
+
+    if (error || !data || data.length === 0) return;
+
+    // รวมมูลค่าพอร์ตรวมตามวันที่
+    const groupedData = {};
+    data.forEach(row => {
+      const date = row.snapshot_date;
+      groupedData[date] = (groupedData[date] || 0) + Number(row.total_value_thb);
+    });
+
+    const labels = Object.keys(groupedData);
+    const values = Object.values(groupedData);
+
+    const canvas = document.getElementById('trendChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (trendChartInstance) trendChartInstance.destroy();
+
+    trendChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'มูลค่าพอร์ตรวม (THB)',
+          data: values,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.15)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointBackgroundColor: '#818cf8'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } },
+          y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } }
+        }
+      }
+    });
+  }
+
   </script>
   </body>
 </html>
