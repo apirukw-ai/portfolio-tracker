@@ -196,31 +196,32 @@
     }
 
     // ดึงรายการกองทุนย่อย
-    async function fetchAssetDetails() {
-      const { data, error } = await supabaseClient.from('v_asset_details').select('*');
-      if (error) return console.error('Error fetching asset details:', error);
+  async function fetchAssetDetails() {
+  const { data, error } = await supabaseClient.from('v_asset_details').select('*');
+  if (error) return console.error('Error fetching asset details:', error);
 
-      const listEl = document.getElementById('asset-details-list');
-      listEl.innerHTML = '';
+  const listEl = document.getElementById('asset-details-list');
+  listEl.innerHTML = '';
 
-      data.forEach(item => {
-        const isProfit = item.unrealized_pnl >= 0;
-        const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+  data.forEach(item => {
+    const pnlPct = item.unrealized_pnl_pct || 0;
+    const isProfit = pnlPct >= 0;
+    const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
 
-        listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
-            <td class="py-3 font-medium text-white">${item.asset_code}</td>
-            <td class="py-3">${formatNumber(item.units, 4)}</td>
-            <td class="py-3">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
-            <td class="py-3 font-semibold">${formatTHB(item.current_value_thb)}</td>
-            <td class="py-3 ${pnlClass}">${isProfit ? '+' : ''}${formatNumber(item.unrealized_pnl_pct)}%</td>
-            <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m) + '%' : '-'}</td>
-            <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd) + '%' : '-'}</td>
-          </tr>
-        `;
-      });
-    }
+    listEl.innerHTML += `
+      <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+        <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
+        <td class="py-3 font-medium text-white">${item.asset_code}</td>
+        <td class="py-3">${formatNumber(item.units, 4)}</td>
+        <td class="py-3">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
+        <td class="py-3 font-semibold">${formatTHB(item.current_value_thb)}</td>
+        <td class="py-3 ${pnlClass} font-medium">${isProfit ? '+' : ''}${formatNumber(pnlPct, 2)}%</td>
+        <td class="py-3 text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+        <td class="py-3 text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+      </tr>
+    `;
+  });
+}
 
     // วาดกราฟ Donut
     function renderChart(labels, dataValues) {
