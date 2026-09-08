@@ -318,7 +318,14 @@ if (data) {
           const appCount = Array.isArray(data) ? data.length : (data.total_apps || 0);
           appCountEl.innerText = `จากทั้งหมด ${appCount} แอปพลิเคชัน`;
         }
-    // 2. ดึงข้อมูล ส่วน 2 (ภาพรวมแต่ละพอร์ต)
+      } // ปิด if (data)
+    } // ปิด try
+  } catch (err) {
+    console.error('Error in fetchSummary:', err);
+  }
+} // ปิด function fetchSummary()
+
+// 2. ดึงข้อมูล ส่วน 2 (ภาพรวมแต่ละพอร์ต)
 async function fetchAppAllocation() {
   const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
   if (error) return console.error('Error fetching allocation:', error);
