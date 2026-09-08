@@ -243,20 +243,27 @@ const { data, error } = await supabaseClient
   .select('*');
       if (error) return console.error('Error fetching summary:', error);
 
-      if (data) {
-        document.getElementById('total-wealth').innerText = formatTHB(data.total_wealth_thb);
-        document.getElementById('total-cost').innerText = formatTHB(data.total_cost_thb);
-        
-        // 1.1 กำไร/ขาดทุนสะสมรวม
-        const pnl = data.total_unrealized_pnl_thb || 0;
-        const pnlPct = data.total_unrealized_pnl_pct || 0;
-        const pnlEl = document.getElementById('total-pnl');
-        const pnlPctEl = document.getElementById('total-pnl-pct');
+      // ✅ แก้ไขบรรทัดที่ 246 เป็นต้นไป ตามนี้ครับ
+if (data) {
+  // 1. รวมยอดเงินบาทของทั้ง 4 พอร์ต
+  const totalWealth = data.reduce((sum, item) => sum + Number(item.total_wealth_thb || 0), 0);
+  const totalCost = data.reduce((sum, item) => sum + Number(item.total_cost_thb || 0), 0);
+  const pnl = data.reduce((sum, item) => sum + Number(item.total_pnl_thb || 0), 0);
 
-        const icon = pnl >= 0 ? '▲ ' : '▼ ';
-        pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
-        pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(pnlPct))}%`;
+  // คำนวณ % PnL รวม
+  const pnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
+  // 2. แสดงผลบนการ์ดด้านบน
+  document.getElementById('total-wealth').innerText = formatTHB(totalWealth);
+  document.getElementById('total-cost').innerText = formatTHB(totalCost);
+
+  // 3. กำไร/ขาดทุนสะสม
+  const pnlEl = document.getElementById('total-pnl');
+  const pnlPctEl = document.getElementById('total-pnl-pct');
+  const icon = pnl >= 0 ? '▲ ' : '▼ ';
+
+  if (pnlEl) pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
+  if (pnlPctEl) pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(pnlPct))}%`;
         if (pnl >= 0) {
           pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
           pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
