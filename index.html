@@ -730,7 +730,7 @@ async function loadDashboardData() {
     }
   } // 📍 เพิ่มปีกกา } ตรงนี้อีก 1 ตัวเพื่อปิดฟังก์ชัน handlePdfUpload ให้สมบูรณ์
 
-// 📍 ฟังก์ชันอ่าน PDF กบข. พร้อมคำนวณ NAV ต้นทุนเฉลี่ยถัวเฉลี่ยให้อัตโนมัติ
+// 📍 ฟังก์ชันอ่าน PDF กบข. คำนวณ NAV ต้นทุนเฉลี่ยถัวเฉลี่ย (แก้ไข Syntax Error และตัวแปร _supabase แล้ว)
 async function parseGpfPdfStatement(fullText) {
   try {
     const plans = [
@@ -741,16 +741,14 @@ async function parseGpfPdfStatement(fullText) {
 
     const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
     
-    // 1. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase มาเตรียมคำนวณถัวเฉลี่ย
-    // ✅ แก้เป็น (ใส่ _supabase)
-	const { data: currentPort, error: fetchErr } = await _supabase.from('user_portfolios').select('asset_code, units, avg_nav');
+    // 1. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
+    const { data: currentPort, error: fetchErr } = await _supabase
       .from('user_portfolios')
       .select('asset_code, units, avg_nav');
       
     if (fetchErr) throw fetchErr;
 
     for (const plan of plans) {
-      // ดึงรายการล่าสุดของแผนนั้นๆ จาก PDF
       const planLines = lines.filter(l => l.includes(plan.name) && (l.includes('เงิน') || l.includes('เปลี่ยนแผน')));
       
       if (planLines.length > 0) {
@@ -758,36 +756,35 @@ async function parseGpfPdfStatement(fullText) {
         const matches = lastLine.match(/([\d,]+\.\d+)/g);
 
         if (matches && matches.length >= 2) {
-          const newNav = parseFloat(matches[0].replace(/,/g, ''));      // NAV ที่ซื้อในสลิป
-          const totalNewUnits = parseFloat(matches[1].replace(/,/g, '')); // หน่วยสะสมรวมใหม่จากสลิป
+          const newNav = parseFloat(matches[0].replace(/,/g, ''));
+          const totalNewUnits = parseFloat(matches[1].replace(/,/g, ''));
 
-          // หาข้อมูลเดิมใน Database
-          const oldAsset = currentPort.find(a => a.asset_code === plan.code);
+          const oldAsset = currentPort ? currentPort.find(a => a.asset_code === plan.code) : null;
           const oldUnits = oldAsset ? parseFloat(oldAsset.units || 0) : 0;
           const oldAvgNav = oldAsset ? parseFloat(oldAsset.avg_nav || 0) : 0;
 
-          const addedUnits = totalNewUnits - oldUnits; // จำนวนหน่วยที่เพิ่มขึ้นจากการ DCA รอบนี้
-
+          const addedUnits = totalNewUnits - oldUnits;
           let calculatedAvgNav = newNav;
 
-          // 📍 ถ้าเป็นการซื้อเพิ่ม (DCA) และมีหน่วยเดิมอยู่แล้ว ให้คำนวณต้นทุนเฉลี่ยแบบ Weighted Average
+          // คำนวณ NAV ต้นทุนเฉลี่ยแบบ Weighted Average
           if (addedUnits > 0 && oldUnits > 0 && oldAvgNav > 0) {
-            const totalCostBefore = oldUnits * oldAvgNav;      // ต้นทุนรวมเดิม
-            const newAddedCost = addedUnits * newNav;          // ต้นทุนที่ใส่เพิ่มรอบนี้
-            calculatedAvgNav = (totalCostBefore + newAddedCost) / totalNewUnits; // NAV ต้นทุนเฉลี่ยใหม่
+            const totalCostBefore = oldUnits * oldAvgNav;
+            const newAddedCost = addedUnits * newNav;
+            calculatedAvgNav = (totalCostBefore + newAddedCost) / totalNewUnits;
           }
 
-          // 2. อัปเดตหน่วยรวมใหม่ และ NAV ต้นทุนเฉลี่ยที่คำนวณแล้วลง Supabase
-          // ✅ โค้ดที่ถูกต้อง
-await _supabase
-  .from('user_portfolios')
-  .update({
-    units: totalNewUnits,
-    avg_nav: calculatedAvgNav,
-    current_nav: newNav,
-    updated_at: new Date()
-  })
-  .eq('asset_code', plan.code);
+          // 2. อัปเดตข้อมูลกลับลง Supabase
+          const { error: updateErr } = await _supabase
+            .from('user_portfolios')
+            .update({
+              units: totalNewUnits,
+              avg_nav: calculatedAvgNav,
+              current_nav: newNav,
+              updated_at: new Date()
+            })
+            .eq('asset_code', plan.code);
+
+          if (updateErr) console.error("Update error for " + plan.code + ":", updateErr);
         }
       }
     }
