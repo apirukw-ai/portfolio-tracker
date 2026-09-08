@@ -730,7 +730,7 @@ async function loadDashboardData() {
     }
   } // 📍 เพิ่มปีกกา } ตรงนี้อีก 1 ตัวเพื่อปิดฟังก์ชัน handlePdfUpload ให้สมบูรณ์
 
-// 📍 ฟังก์ชันอ่าน PDF กบข. คำนวณ NAV ต้นทุนเฉลี่ยถัวเฉลี่ย (แก้ไข Syntax Error และตัวแปร _supabase แล้ว)
+// 📍 ฟังก์ชันอ่าน PDF กบข. คำนวณ NAV ต้นทุนเฉลี่ย (ใช้ supabaseClient)
 async function parseGpfPdfStatement(fullText) {
   try {
     const plans = [
@@ -741,8 +741,8 @@ async function parseGpfPdfStatement(fullText) {
 
     const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
     
-    // 1. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
-    const { data: currentPort, error: fetchErr } = await _supabase
+    // 1. ดึงข้อมูลพอร์ตปัจจุบันผ่าน supabaseClient
+    const { data: currentPort, error: fetchErr } = await supabaseClient
       .from('user_portfolios')
       .select('asset_code, units, avg_nav');
       
@@ -773,8 +773,8 @@ async function parseGpfPdfStatement(fullText) {
             calculatedAvgNav = (totalCostBefore + newAddedCost) / totalNewUnits;
           }
 
-          // 2. อัปเดตข้อมูลกลับลง Supabase
-          const { error: updateErr } = await _supabase
+          // 2. อัปเดตข้อมูลกลับลง Supabase ผ่าน supabaseClient
+          const { error: updateErr } = await supabaseClient
             .from('user_portfolios')
             .update({
               units: totalNewUnits,
@@ -797,7 +797,6 @@ async function parseGpfPdfStatement(fullText) {
     showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF", "error");
   }
 }
-
 	  
   async function handleImageUpload(event) {
     const file = event.target.files[0];
