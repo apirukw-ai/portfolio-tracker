@@ -181,7 +181,7 @@ function handleSort(columnKey) {
   }
   renderAllAppTables(globalAssetDetails); // วาดตารางใหม่
 }
-    const formatTHB = (val) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(val || 0);
+    const formatTHB = (val) => `฿${formatNumber(val, 2)}`;
     const formatNumber = (val, decimals = 2) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(val || 0);
 
     function refreshDashboard() {
