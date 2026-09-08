@@ -238,25 +238,27 @@ async function loadDashboardData() {
 
     // 📍 1. ดึงข้อมูล แถว 1 (บนสุด)
     async function fetchSummary() {
-      // ✅ แก้เป็น (ดึงข้อมูลแบบ Array ทั้งหมด 4 พอร์ต)
-const { data, error } = await supabaseClient
-  .from('v_dashboard_summary')
-  .select('*');
-      if (error) return console.error('Error fetching summary:', error);
+  const { data: assets } = await supabaseClient.from('assets').select('*');
+  const fxRate = window.currentFxRate || 32.88; // หรือดึงจาก user_portfolios
 
-      // ✅ แก้ไขบรรทัดที่ 246 เป็นต้นไป ตามนี้ครับ
-if (data) {
-  // 1. รวมยอดเงินบาทของทั้ง 4 พอร์ต
-  const totalWealth = data.reduce((sum, item) => sum + Number(item.total_wealth_thb || 0), 0);
-  const totalCost = data.reduce((sum, item) => sum + Number(item.total_cost_thb || 0), 0);
-  const pnl = data.reduce((sum, item) => sum + Number(item.total_pnl_thb || 0), 0);
+  let totalWealthTHB = 0;
+  let totalCostTHB = 0;
 
-  // คำนวณ % PnL รวม
-  const pnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
+  assets.forEach(asset => {
+    const isUSD = asset.currency === 'USD' || asset.app_name === 'DIME';
+const rate = isUSD ? fxRate : 1;
 
-  // 2. แสดงผลบนการ์ดด้านบน
-  document.getElementById('total-wealth').innerText = formatTHB(totalWealth);
-  document.getElementById('total-cost').innerText = formatTHB(totalCost);
+const marketValue = (Number(asset.units) * Number(asset.nav_price || asset.current_nav || 0)) * rate;
+const costBasis = (Number(asset.units) * Number(asset.avg_nav || 0)) * rate;
+
+    totalWealthTHB += marketValue;
+    totalCostTHB += costBasis;
+  });
+
+  // แสดงผลยอดรวมภาพรวมเป็น THB
+  document.getElementById('total-wealth').innerText = formatTHB(totalWealthTHB);
+  document.getElementById('total-cost').innerText = formatTHB(totalCostTHB);
+}
 
 // คำนวณ % กำไร/ขาดทุนรวมของทั้งพอร์ต
       const totalPnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
@@ -1008,30 +1010,27 @@ async function parseDimeImage(text) {
 }
 
 // 2. ฟังก์ชันอัปเดตลง Supabase
+// อัปเดตข้อมูลลง Database โดยเก็บเป็น USD เพียวๆ
 async function updateDatabaseUnitsAndCost(items) {
   for (const item of items) {
     const updateData = {
       units: item.units,
       avg_nav: item.avgNav,
-      currency: 'USD' // ล็อกสกุลเงินเป็น USD
+      currency: 'USD'
     };
 
-    // อัปเดตราคาปัจจุบัน (NAV) ด้วยถ้ามี
     if (item.currentNav) {
       updateData.nav_price = item.currentNav;
-      updateData.current_nav = item.currentNav;
     }
 
-    const { error } = await supabaseClient
+    await supabaseClient
       .from('assets')
       .update(updateData)
       .eq('code', item.code);
-
-    if (error) {
-      console.error(`Error updating ${item.code}:`, error);
-    }
   }
 
+  refreshDashboard(); // โหลดหน้า Dashboard ใหม่
+}
   // โหลดข้อมูลภาพรวมใหม่ทันที
   if (typeof fetchSummary === 'function') fetchSummary();
   if (typeof fetchAppAllocation === 'function') fetchAppAllocation();
