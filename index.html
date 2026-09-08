@@ -914,65 +914,79 @@
     }
 
     async function parseDimeImage(text) {
-      try {
-        const lines = text.split('\n');
-        const items = [];
+  try {
+    const lines = text.split('\n');
+    const items = [];
 
-        const tablePattern = /^([A-Z]{2,5})\b.*?\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/;
+    // 1. Regex สำหรับตารางสรุปพอร์ตแบบหลายคอลัมน์ (Ticker + Company + Shares + Avg Cost + Total Cost + Price)
+    // ตัวอย่างรูปแบบข้อความ: NVDA NVIDIA Corp 21.11 46.39 979.23 226.27
+    const tablePattern = /\b([A-Z]{1,5})\b\s+[A-Za-z0-9\s.&'-]+?\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)\s+([\d,]+\.\d+)/;
 
-        for (let line of lines) {
-          const trimmedLine = line.trim();
-          const match = trimmedLine.match(tablePattern);
-          if (match) {
-            const code = match[1];
-            const units = parseFloat(match[2].replace(/,/g, ''));
-            const avgNav = parseFloat(match[3].replace(/,/g, ''));
-            const currentNav = parseFloat(match[5].replace(/,/g, ''));
+    for (let line of lines) {
+      const trimmedLine = line.trim();
+      const match = trimmedLine.match(tablePattern);
+      
+      if (match) {
+        const code = match[1].toUpperCase();
+        const units = parseFloat(match[2].replace(/,/g, ''));
+        const avgNav = parseFloat(match[3].replace(/,/g, ''));
+        const currentNav = parseFloat(match[5].replace(/,/g, ''));
 
-            if (code !== 'TICKER' && !isNaN(units) && !isNaN(avgNav)) {
-              items.push({ 
-                code, 
-                units, 
-                avgNav, 
-                currentNav: !isNaN(currentNav) ? currentNav : avgNav, 
-                currency: 'USD' 
-              });
-            }
-          }
+        // กรองคำหัวข้อตารางออก
+        if (!['TICKER', 'TOTAL', 'PRICE', 'SHARES', 'VOLUME'].includes(code) && !isNaN(units) && !isNaN(avgNav)) {
+          items.push({ 
+            code, 
+            units, 
+            avgNav, 
+            currentNav: !isNaN(currentNav) ? currentNav : avgNav, 
+            currency: 'USD' 
+          });
         }
-
-        if (items.length === 0) {
-          const cleanText = text.replace(/([\u0E00-\u0E7F])\s+(?=[\u0E00-\u0E7F])/g, '$1');
-          const tickerMatch = cleanText.match(/\b([A-Z]{2,5})\b/);
-          const unitsMatch = cleanText.match(/(?:จำนวนหุ้นคงเหลือ|จำนวนหุ้น|Shares?)[^\n]*\n?\s*([\d,]+\.\d+)/i) || cleanText.match(/([\d,]+\.\d{4,})/);
-          const avgNavMatch = cleanText.match(/(?:ต้นทุนต่อหุ้น|ต้นทุนเฉลี่ย|Avg\.?\s*Cost)[^\n]*\n?\s*([\d,]+\.\d+)/i);
-          const priceMatch = cleanText.match(/(?:ราคา|Price)[^\n]*\n?\s*([\d,]+\.\d+)/i);
-
-          if (tickerMatch && unitsMatch && avgNavMatch) {
-            const units = parseFloat(unitsMatch[1].replace(/,/g, ''));
-            const avgNav = parseFloat(avgNavMatch[1].replace(/,/g, ''));
-            const currentNav = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : avgNav;
-
-            items.push({
-              code: tickerMatch[1],
-              units,
-              avgNav,
-              currentNav,
-              currency: 'USD'
-            });
-          }
-        }
-
-        if (items.length > 0) {
-          await updateDatabaseUnitsAndCost(items);
-        } else {
-          showToast("ไม่สามารถอ่านข้อมูลหุ้น/ต้นทุนจากรูปได้ครบถ้วน", "error");
-        }
-      } catch (err) {
-        console.error("Parse Dime Error:", err);
-        showToast("เกิดข้อผิดพลาดในการประมวลผลรูป", "error");
       }
     }
+
+    // 2. หากไม่พบรูปแบบตาราง ให้สแกนแบบสลิปการทำรายการ DCA (Single Transaction Slip)
+    if (items.length === 0) {
+      const cleanText = text.replace(/([\u0E00-\u0E7F])\s+(?=[\u0E00-\u0E7F])/g, '$1');
+      
+      // ดึง Ticker หุ้น (เช่น NVDA, AAPL)
+      const tickerMatch = cleanText.match(/\b([A-Z]{1,5})\b/);
+      
+      // ดึงจำนวนหุ้น/หน่วย
+      const unitsMatch = cleanText.match(/(?:จำนวนหุ้น|จำนวนหน่วย|Shares?|Executed Shares?|Units?)[^\n]*?\s*([\d,]+\.\d+)/i) 
+                      || cleanText.match(/([\d,]+\.\d{4,})/);
+      
+      // ดึงราคาต้นทุนเฉลี่ย / ราคาที่สำเร็จ
+      const avgNavMatch = cleanText.match(/(?:ต้นทุนต่อหุ้น|ต้นทุนเฉลี่ย|ราคาเฉลี่ย|ราคาที่สำเร็จ|Avg\.?\s*Cost|Executed Price|Match Price)[^\n]*?\s*([\d,]+\.\d+)/i);
+      
+      // ดึงราคาปัจจุบัน (ถ้ามี)
+      const priceMatch = cleanText.match(/(?:ราคาปัจจุบัน|Market Price|Current Price|Price)[^\n]*?\s*([\d,]+\.\d+)/i);
+
+      if (tickerMatch && unitsMatch && avgNavMatch) {
+        const units = parseFloat(unitsMatch[1].replace(/,/g, ''));
+        const avgNav = parseFloat(avgNavMatch[1].replace(/,/g, ''));
+        const currentNav = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : avgNav;
+
+        items.push({
+          code: tickerMatch[1].toUpperCase(),
+          units,
+          avgNav,
+          currentNav,
+          currency: 'USD'
+        });
+      }
+    }
+
+    if (items.length > 0) {
+      await updateDatabaseUnitsAndCost(items);
+    } else {
+      showToast("ไม่สามารถอ่านข้อมูลหุ้น/ต้นทุนจากรูปได้ กรุณาตรวจสอบความคมชัดหรือครอบรูปเฉพาะส่วนตาราง", "error");
+    }
+  } catch (err) {
+    console.error("Parse Dime Error:", err);
+    showToast("เกิดข้อผิดพลาดในการประมวลผลรูปภาพ", "error");
+  }
+}
 
     async function updateDatabaseUnitsAndCost(items) {
       try {
