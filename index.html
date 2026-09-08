@@ -313,17 +313,26 @@ if (data) {
 
       sortedData.forEach(item => {
         labels.push(item.app_source.toUpperCase());
-        chartValues.push(item.total_wealth_thb);
+
+        // 📍 เช็กว่าเป็น DIME หรือ USD หรือไม่ ถ้าใช่ให้คูณ fx_rate
+        const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
+        const fx = item.fx_rate || (isUSD ? 32.88 : 1);
+
+        // คำนวณมูลค่าเงินบาทจริง
+        const wealthVal = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
+        const costVal = isUSD ? (item.total_cost_thb * fx) : item.total_cost_thb;
+        const pnlVal = isUSD ? ((item.total_pnl_thb || item.total_unrealized_pnl_thb || 0) * fx) : (item.total_pnl_thb || 0);
+
+        chartValues.push(wealthVal);
 
         // กำไรสะสม
-        const pnlVal = item.total_pnl_thb || 0;
         const pnlPct = item.pnl_pct || 0;
         const isProfit = pnlVal >= 0;
         const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
         const icon = isProfit ? '▲ ' : '▼ ';
 
         // กำไรรายวัน
-        const dailyVal = item.daily_pnl_thb || 0;
+        const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
         const dailyPct = item.daily_pnl_pct || 0;
         const isDailyProfit = dailyVal >= 0;
         const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
@@ -332,8 +341,8 @@ if (data) {
         listEl.innerHTML += `
           <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
             <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
-            <td class="py-2.5">${formatTHB(item.total_wealth_thb)}</td>
-            <td class="py-2.5 text-slate-400">${formatTHB(item.total_cost_thb)}</td>
+            <td class="py-2.5">${formatTHB(wealthVal)}</td>
+            <td class="py-2.5 text-slate-400">${formatTHB(costVal)}</td>
             <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
             <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
             <td class="py-2.5 font-medium text-indigo-400">${formatNumber(item.portfolio_weight_pct)}%</td>
