@@ -728,9 +728,9 @@ async function loadDashboardData() {
       }
       event.target.value = ''; // Reset File Input
     }
-  }
+  } // 📍 เพิ่มปีกกา } ตรงนี้อีก 1 ตัวเพื่อปิดฟังก์ชัน handlePdfUpload ให้สมบูรณ์
 
-// 📍 ฟังก์ชันประมวลผล PDF กบข. ดึงหน่วยและ NAV ล่าสุด
+// 📍 ฟังก์ชันประมวลผล PDF กบข. นำมาไว้นอกฟังก์ชันหลัก
 async function parseGpfPdfStatement(fullText) {
   try {
     const plans = [
