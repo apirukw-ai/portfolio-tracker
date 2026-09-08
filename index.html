@@ -345,20 +345,29 @@ async function fetchAppAllocation() {
     const isDailyProfit = dailyVal >= 0;
     const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
     const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
+	// แสดงยอด USD ในวงเล็บกำกับไว้ (เฉพาะพอร์ตที่เป็น USD / DIME)
+  const usdWealthText = isUSD ? `<span class="text-xs text-slate-400 block">($${formatNumber(item.total_wealth_thb || 0, 2)})</span>` : '';
+  const usdCostText = isUSD ? `<span class="text-xs text-slate-400 block">($${formatNumber(item.total_cost_thb || 0, 2)})</span>` : '';
 
-    // คำนวณ % สัดส่วนพอร์ต
-    const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
+  // คำนวณ % สัดส่วนพอร์ต
+  const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
 
-    listEl.innerHTML += `
-      <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-        <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
-        <td class="py-2.5">${formatTHB(wealthVal)}</td>
-        <td class="py-2.5 text-slate-400">${formatTHB(costVal)}</td>
-        <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
-        <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
-        <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
-      </tr>
-      `;
+  listEl.innerHTML += `
+    <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+      <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
+      <td class="py-2.5">
+        ${formatTHB(wealthVal)}
+        ${usdWealthText}
+      </td>
+      <td class="py-2.5 text-slate-400">
+        ${formatTHB(costVal)}
+        ${usdCostText}
+      </td>
+      <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
+      <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
+      <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
+    </tr>
+  `;
     }); // <--- จบลูป sortedData.forEach
 
     // วาดกราฟหลังจากเก็บข้อมูลครบทุกพอร์ตแล้ว
