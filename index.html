@@ -295,65 +295,72 @@ if (data) {
       }
     }
 
-    // 📍 2. ดึงข้อมูล แถว 2 (ภาพรวมแต่ละพอร์ต) -> กำไร/ขาดทุนสะสม นำหน้า รายวัน
-    async function fetchAppAllocation() {
-      const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
-      if (error) return console.error('Error fetching allocation:', error);
+    // 2. ดึงข้อมูล ส่วน 2 (ภาพรวมแต่ละพอร์ต)
+async function fetchAppAllocation() {
+  const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
+  if (error) return console.error('Error fetching allocation:', error);
 
-      const listEl = document.getElementById('app-allocation-list');
-      if (!listEl) return;
-      listEl.innerHTML = '';
+  const listEl = document.getElementById('app-allocation-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
 
-      const order = ['GPF', 'MFC', 'SCB', 'DIME'];
-      const sortedData = (data || []).sort((a, b) => {
-        return order.indexOf(a.app_source.toUpperCase()) - order.indexOf(b.app_source.toUpperCase());
-      });
+  const order = ['GPF', 'MFC', 'SCB', 'DIME'];
+  const sortedData = (data || []).sort((a, b) => {
+    return order.indexOf(a.app_source.toUpperCase()) - order.indexOf(b.app_source.toUpperCase());
+  });
 
-      const labels = [];
-      const chartValues = [];
+  const labels = [];
+  const chartValues = [];
 
-      sortedData.forEach(item => {
-  labels.push(item.app_source.toUpperCase());
+  // 1. คำนวณหาผลรวมเงินบาททั้งหมดล่วงหน้าเพื่อใช้คิดสัดส่วน %
+  const totalWealth = sortedData.reduce((sum, item) => {
+    const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
+    const fx = item.fx_rate || (isUSD ? 32.88 : 1);
+    const val = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
+    return sum + Number(val || 0);
+  }, 0);
 
-  // 1. เช็กว่าเป็น DIME หรือ USD หรือไม่
-  const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
-  const fx = item.fx_rate || (isUSD ? 32.88 : 1);
+  // 2. วนลูปสร้างตารางและเก็บค่าใส่ กราฟ
+  sortedData.forEach(item => {
+    labels.push(item.app_source.toUpperCase());
 
-  // 2. คำนวณมูลค่าเงินบาทจริง
-  const wealthVal = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
-  const costVal = isUSD ? (item.total_cost_thb * fx) : item.total_cost_thb;
-  const pnlVal = isUSD ? ((item.total_pnl_thb || item.total_unrealized_pnl_thb || 0) * fx) : (item.total_pnl_thb || 0);
+    const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
+    const fx = item.fx_rate || (isUSD ? 32.88 : 1);
 
-  chartValues.push(wealthVal);
+    const wealthVal = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
+    const costVal = isUSD ? (item.total_cost_thb * fx) : item.total_cost_thb;
+    const pnlVal = isUSD ? ((item.total_pnl_thb || item.total_unrealized_pnl_thb || 0) * fx) : (item.total_pnl_thb || 0);
 
-  // 3. คำนวณ % กำไร/ขาดทุน
-  const pnlPct = item.pnl_pct || 0;
-  const isProfit = pnlVal >= 0;
-  const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
-  const icon = isProfit ? '▲ ' : '▼ ';
+    chartValues.push(wealthVal);
 
-  // 4. คำนวณกำไรรายวัน
-  const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
-  const dailyPct = item.daily_pnl_pct || 0;
-  const isDailyProfit = dailyVal >= 0;
-  const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
-  const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
+    // คำนวณ % กำไรสะสม
+    const pnlPct = item.pnl_pct || 0;
+    const isProfit = pnlVal >= 0;
+    const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+    const icon = isProfit ? '▲ ' : '▼ ';
 
-  // 📍 5. แทรกบรรทัดนี้ตรงนี้ครับ! (ก่อนสร้าง HTML)
-  const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
+    // คำนวณกำไรรายวัน
+    const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
+    const dailyPct = item.daily_pnl_pct || 0;
+    const isDailyProfit = dailyVal >= 0;
+    const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+    const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
 
-  // 6. แสดงผลลงตาราง
-  listEl.innerHTML += `
-    <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-      <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
-      <td class="py-2.5">${formatTHB(wealthVal)}</td>
-      <td class="py-2.5 text-slate-400">${formatTHB(costVal)}</td>
-      <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
-      <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
-      <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
-    </tr>
-  `;
-});
+    // คำนวณ % สัดส่วนพอร์ต
+    const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
+
+    listEl.innerHTML += `
+      <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+        <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
+        <td class="py-2.5">${formatTHB(wealthVal)}</td>
+        <td class="py-2.5 text-slate-400">${formatTHB(costVal)}</td>
+        <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
+        <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
+        <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
+      </tr>
+    `;
+  });
+}
       renderChart(labels, chartValues);
     }
 
