@@ -478,7 +478,7 @@ async function loadDashboardData() {
           <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
           <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
           <td class="py-2.5 text-slate-200">${formatNumber(item.units, 4)}</td>
-          <td class="py-2.5 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency || 'THB'}</td>
+          <td class="py-2.5 text-slate-200">${formatNumber(item.current_nav, 2)} THB</td>
           <td class="py-2.5 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
           <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlThb))} (${formatNumber(Math.abs(pnlPct), 2)}%)</td>
           <td class="py-2.5 ${dailyPnlClass}">${dailyIcon}${formatTHB(Math.abs(dailyPnlThb))} (${formatNumber(Math.abs(dailyPnlPct), 2)}%)</td>
