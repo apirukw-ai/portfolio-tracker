@@ -742,7 +742,8 @@ async function parseGpfPdfStatement(fullText) {
     const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
     
     // 1. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase มาเตรียมคำนวณถัวเฉลี่ย
-    const { data: currentPort, error: fetchErr } = await supabase
+    // ✅ แก้เป็น (ใส่ _supabase)
+	const { data: currentPort, error: fetchErr } = await _supabase.from('user_portfolios').select('asset_code, units, avg_nav');
       .from('user_portfolios')
       .select('asset_code, units, avg_nav');
       
@@ -777,15 +778,16 @@ async function parseGpfPdfStatement(fullText) {
           }
 
           // 2. อัปเดตหน่วยรวมใหม่ และ NAV ต้นทุนเฉลี่ยที่คำนวณแล้วลง Supabase
-          await supabase
-            .from('user_portfolios')
-            .update({
-              units: totalNewUnits,
-              avg_nav: calculatedAvgNav,
-              current_nav: newNav,
-              updated_at: new Date()
-            })
-            .eq('asset_code', plan.code);
+          // ✅ โค้ดที่ถูกต้อง
+await _supabase
+  .from('user_portfolios')
+  .update({
+    units: totalNewUnits,
+    avg_nav: calculatedAvgNav,
+    current_nav: newNav,
+    updated_at: new Date()
+  })
+  .eq('asset_code', plan.code);
         }
       }
     }
