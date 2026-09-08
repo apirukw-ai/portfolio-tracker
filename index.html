@@ -936,43 +936,79 @@ async function handleImageUpload(event) {
   }
 }
 
+// 1. ฟังก์ชันสแกนรูป รองรับทั้งแบบตารางหลายรายการ และรูปเดี่ยว
 async function parseDimeImage(text) {
   try {
-    // 1. รวมอักขระภาษาไทยที่ถูก OCR เว้นวรรคกระจายออกเข้าด้วยกัน
-    const cleanText = text.replace(/([\u0E00-\u0E7F])\s+(?=[\u0E00-\u0E7F])/g, '$1');
+    const lines = text.split('\n');
+    const items = [];
 
-    // 2. หา Ticker (เช่น ABBV)
-    const tickerMatch = cleanText.match(/\b([A-Z]{2,5})\b/);
+    // รูปแบบตารางภาษาอังกฤษ: TICKER Company Shares Avg.Cost ...
+    const tablePattern = /^([A-Z]{2,5})\s+.+?\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/;
 
-    // 3. หาจำนวนหุ้นคงเหลือ (ดึงตัวเลขทศนิยมบรรทัดล่างจากหัวข้อ)
-    const unitsMatch = cleanText.match(/จำนวนหุ้นคงเหลือ[^\n]*\n\s*([\d,]+\.\d+)/i)
-                     || cleanText.match(/จำนวนหุ้น[^\n]*\n\s*([\d,]+\.\d+)/i)
-                     || cleanText.match(/([\d,]+\.\d{4,})/); // สำรอง: ตัวเลขทศนิยม 4 ตำแหน่งขึ้นไป
+    for (let line of lines) {
+      const match = line.trim().match(tablePattern);
+      if (match) {
+        const code = match[1];
+        const units = parseFloat(match[2].replace(/,/g, ''));
+        const avgNav = parseFloat(match[3].replace(/,/g, ''));
+        
+        // ข้ามบรรทัด Header (กรณีติดคำว่า Ticker, Shares)
+        if (code !== 'TICKER' && !isNaN(units) && !isNaN(avgNav)) {
+          items.push({ code, units, avgNav, currency: 'USD' });
+        }
+      }
+    }
 
-    // 4. หาต้นทุนต่อหุ้น USD (ดึงตัวเลขทศนิยมบรรทัดล่างจากหัวข้อ)
-    const avgNavMatch = cleanText.match(/ต้นทุนต่อหุ้น[^\n]*\n\s*([\d,]+\.\d+)/i)
-                      || cleanText.match(/Avg\.?\s*Cost[^\n]*\n\s*([\d,]+\.\d+)/i);
+    // หากไม่พบโครงสร้างตาราง ให้สแกนแบบรูปเดี่ยว (Single Item)
+    if (items.length === 0) {
+      const cleanText = text.replace(/([\u0E00-\u0E7F])\s+(?=[\u0E00-\u0E7F])/g, '$1');
+      const tickerMatch = cleanText.match(/\b([A-Z]{2,5})\b/);
+      const unitsMatch = cleanText.match(/(?:จำนวนหุ้นคงเหลือ|จำนวนหุ้น|Shares?)[^\n]*\n?\s*([\d,]+\.\d+)/i) || cleanText.match(/([\d,]+\.\d{4,})/);
+      const avgNavMatch = cleanText.match(/(?:ต้นทุนต่อหุ้น|ต้นทุนเฉลี่ย|Avg\.?\s*Cost)[^\n]*\n?\s*([\d,]+\.\d+)/i);
 
-    if (tickerMatch && unitsMatch && avgNavMatch) {
-      const code = tickerMatch[1];
-      const units = parseFloat(unitsMatch[1].replace(/,/g, ''));
-      const avgNav = parseFloat(avgNavMatch[1].replace(/,/g, ''));
+      if (tickerMatch && unitsMatch && avgNavMatch) {
+        items.push({
+          code: tickerMatch[1],
+          units: parseFloat(unitsMatch[1].replace(/,/g, '')),
+          avgNav: parseFloat(avgNavMatch[1].replace(/,/g, '')),
+          currency: 'USD'
+        });
+      }
+    }
 
-      console.log("สแกนสำเร็จ:", { code, units, avgNav });
-      await updateDatabaseUnitsAndCost([{ code, units, avgNav }]);
-      showToast(`อัปเดต ${code} เรียบร้อยแล้ว (${units} หุ้น @ ${avgNav} USD)`, "success");
+    if (items.length > 0) {
+      console.log("สแกนพบรายการ:", items);
+      await updateDatabaseUnitsAndCost(items);
+      showToast(`สแกนและอัปเดตสำเร็จ ${items.length} รายการ`, "success");
     } else {
-      console.warn("จับคู่ข้อมูลไม่ครบ:", { 
-        ticker: tickerMatch ? tickerMatch[1] : null, 
-        units: unitsMatch ? unitsMatch[1] : null, 
-        avgNav: avgNavMatch ? avgNavMatch[1] : null 
-      });
       showToast("ไม่สามารถอ่านข้อมูลหุ้น/ต้นทุนจากรูปได้ครบถ้วน", "error");
     }
   } catch (err) {
     console.error("Parse Dime Error:", err);
-    showToast("เกิดข้อผิดพลาดในการประมวลผลรูป Dime", "error");
+    showToast("เกิดข้อผิดพลาดในการประมวลผลรูป", "error");
   }
+}
+
+// 2. ฟังก์ชันอัปเดตลง Supabase พร้อมบังคับเปลี่ยนสกุลเงินเป็น USD
+async function updateDatabaseUnitsAndCost(items) {
+  for (const item of items) {
+    const { error } = await supabaseClient
+      .from('assets')
+      .update({ 
+        units: item.units, 
+        avg_nav: item.avgNav,
+        currency: 'USD' // ล็อกสกุลเงินเป็น USD เพื่อให้ระบบแปลงอัตราแลกเปลี่ยนเป็น THB ได้ถูกต้อง
+      })
+      .eq('code', item.code);
+
+    if (error) {
+      console.error(`Error updating ${item.code}:`, error);
+    }
+  }
+
+  // โหลดข้อมูลภาพรวมใหม่ทันที
+  if (typeof fetchSummary === 'function') fetchSummary();
+  if (typeof fetchAssets === 'function') fetchAssets();
 }
       
   // อัปเดตฟังก์ชันแจ้งเตือนตอนบันทึกข้อมูลใน updateDatabaseUnitsAndCost
