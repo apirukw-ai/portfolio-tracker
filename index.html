@@ -910,10 +910,16 @@ async function handleImageUpload(event) {
 
     const { data: { text } } = await Tesseract.recognize(file, 'eng+tha');
 
-    // เพิ่มการเช็กคำว่า "จำนวนหุ้นคงเหลือ" และ "ต้นทุนต่อหุ้น"
-    if (text.includes("Dime") || text.includes("Ticker") || text.includes("Avg. Cost") || text.includes("จำนวนหุ้นคงเหลือ") || text.includes("ต้นทุนต่อหุ้น")) {
+    // แสดงข้อความที่ OCR อ่านได้ลงใน Console เพื่อตรวจสอบ
+    console.log("=== ข้อความที่ OCR อ่านได้จากรูป ===");
+    console.log(text);
+
+    const lowerText = text.toLowerCase();
+    
+    // ตรวจสอบเงื่อนไขแบบยืดหยุ่นขึ้น
+    if (lowerText.includes("dime") || text.includes("จำนวนหุ้น") || text.includes("ต้นทุน") || lowerText.includes("ticker")) {
       await parseDimeImage(text);
-    } else if (text.includes("SCB") || text.includes("ต้นทุนเฉลี่ย") || text.includes("จำนวนหน่วยลงทุน")) {
+    } else if (lowerText.includes("scb") || text.includes("หน่วยลงทุน") || text.includes("ราคาเฉลี่ย")) {
       await parseScbImage(text);
     } else {
       showToast("ไม่พบรูปแบบรูปภาพที่รองรับ", "error");
@@ -930,23 +936,28 @@ async function handleImageUpload(event) {
   }
 }
 
-// 2. เพิ่มฟังก์ชัน parseDimeImage รองรับโครงสร้างหน้าจอ Dime
 async function parseDimeImage(text) {
   try {
-    // ดึง Ticker หุ้น (เช่น ABBV)
+    // 1. ดึง Ticker หุ้นภาษาอังกฤษ (เช่น ABBV)
     const tickerMatch = text.match(/([A-Z]{2,5})/);
-    // ดึงจำนวนหุ้นคงเหลือ (เช่น 6.6514601)
-    const unitsMatch = text.match(/จำนวนหุ้นคงเหลือ\s*([\d,]+\.?\d*)/);
-    // ดึงต้นทุนต่อหุ้น USD (เช่น 172.6207)
-    const avgNavMatch = text.match(/ต้นทุนต่อหุ้น\s*\(USD\)\s*([\d,]+\.?\d*)/);
+
+    // 2. ดึงจำนวนหุ้น (รองรับรูปแบบเว้นวรรคและเครื่องหมายต่าง ๆ)
+    const unitsMatch = text.match(/(?:จำนวนหุ้นคงเหลือ|จำนวนหุ้น|Units?)\s*[:\s]*([\d,]+\.?\d*)/i)
+                     || text.match(/([\d,]+\.\d{4,})/); // สำรอง: หาตัวเลขทศนิยม 4 ตำแหน่งขึ้นไป
+
+    // 3. ดึงต้นทุนต่อหุ้น (USD)
+    const avgNavMatch = text.match(/(?:ต้นทุนต่อหุ้น|ต้นทุนเฉลี่ย|Avg\.?\s*Cost)\s*\(?USD\)?\s*[:\s]*([\d,]+\.?\d*)/i);
 
     if (tickerMatch && unitsMatch && avgNavMatch) {
       const code = tickerMatch[1];
       const units = parseFloat(unitsMatch[1].replace(/,/g, ''));
       const avgNav = parseFloat(avgNavMatch[1].replace(/,/g, ''));
 
+      console.log("สแกนสำเร็จ:", { code, units, avgNav });
       await updateDatabaseUnitsAndCost([{ code, units, avgNav }]);
+      showToast(`อัปเดต ${code} เรียบร้อยแล้ว`, "success");
     } else {
+      console.warn("จับคู่ข้อมูลไม่ครบ:", { tickerMatch, unitsMatch, avgNavMatch });
       showToast("ไม่สามารถอ่านข้อมูลหุ้น/ต้นทุนจากรูปได้ครบถ้วน", "error");
     }
   } catch (err) {
