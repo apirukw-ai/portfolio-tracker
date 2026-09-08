@@ -181,7 +181,8 @@ function handleSort(columnKey) {
   }
   renderAllAppTables(globalAssetDetails); // วาดตารางใหม่
 }
-    const formatTHB = (val) => `฿${formatNumber(val, 2)}`;
+    // บังคับทศนิยม 2 ตำแหน่งใน formatTHB
+const formatTHB = (val) => `฿${formatNumber(Number(val) || 0, 2)}`;
     const formatNumber = (val, decimals = 2) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(val || 0);
 
     function refreshDashboard() {
@@ -312,44 +313,47 @@ if (data) {
       const chartValues = [];
 
       sortedData.forEach(item => {
-        labels.push(item.app_source.toUpperCase());
+  labels.push(item.app_source.toUpperCase());
 
-        // 📍 เช็กว่าเป็น DIME หรือ USD หรือไม่ ถ้าใช่ให้คูณ fx_rate
-        const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
-        const fx = item.fx_rate || (isUSD ? 32.88 : 1);
+  // 1. เช็กว่าเป็น DIME หรือ USD หรือไม่
+  const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
+  const fx = item.fx_rate || (isUSD ? 32.88 : 1);
 
-        // คำนวณมูลค่าเงินบาทจริง
-        const wealthVal = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
-        const costVal = isUSD ? (item.total_cost_thb * fx) : item.total_cost_thb;
-        const pnlVal = isUSD ? ((item.total_pnl_thb || item.total_unrealized_pnl_thb || 0) * fx) : (item.total_pnl_thb || 0);
+  // 2. คำนวณมูลค่าเงินบาทจริง
+  const wealthVal = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
+  const costVal = isUSD ? (item.total_cost_thb * fx) : item.total_cost_thb;
+  const pnlVal = isUSD ? ((item.total_pnl_thb || item.total_unrealized_pnl_thb || 0) * fx) : (item.total_pnl_thb || 0);
 
-        chartValues.push(wealthVal);
+  chartValues.push(wealthVal);
 
-        // กำไรสะสม
-        const pnlPct = item.pnl_pct || 0;
-        const isProfit = pnlVal >= 0;
-        const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
-        const icon = isProfit ? '▲ ' : '▼ ';
+  // 3. คำนวณ % กำไร/ขาดทุน
+  const pnlPct = item.pnl_pct || 0;
+  const isProfit = pnlVal >= 0;
+  const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+  const icon = isProfit ? '▲ ' : '▼ ';
 
-        // กำไรรายวัน
-        const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
-        const dailyPct = item.daily_pnl_pct || 0;
-        const isDailyProfit = dailyVal >= 0;
-        const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
-        const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
+  // 4. คำนวณกำไรรายวัน
+  const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
+  const dailyPct = item.daily_pnl_pct || 0;
+  const isDailyProfit = dailyVal >= 0;
+  const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+  const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
 
-        listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
-            <td class="py-2.5">${formatTHB(wealthVal)}</td>
-            <td class="py-2.5 text-slate-400">${formatTHB(costVal)}</td>
-            <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
-            <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
-            <td class="py-2.5 font-medium text-indigo-400">${formatNumber(item.portfolio_weight_pct)}%</td>
-          </tr>
-        `;
-      });
+  // 📍 5. แทรกบรรทัดนี้ตรงนี้ครับ! (ก่อนสร้าง HTML)
+  const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
 
+  // 6. แสดงผลลงตาราง
+  listEl.innerHTML += `
+    <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+      <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
+      <td class="py-2.5">${formatTHB(wealthVal)}</td>
+      <td class="py-2.5 text-slate-400">${formatTHB(costVal)}</td>
+      <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
+      <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
+      <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
+    </tr>
+  `;
+});
       renderChart(labels, chartValues);
     }
 
