@@ -306,7 +306,10 @@ if (data) {
           dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
         }
 
-        document.getElementById('app-count').innerText = `จากทั้งหมด ${data.total_apps || 0} แอปพลิเคชัน (${data.total_assets || 0} รายการ)`;
+        const appCountEl = document.getElementById('app-count');
+if (appCountEl) {
+  appCountEl.innerText = `จากทั้งหมด ${data.total_apps || 0} แอปพลิเคชัน (${data.total_assets || 0} รายการ)`;
+}
       }
     }
 
@@ -891,42 +894,67 @@ async function parseGpfPdfStatement(fullText) {
   }
 }
 	  
-  async function handleImageUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+  // 1. ปรับเงื่อนไขใน handleImageUpload ให้รองรับภาษาไทย
+async function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
 
-    const label = event.target.closest('label');
-    const originalText = label ? label.innerHTML : '';
+  const label = event.target.closest('label');
+  const originalText = label ? label.innerHTML : '';
 
-    try {
-      // 📍 แสดงสถานะ "กำลังอ่านเอกสาร..."
-      if (label) {
-        label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกนรูป...`;
-        label.style.pointerEvents = 'none';
-      }
-
-      const { data: { text } } = await Tesseract.recognize(file, 'eng+tha');
-
-      if (text.includes("Dime") || text.includes("Ticker") || text.includes("Avg. Cost")) {
-        parseDimeImage(text);
-      } else if (text.includes("SCB") || text.includes("ต้นทุนเฉลี่ย") || text.includes("จำนวนหน่วยลงทุน")) {
-        parseScbImage(text);
-      } else {
-        showToast("ไม่พบรูปแบบรูปภาพที่รองรับ", "error");
-      }
-    } catch (err) {
-      console.error("Image OCR Error:", err);
-      showToast("เกิดข้อผิดพลาดในการอ่านรูปภาพ", "error");
-    } finally {
-      // 📍 คืนค่าปุ่มเดิม
-      if (label) {
-        label.innerHTML = originalText;
-        label.style.pointerEvents = 'auto';
-      }
-      event.target.value = ''; // Reset File Input
+  try {
+    if (label) {
+      label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกนรูป...`;
+      label.style.pointerEvents = 'none';
     }
-  }
 
+    const { data: { text } } = await Tesseract.recognize(file, 'eng+tha');
+
+    // เพิ่มการเช็กคำว่า "จำนวนหุ้นคงเหลือ" และ "ต้นทุนต่อหุ้น"
+    if (text.includes("Dime") || text.includes("Ticker") || text.includes("Avg. Cost") || text.includes("จำนวนหุ้นคงเหลือ") || text.includes("ต้นทุนต่อหุ้น")) {
+      await parseDimeImage(text);
+    } else if (text.includes("SCB") || text.includes("ต้นทุนเฉลี่ย") || text.includes("จำนวนหน่วยลงทุน")) {
+      await parseScbImage(text);
+    } else {
+      showToast("ไม่พบรูปแบบรูปภาพที่รองรับ", "error");
+    }
+  } catch (err) {
+    console.error("Image OCR Error:", err);
+    showToast("เกิดข้อผิดพลาดในการอ่านรูปภาพ", "error");
+  } finally {
+    if (label) {
+      label.innerHTML = originalText;
+      label.style.pointerEvents = 'auto';
+    }
+    event.target.value = '';
+  }
+}
+
+// 2. เพิ่มฟังก์ชัน parseDimeImage รองรับโครงสร้างหน้าจอ Dime
+async function parseDimeImage(text) {
+  try {
+    // ดึง Ticker หุ้น (เช่น ABBV)
+    const tickerMatch = text.match(/([A-Z]{2,5})/);
+    // ดึงจำนวนหุ้นคงเหลือ (เช่น 6.6514601)
+    const unitsMatch = text.match(/จำนวนหุ้นคงเหลือ\s*([\d,]+\.?\d*)/);
+    // ดึงต้นทุนต่อหุ้น USD (เช่น 172.6207)
+    const avgNavMatch = text.match(/ต้นทุนต่อหุ้น\s*\(USD\)\s*([\d,]+\.?\d*)/);
+
+    if (tickerMatch && unitsMatch && avgNavMatch) {
+      const code = tickerMatch[1];
+      const units = parseFloat(unitsMatch[1].replace(/,/g, ''));
+      const avgNav = parseFloat(avgNavMatch[1].replace(/,/g, ''));
+
+      await updateDatabaseUnitsAndCost([{ code, units, avgNav }]);
+    } else {
+      showToast("ไม่สามารถอ่านข้อมูลหุ้น/ต้นทุนจากรูปได้ครบถ้วน", "error");
+    }
+  } catch (err) {
+    console.error("Parse Dime Error:", err);
+    showToast("เกิดข้อผิดพลาดในการประมวลผลรูป Dime", "error");
+  }
+}
+      
   // อัปเดตฟังก์ชันแจ้งเตือนตอนบันทึกข้อมูลใน updateDatabaseUnitsAndCost
   async function updateDatabaseUnitsAndCost(updates) {
     for (const item of updates) {
