@@ -942,42 +942,60 @@ async function parseDimeImage(text) {
     const lines = text.split('\n');
     const items = [];
 
-    // รูปแบบตารางภาษาอังกฤษ: TICKER Company Shares Avg.Cost ...
-    const tablePattern = /^([A-Z]{2,5})\s+.+?\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/;
+    // ดึงอัตราแลกเปลี่ยน FX Rate ในระบบ (ถ้าไม่มีให้ใช้ค่าตั้งต้น 34.5)
+    const fxRate = window.currentFxRate || 34.5;
+
+    // Regex สำหรับแกะตาราง DIME ภาษาอังกฤษ: TICKER Company Shares Avg.Cost TotalCost Price ...
+    // กลุ่ม 1: Code | กลุ่ม 2: Shares | กลุ่ม 3: AvgCost | กลุ่ม 4: TotalCost | กลุ่ม 5: Current Price
+    const tablePattern = /^([A-Z]{2,5})\b.*?\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)/;
 
     for (let line of lines) {
-      const match = line.trim().match(tablePattern);
+      const trimmedLine = line.trim();
+      const match = trimmedLine.match(tablePattern);
       if (match) {
         const code = match[1];
         const units = parseFloat(match[2].replace(/,/g, ''));
         const avgNav = parseFloat(match[3].replace(/,/g, ''));
-        
-        // ข้ามบรรทัด Header (กรณีติดคำว่า Ticker, Shares)
+        const currentNav = parseFloat(match[5].replace(/,/g, '')); // ราคาปัจจุบัน (USD)
+
+        // ข้ามบรรทัด Header
         if (code !== 'TICKER' && !isNaN(units) && !isNaN(avgNav)) {
-          items.push({ code, units, avgNav, currency: 'USD' });
+          items.push({ 
+            code, 
+            units, 
+            avgNav, 
+            currentNav: !isNaN(currentNav) ? currentNav : avgNav, 
+            currency: 'USD' 
+          });
         }
       }
     }
 
-    // หากไม่พบโครงสร้างตาราง ให้สแกนแบบรูปเดี่ยว (Single Item)
+    // หากไม่พบตาราง ให้สแกนแบบรูปเดี่ยว (Single Item)
     if (items.length === 0) {
       const cleanText = text.replace(/([\u0E00-\u0E7F])\s+(?=[\u0E00-\u0E7F])/g, '$1');
       const tickerMatch = cleanText.match(/\b([A-Z]{2,5})\b/);
       const unitsMatch = cleanText.match(/(?:จำนวนหุ้นคงเหลือ|จำนวนหุ้น|Shares?)[^\n]*\n?\s*([\d,]+\.\d+)/i) || cleanText.match(/([\d,]+\.\d{4,})/);
       const avgNavMatch = cleanText.match(/(?:ต้นทุนต่อหุ้น|ต้นทุนเฉลี่ย|Avg\.?\s*Cost)[^\n]*\n?\s*([\d,]+\.\d+)/i);
+      const priceMatch = cleanText.match(/(?:ราคา|Price)[^\n]*\n?\s*([\d,]+\.\d+)/i);
 
       if (tickerMatch && unitsMatch && avgNavMatch) {
+        const units = parseFloat(unitsMatch[1].replace(/,/g, ''));
+        const avgNav = parseFloat(avgNavMatch[1].replace(/,/g, ''));
+        const currentNav = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : avgNav;
+
         items.push({
           code: tickerMatch[1],
-          units: parseFloat(unitsMatch[1].replace(/,/g, '')),
-          avgNav: parseFloat(avgNavMatch[1].replace(/,/g, '')),
+          units,
+          avgNav,
+          currentNav,
           currency: 'USD'
         });
       }
     }
 
     if (items.length > 0) {
-      console.log("สแกนพบรายการ:", items);
+      console.log("สแกนพบรายการ DIME:", items);
       await updateDatabaseUnitsAndCost(items);
       showToast(`สแกนและอัปเดตสำเร็จ ${items.length} รายการ`, "success");
     } else {
@@ -989,16 +1007,24 @@ async function parseDimeImage(text) {
   }
 }
 
-// 2. ฟังก์ชันอัปเดตลง Supabase พร้อมบังคับเปลี่ยนสกุลเงินเป็น USD
+// 2. ฟังก์ชันอัปเดตลง Supabase
 async function updateDatabaseUnitsAndCost(items) {
   for (const item of items) {
+    const updateData = {
+      units: item.units,
+      avg_nav: item.avgNav,
+      currency: 'USD' // ล็อกสกุลเงินเป็น USD
+    };
+
+    // อัปเดตราคาปัจจุบัน (NAV) ด้วยถ้ามี
+    if (item.currentNav) {
+      updateData.nav_price = item.currentNav;
+      updateData.current_nav = item.currentNav;
+    }
+
     const { error } = await supabaseClient
       .from('assets')
-      .update({ 
-        units: item.units, 
-        avg_nav: item.avgNav,
-        currency: 'USD' // ล็อกสกุลเงินเป็น USD เพื่อให้ระบบแปลงอัตราแลกเปลี่ยนเป็น THB ได้ถูกต้อง
-      })
+      .update(updateData)
       .eq('code', item.code);
 
     if (error) {
@@ -1008,6 +1034,7 @@ async function updateDatabaseUnitsAndCost(items) {
 
   // โหลดข้อมูลภาพรวมใหม่ทันที
   if (typeof fetchSummary === 'function') fetchSummary();
+  if (typeof fetchAppAllocation === 'function') fetchAppAllocation();
   if (typeof fetchAssets === 'function') fetchAssets();
 }
       
