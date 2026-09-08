@@ -2,322 +2,403 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3309/3309991.png">
   <title>Investment Portfolio Dashboard</title>
-  <!-- Tailwind CSS via CDN -->
+  
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Chart.js สำหรับวาดกราฟ -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Google Fonts (Prompt) -->
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- CDN สำหรับสแกน PDF และ รูปภาพ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { font-family: 'Prompt', sans-serif; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 sm:p-4 md:p-8">
 
-  <div class="max-w-7xl mx-auto space-y-6">
+  <div class="max-w-7xl mx-auto space-y-4 sm:space-y-6">
     
     <!-- Header -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-700">
       <div>
-        <h1 class="text-2xl md:text-3xl font-bold text-white">Investment Portfolio</h1>
-        <p class="text-slate-400 text-sm mt-1">ภาพรวมการลงทุนรวมทุกแอปพลิเคชัน</p>
+        <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-white">Investment Portfolio</h1>
+        <p class="text-slate-400 text-xs sm:text-sm mt-0.5">ภาพรวมการลงทุนรวมทุกแอปพลิเคชัน</p>
       </div>
 
-      <!-- ปุ่มสแกนเอกสาร + ปุ่มรีเฟรช -->
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-        <label class="cursor-pointer bg-slate-700/60 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2">
-          📄 สแกน PDF (GPF/MFC)
+      <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+        <label class="cursor-pointer bg-slate-700/60 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+          📄 สแกน PDF
           <input type="file" id="pdf-input" accept="application/pdf" class="hidden" onchange="handlePdfUpload(event)">
         </label>
 
-        <label class="cursor-pointer bg-slate-700/60 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2">
-          🖼️ สแกนรูป/สลิป (Dime/SCB)
+        <label class="cursor-pointer bg-slate-700/60 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+          🖼️ สแกนรูป
           <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
         </label>
 
-        <button onclick="loadDashboardData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm transition font-medium flex items-center gap-1.5 shadow-md">
+        <button onclick="loadDashboardData()" class="col-span-2 sm:col-span-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm transition font-medium flex items-center justify-center gap-1.5 shadow-md">
           <span>🔄</span> รีเฟรชข้อมูล
         </button>
       </div>
     </div>
 
-    <!-- 1. Summary Cards (ภาพรวมพอร์ต) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
-        <p class="text-slate-400 text-sm">มูลค่าพอร์ตรวมทั้งหมด</p>
-        <h2 id="total-wealth" class="text-3xl font-bold text-emerald-400 mt-2">฿0.00</h2>
-        <p id="app-count" class="text-xs text-slate-500 mt-2">จากทั้งหมด 0 แอปพลิเคชัน</p>
+    <!-- 📍 แถว 1 (บนสุด): ภาพรวมพอร์ต (เพิ่มการ์ดกำไร/ขาดทุนรายวัน) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-xs sm:text-sm">มูลค่าพอร์ตรวมทั้งหมด</p>
+        <h2 id="total-wealth" class="text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2">฿0.00</h2>
+        <p id="total-wealth-subtext" class="text-[11px] sm:text-xs text-slate-500 mt-1">จากทั้งหมด 0 แอปพลิเคชัน</p>
       </div>
 
-      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
-        <p class="text-slate-400 text-sm">เงินลงทุนรวม (ต้นทุน)</p>
-        <h2 id="total-cost" class="text-3xl font-bold text-slate-200 mt-2">฿0.00</h2>
-        <p class="text-xs text-slate-500 mt-2">ต้นทุนสะสม</p>
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-xs sm:text-sm">เงินลงทุนรวม (ต้นทุน)</p>
+        <h2 id="total-cost" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
+        <p class="text-[11px] sm:text-xs text-slate-500 mt-1">ต้นทุนสะสม</p>
       </div>
 
-      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md">
-        <p class="text-slate-400 text-sm">กำไร / ขาดทุนรวมทั้งหมด</p>
-        <h2 id="total-pnl" class="text-3xl font-bold text-slate-200 mt-2">฿0.00</h2>
-        <p id="total-pnl-pct" class="text-xs font-semibold mt-2">0.00%</p>
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-xs sm:text-sm">กำไร/ขาดทุนสะสม</p>
+        <h2 id="total-pnl" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
+        <p id="total-pnl-pct" class="text-[11px] sm:text-xs font-semibold mt-1">0.00%</p>
+      </div>
+
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-xs sm:text-sm">กำไร/ขาดทุนรายวัน</p>
+        <h2 id="daily-pnl" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
+        <p id="daily-pnl-pct" class="text-[11px] sm:text-xs font-semibold mt-1">0.00%</p>
       </div>
     </div>
 
-    <!-- 2. Allocation Table & Chart Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- สัดส่วนแต่ละแอป (Table) -->
-      <div class="lg:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
-        <h3 class="text-lg font-bold text-white mb-4">สัดส่วนแยกตามแอปพลิเคชัน</h3>
-        <table class="w-full text-left text-sm">
-          <thead class="text-slate-400 border-b border-slate-700">
-            <tr>
-              <th class="pb-3">แอป</th>
-              <th class="pb-3">มูลค่าปัจจุบัน</th>
-              <th class="pb-3">ต้นทุน</th>
-              <th class="pb-3">กำไร/ขาดทุน</th>
-              <th class="pb-3">สัดส่วนพอร์ต</th>
-            </tr>
-          </thead>
-          <tbody id="app-allocation-list" class="divide-y divide-slate-700/50">
-            <!-- Data Rows injected here -->
-          </tbody>
-        </table>
+    <!-- 📍 แถว 2: ภาพรวมของแต่ละพอร์ต (กำไร/ขาดทุนสะสม อยู่หน้า รายวัน) + กราฟ -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div class="lg:col-span-2 bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <h3 class="text-base sm:text-lg font-bold text-white mb-3">ภาพรวมของแต่ละพอร์ต</h3>
+        <div class="overflow-x-auto no-scrollbar">
+          <table class="w-full text-left text-xs sm:text-sm min-w-[550px]">
+            <thead class="text-slate-400 border-b border-slate-700">
+              <tr>
+                <th class="pb-2 sm:pb-3">แอป</th>
+                <th class="pb-2 sm:pb-3">มูลค่าปัจจุบัน</th>
+                <th class="pb-2 sm:pb-3">ต้นทุน</th>
+                <th class="pb-2 sm:pb-3">กำไร/ขาดทุนสะสม</th>
+                <th class="pb-2 sm:pb-3">กำไร/ขาดทุนรายวัน</th>
+                <th class="pb-2 sm:pb-3">สัดส่วนพอร์ต</th>
+              </tr>
+            </thead>
+            <tbody id="app-allocation-list" class="divide-y divide-slate-700/50"></tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- กล่องแสดงกราฟ (สลับมุมมองได้) -->
-      <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col justify-between">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-bold text-white">ภาพรวมการลงทุน</h3>
-          <div class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/50 text-xs">
-            <button id="btn-chart-allocation" onclick="switchChartView('allocation')" class="px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition">
-              สัดส่วนพอร์ต
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col justify-between">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-base sm:text-lg font-bold text-white">ภาพรวมการลงทุน</h3>
+          <div class="flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-700/50 text-[11px] sm:text-xs">
+            <button id="btn-chart-allocation" onclick="switchChartView('allocation')" class="px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium transition">
+              สัดส่วน
             </button>
-            <button id="btn-chart-trend" onclick="switchChartView('trend')" class="px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition">
-              แนวโน้มเติบโต
+            <button id="btn-chart-trend" onclick="switchChartView('trend')" class="px-2.5 py-1 rounded-md text-slate-400 hover:text-white font-medium transition">
+              แนวโน้ม
             </button>
           </div>
         </div>
 
-        <div id="chart-view-allocation" class="w-full max-w-[250px] mx-auto flex items-center justify-center">
+        <div id="chart-view-allocation" class="w-full max-w-[200px] sm:max-w-[250px] mx-auto flex items-center justify-center my-2">
           <canvas id="allocationChart"></canvas>
         </div>
 
-        <div id="chart-view-trend" class="h-64 relative hidden">
+        <div id="chart-view-trend" class="h-56 sm:h-64 relative hidden">
           <canvas id="trendChart"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- 3. Asset Details Table (รายการกองทุนทั้งหมด) -->
-    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-md overflow-x-auto">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-        <h3 class="text-lg font-bold text-white">รายการกองทุน / สินทรัพย์ย่อย</h3>
-        <div class="flex flex-wrap gap-2" id="app-filter-buttons">
-          <button onclick="filterAssetDetails('ALL')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition filter-btn" data-app="ALL">ทั้งหมด</button>
-          <button onclick="filterAssetDetails('GPF')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="GPF">GPF</button>
-          <button onclick="filterAssetDetails('DIME')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="DIME">Dime</button>
-          <button onclick="filterAssetDetails('MFC')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="MFC">MFC</button>
-          <button onclick="filterAssetDetails('SCB')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn" data-app="SCB">SCB</button>
-        </div>
-      </div>
+    <!-- 📍 แถว 3: รายละเอียดของแต่ละพอร์ต (กำไร/ขาดทุนสะสม อยู่หน้า รายวัน) เรียง GPF -> MFC -> SCB -> DIME -->
+    <div id="app-tables-container" class="space-y-6"></div>
 
-      <table class="w-full text-left text-sm">
-        <thead class="bg-slate-800/50">
-          <tr class="text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
-            <th class="py-3 text-left">แอป</th>
-            <th class="py-3 text-left">รหัสสินทรัพย์</th>
-            <th class="py-3 text-left">จำนวนหน่วย</th>
-            <th class="py-3 text-left">NAV ปัจจุบัน</th>
-            <th class="py-3 text-left">มูลค่ารวม (THB)</th>
-            <th class="py-3 text-left">กำไร/ขาดทุน (%)</th>
-            <th class="py-3 text-center">สัดส่วน (จริง/เป้า)</th>
-            <th class="py-3 text-center">3M (%)</th>
-            <th class="py-3 text-center">YTD (%)</th>
-            <th class="py-3 text-center">จัดการ</th>
-          </tr>
-        </thead>
-        <tbody id="asset-details-list" class="divide-y divide-slate-700/50">
-          <!-- Data Rows injected here -->
-        </tbody>
-      </table>
-
-      <div class="flex justify-end items-center text-xs text-slate-400 mt-3 px-2">
-        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-        🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
-      </div>
+    <div class="flex justify-end items-center text-[11px] sm:text-xs text-slate-400 mt-2 px-1">
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+      🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
     </div>
 
   </div>
 
   <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
   <div id="edit-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-      <h3 class="text-lg font-bold text-white mb-4" id="modal-title">แก้ไขรายการสินทรัพย์</h3>
-      
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 sm:p-6 w-full max-w-md shadow-2xl">
+      <h3 class="text-base sm:text-lg font-bold text-white mb-3" id="modal-title">แก้ไขรายการสินทรัพย์</h3>
       <input type="hidden" id="edit-id" />
-      
-      <div class="space-y-4">
+      <div class="space-y-3">
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">รหัสสินทรัพย์ / กองทุน</label>
           <input type="text" id="edit-asset-code" disabled class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-400 text-sm focus:outline-none" />
         </div>
-        
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">จำนวนหน่วย (Units)</label>
           <input type="number" step="any" id="edit-units" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" />
         </div>
-        
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">NAV ต้นทุนเฉลี่ย (Avg NAV)</label>
           <input type="number" step="any" id="edit-avg-nav" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" />
         </div>
-
         <div>
           <label class="block text-xs font-semibold text-slate-400 mb-1">สัดส่วนเป้าหมาย (Target %)</label>
           <input type="number" step="any" id="edit-target-pct" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:outline-none" placeholder="เช่น 20" />
         </div>
       </div>
-      
-      <div class="flex justify-end gap-3 mt-6">
-        <button type="button" onclick="closeEditModal()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">ยกเลิก</button>
-        <button type="button" onclick="saveAssetEdit()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition">บันทึกข้อมูล</button>
+      <div class="flex justify-end gap-2.5 mt-5">
+        <button type="button" onclick="closeEditModal()" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition">ยกเลิก</button>
+        <button type="button" onclick="saveAssetEdit()" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition">บันทึกข้อมูล</button>
       </div>
     </div>
   </div>
 
   <script>
-    // ----------------------------------------------------
-    // 1. ตั้งค่าการเชื่อมต่อ Supabase
-    // ----------------------------------------------------
     const SUPABASE_URL = 'https://iproktvvetsbxxmpptuj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwcm9rdHZ2ZXRzYnh4bXBwdHVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyOTU3NDEsImV4cCI6MjEwMjg3MTc0MX0.Kc0USo30u4gvZNJ1bsOdD9k6nwEBcY7lNMAQxWEFzqw';
-
+	
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let chartInstance = null;
     let globalAssetDetails = [];
+	let currentSortColumn = 'unrealized_pnl_pct'; // คอลัมน์เริ่มต้น
+let isSortAsc = false; // false = มากไปน้อย (Desc), true = น้อยไปมาก (Asc)
 
-    const formatTHB = (val) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(val || 0);
+// ฟังก์ชันสลับการเรียงลำดับเมื่อกดหัวตาราง
+function handleSort(columnKey) {
+  if (currentSortColumn === columnKey) {
+    isSortAsc = !isSortAsc; // ถ้ากดคอลัมน์เดิม ให้สลับทิศทาง (มาก<->น้อย)
+  } else {
+    currentSortColumn = columnKey;
+    isSortAsc = false; // ถ้ากดคอลัมน์ใหม่ ให้เริ่มจากมากไปน้อยก่อน
+  }
+  renderAllAppTables(globalAssetDetails); // วาดตารางใหม่
+}
+    // บังคับทศนิยม 2 ตำแหน่งใน formatTHB
+const formatTHB = (val) => `฿${formatNumber(Number(val) || 0, 2)}`;
     const formatNumber = (val, decimals = 2) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(val || 0);
 
-    // ----------------------------------------------------
-    // 2. ฟังก์ชันหลักในการรีโหลดและดึงข้อมูล Dashboard
-    // ----------------------------------------------------
     function refreshDashboard() {
       fetchSummary();
       fetchAppAllocation();
       fetchAssetDetails();
     }
+	// ฟังก์ชันใส่ Skeleton Loader ก่อนดึงข้อมูลจริง
+function showSkeletonLoaders() {
+  const loadingTemplate = `
+    <div class="animate-pulse flex space-x-4 py-3">
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+    </div>
+  `;
+  
+  const appList = document.getElementById('app-allocation-list');
+  const container = document.getElementById('app-tables-container');
+  
+  if (appList) appList.innerHTML = loadingTemplate;
+  if (container) container.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">${loadingTemplate}${loadingTemplate}</div>`;
+}
 
-    async function loadDashboardData() {
-      refreshDashboard();
-    }
+// อัปเดตฟังก์ชัน loadDashboardData
+async function loadDashboardData() {
+  showSkeletonLoaders();
+  await refreshDashboard();
+}// ฟังก์ชันใส่ Skeleton Loader ก่อนดึงข้อมูลจริง
+function showSkeletonLoaders() {
+  const loadingTemplate = `
+    <div class="animate-pulse flex space-x-4 py-3">
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+      <div class="h-4 bg-slate-700 rounded w-1/4"></div>
+    </div>
+  `;
+  
+  const appList = document.getElementById('app-allocation-list');
+  const container = document.getElementById('app-tables-container');
+  
+  if (appList) appList.innerHTML = loadingTemplate;
+  if (container) container.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">${loadingTemplate}${loadingTemplate}</div>`;
+}
 
+// อัปเดตฟังก์ชัน loadDashboardData
+async function loadDashboardData() {
+  showSkeletonLoaders();
+  await refreshDashboard();
+}
+
+    // 📍 1. ดึงข้อมูล แถว 1 (บนสุด)
     async function fetchSummary() {
-      const { data, error } = await supabaseClient.from('v_dashboard_summary').select('*').single();
+      // ✅ แก้เป็น (ดึงข้อมูลแบบ Array ทั้งหมด 4 พอร์ต)
+const { data, error } = await supabaseClient
+  .from('v_dashboard_summary')
+  .select('*');
       if (error) return console.error('Error fetching summary:', error);
 
-      if (data) {
-        document.getElementById('total-wealth').innerText = formatTHB(data.total_wealth_thb);
-        document.getElementById('total-cost').innerText = formatTHB(data.total_cost_thb);
-        
-        const pnl = data.total_unrealized_pnl_thb || 0;
-        const pnlPct = data.total_unrealized_pnl_pct || 0;
-        const pnlEl = document.getElementById('total-pnl');
-        const pnlPctEl = document.getElementById('total-pnl-pct');
+      // ✅ แก้ไขบรรทัดที่ 246 เป็นต้นไป ตามนี้ครับ
+if (data) {
+  // 1. รวมยอดเงินบาทของทั้ง 4 พอร์ต
+  const totalWealth = data.reduce((sum, item) => sum + Number(item.total_wealth_thb || 0), 0);
+  const totalCost = data.reduce((sum, item) => sum + Number(item.total_cost_thb || 0), 0);
+  const pnl = data.reduce((sum, item) => sum + Number(item.total_pnl_thb || 0), 0);
 
-        pnlEl.innerText = formatTHB(pnl);
-        pnlPctEl.innerText = `${pnlPct >= 0 ? '+' : ''}${formatNumber(pnlPct)}%`;
+  // คำนวณ % PnL รวม
+  const pnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
+  // 2. แสดงผลบนการ์ดด้านบน
+  document.getElementById('total-wealth').innerText = formatTHB(totalWealth);
+  document.getElementById('total-cost').innerText = formatTHB(totalCost);
+
+// คำนวณ % กำไร/ขาดทุนรวมของทั้งพอร์ต
+      const totalPnlPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
+      const appCount = data.length;
+
+      // ค้นหา element ใต้ยอดเงินรวม (ลองหาทั้งจาก id และ class)
+      const subTextEl = document.getElementById('total-wealth-subtext') || document.querySelector('#total-wealth + p') || document.querySelector('.total-wealth-sub');
+      
+      if (subTextEl) {
+        const isProfit = pnl >= 0;
+        const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+        const icon = isProfit ? '▲ ' : '▼ ';
+
+        subTextEl.innerHTML = `จากทั้งหมด <span class="font-semibold text-white">${appCount}</span> แอปพลิเคชัน (<span class="${pnlClass}">${icon}${formatNumber(Math.abs(totalPnlPct), 2)}%</span>)`;
+      }
+	
+  // 3. กำไร/ขาดทุนสะสม
+  const pnlEl = document.getElementById('total-pnl');
+  const pnlPctEl = document.getElementById('total-pnl-pct');
+  const icon = pnl >= 0 ? '▲ ' : '▼ ';
+
+  if (pnlEl) pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
+  if (pnlPctEl) pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(pnlPct))}%`;
         if (pnl >= 0) {
-          pnlEl.className = 'text-3xl font-bold text-emerald-400 mt-2';
-          pnlPctEl.className = 'text-xs font-semibold text-emerald-400 mt-2';
+          pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
+          pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
         } else {
-          pnlEl.className = 'text-3xl font-bold text-rose-400 mt-2';
-          pnlPctEl.className = 'text-xs font-semibold text-rose-400 mt-2';
+          pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
+          pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
+        }
+
+        // 1.2 กำไร/ขาดทุนรายวันรวม
+        const dailyPnl = data.total_daily_pnl_thb || 0;
+        const dailyPnlPct = data.total_daily_pnl_pct || 0;
+        const dailyPnlEl = document.getElementById('daily-pnl');
+        const dailyPnlPctEl = document.getElementById('daily-pnl-pct');
+
+        const dailyIcon = dailyPnl >= 0 ? '▲ ' : '▼ ';
+        dailyPnlEl.innerText = `${dailyIcon}${formatTHB(Math.abs(dailyPnl))}`;
+        dailyPnlPctEl.innerText = `${dailyIcon}${formatNumber(Math.abs(dailyPnlPct))}%`;
+
+        if (dailyPnl >= 0) {
+          dailyPnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
+          dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
+        } else {
+          dailyPnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
+          dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
         }
 
         document.getElementById('app-count').innerText = `จากทั้งหมด ${data.total_apps || 0} แอปพลิเคชัน (${data.total_assets || 0} รายการ)`;
       }
     }
 
-    async function fetchAppAllocation() {
-      const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
-      if (error) return console.error('Error fetching allocation:', error);
+    // 2. ดึงข้อมูล ส่วน 2 (ภาพรวมแต่ละพอร์ต)
+async function fetchAppAllocation() {
+  const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
+  if (error) return console.error('Error fetching allocation:', error);
 
-      const listEl = document.getElementById('app-allocation-list');
-      if (!listEl) return;
-      listEl.innerHTML = '';
+  const listEl = document.getElementById('app-allocation-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
 
-      const labels = [];
-      const chartValues = [];
+  const order = ['GPF', 'MFC', 'SCB', 'DIME'];
+  const sortedData = (data || []).sort((a, b) => {
+    return order.indexOf(a.app_source.toUpperCase()) - order.indexOf(b.app_source.toUpperCase());
+  });
 
-      (data || []).forEach(item => {
-        labels.push(item.app_source.toUpperCase());
-        chartValues.push(item.total_wealth_thb);
+  const labels = [];
+  const chartValues = [];
 
-        const isProfit = item.total_pnl_thb >= 0;
-        const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+  // 1. คำนวณหาผลรวมเงินบาททั้งหมดล่วงหน้าเพื่อใช้คิดสัดส่วน %
+  const totalWealth = sortedData.reduce((sum, item) => {
+    const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
+    const fx = item.fx_rate || (isUSD ? 32.88 : 1);
+    const val = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
+    return sum + Number(val || 0);
+  }, 0);
 
-        listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-3 font-semibold text-white uppercase">${item.app_source}</td>
-            <td class="py-3">${formatTHB(item.total_wealth_thb)}</td>
-            <td class="py-3 text-slate-400">${formatTHB(item.total_cost_thb)}</td>
-            <td class="py-3 ${pnlClass}">${formatTHB(item.total_pnl_thb)} (${isProfit ? '+' : ''}${formatNumber(item.pnl_pct)}%)</td>
-            <td class="py-3 font-medium text-indigo-400">${formatNumber(item.portfolio_weight_pct)}%</td>
-          </tr>
-        `;
-      });
+  // 2. วนลูปสร้างตารางและเก็บค่าใส่ กราฟ
+  sortedData.forEach(item => {
+    labels.push(item.app_source.toUpperCase());
 
-      renderChart(labels, chartValues);
-    }
+    const isUSD = item.app_source.toUpperCase() === 'DIME' || item.currency === 'USD';
+    const fx = item.fx_rate || (isUSD ? 32.88 : 1);
+
+    const wealthVal = isUSD ? (item.total_wealth_thb * fx) : item.total_wealth_thb;
+    const costVal = isUSD ? (item.total_cost_thb * fx) : item.total_cost_thb;
+    const pnlVal = isUSD ? ((item.total_pnl_thb || item.total_unrealized_pnl_thb || 0) * fx) : (item.total_pnl_thb || 0);
+
+    chartValues.push(wealthVal);
+
+    // คำนวณ % กำไรสะสม
+    const pnlPct = item.pnl_pct || 0;
+    const isProfit = pnlVal >= 0;
+    const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+    const icon = isProfit ? '▲ ' : '▼ ';
+
+    // คำนวณกำไรรายวัน
+    const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
+    const dailyPct = item.daily_pnl_pct || 0;
+    const isDailyProfit = dailyVal >= 0;
+    const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+    const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
+	// แสดงยอด USD ในวงเล็บกำกับไว้ (เฉพาะพอร์ตที่เป็น USD / DIME)
+  const usdWealthText = isUSD ? `<span class="text-xs text-slate-400 block">($${formatNumber(item.total_wealth_thb || 0, 2)})</span>` : '';
+  const usdCostText = isUSD ? `<span class="text-xs text-slate-400 block">($${formatNumber(item.total_cost_thb || 0, 2)})</span>` : '';
+
+  // คำนวณ % สัดส่วนพอร์ต
+  const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
+
+  listEl.innerHTML += `
+    <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+      <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
+      <td class="py-2.5">
+        ${formatTHB(wealthVal)}
+        ${usdWealthText}
+      </td>
+      <td class="py-2.5 text-slate-400">
+        ${formatTHB(costVal)}
+        ${usdCostText}
+      </td>
+      <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
+      <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
+      <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
+    </tr>
+  `;
+    }); // <--- จบลูป sortedData.forEach
+
+    // วาดกราฟหลังจากเก็บข้อมูลครบทุกพอร์ตแล้ว
+    renderChart(labels, chartValues);
+  } // <--- จบฟังก์ชัน fetchAppAllocation
 
     async function fetchAssetDetails() {
       const { data, error } = await supabaseClient.from('v_asset_details').select('*');
       if (error) return console.error('Error fetching asset details:', error);
 
       globalAssetDetails = data || [];
-      
-      const activeBtn = document.querySelector('.filter-btn.bg-indigo-600');
-      const activeApp = activeBtn ? activeBtn.dataset.app : 'ALL';
-      
-      filterAssetDetails(activeApp);
-    }
-
-    // ----------------------------------------------------
-    // 3. ฟังก์ชันกรองข้อมูล และ แปลงชื่อสินทรัพย์
-    // ----------------------------------------------------
-    function filterAssetDetails(appSource) {
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        if (btn.dataset.app === appSource) {
-          btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-md transition filter-btn";
-        } else {
-          btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn";
-        }
-      });
-
-      if (appSource === 'ALL') {
-        renderAssetDetailsTable(globalAssetDetails);
-      } else {
-        const filtered = globalAssetDetails.filter(item => item.app_source.toUpperCase() === appSource);
-        renderAssetDetailsTable(filtered);
-      }
+      renderAllAppTables(globalAssetDetails);
     }
 
     function getReadableAssetName(item) {
       const code = item.asset_code || item.symbol || '';
-      
       const mfcFundNames = {
         'MPF07': 'IGOLD-G',
         'MPF15': 'MGTECH',
@@ -333,7 +414,7 @@
           return `
             <div>
               <div class="font-medium text-white">${code}</div>
-              <div class="text-[11px] text-amber-400/90 font-medium mt-0.5">${fundName}</div>
+              <div class="text-[10px] sm:text-[11px] text-amber-400/90 font-medium mt-0.5">${fundName}</div>
             </div>
           `;
         }
@@ -344,7 +425,7 @@
         return `
           <div>
             <div class="font-medium text-white">${code}</div>
-            <div class="text-[11px] text-slate-400 font-normal mt-0.5">${subName}</div>
+            <div class="text-[10px] sm:text-[11px] text-slate-400 font-normal mt-0.5">${subName}</div>
           </div>
         `;
       }
@@ -352,86 +433,183 @@
       return `<span class="font-medium text-white">${code}</span>`;
     }
 
-    // ----------------------------------------------------
-    // 4. ฟังก์ชันแสดงตารางสินทรัพย์
-    // ----------------------------------------------------
-    function renderAssetDetailsTable(data) {
-      const listEl = document.getElementById('asset-details-list');
-      if (!listEl) return;
-      listEl.innerHTML = '';
+    // 📍 3. ดึงข้อมูล แถว 3 (รายละเอียดแต่ละพอร์ต) -> กำไร/ขาดทุนสะสม อยู่หน้า รายวัน
+	function renderAllAppTables(allData) {
+  const container = document.getElementById('app-tables-container');
+  if (!container) return;
+  container.innerHTML = '';
 
-      if (data && data.length > 0) {
-        const rawTime = data[0].updated_at || data[0].nav_date || '-';
-        const formattedTime = formatThaiDateTime(rawTime);
-        const timeEl = document.getElementById('last-updated-time');
-        if (timeEl) timeEl.innerText = formattedTime;
+  if (allData && allData.length > 0) {
+    const rawTime = allData[0].updated_at || allData[0].nav_date || '-';
+    const timeEl = document.getElementById('last-updated-time');
+    if (timeEl) timeEl.innerText = formatThaiDateTime(rawTime);
+  }
+
+  const overallTotalWealth = allData.reduce((sum, item) => sum + Number(item.current_value_thb || 0), 0);
+  const appOrder = ['GPF', 'MFC', 'SCB', 'DIME'];
+
+  // ฟังก์ชันสัญลักษณ์ลูกศรบอกทิศทาง Sort บนหัวตาราง
+  const getSortIcon = (col) => {
+    if (currentSortColumn !== col) return '↕️';
+    return isSortAsc ? '▲' : '▼';
+  };
+
+  appOrder.forEach(app => {
+    const appItems = allData.filter(item => item.app_source.toUpperCase() === app);
+    if (appItems.length === 0) return;
+
+    const appTotalWealth = appItems.reduce((sum, item) => sum + Number(item.current_value_thb || 0), 0);
+    const appTotalCost = appItems.reduce((sum, item) => sum + Number(item.total_cost_thb || 0), 0);
+    
+    const appPnlThb = appTotalWealth - appTotalCost;
+    const appPnlPct = appTotalCost > 0 ? (appPnlThb / appTotalCost) * 100 : 0;
+    const isAppProfit = appPnlThb >= 0;
+    const appPnlClass = isAppProfit ? 'text-emerald-400' : 'text-rose-400';
+    const appIcon = isAppProfit ? '▲ ' : '▼ ';
+
+    const appDailyPnlThb = appItems.reduce((sum, item) => sum + Number(item.daily_pnl_thb || 0), 0);
+    const appDailyPnlPct = appTotalWealth > 0 ? (appDailyPnlThb / appTotalWealth) * 100 : 0;
+    const isAppDailyProfit = appDailyPnlThb >= 0;
+    const appDailyPnlClass = isAppDailyProfit ? 'text-emerald-400' : 'text-rose-400';
+    const appDailyIcon = isAppDailyProfit ? '▲ ' : '▼ ';
+
+    // 📍 ประมวลผลการ Sort ข้อมูลตามคอลัมน์และทิศทางที่เลือก
+    const sortedItems = [...appItems].sort((a, b) => {
+      let valA = a[currentSortColumn];
+      let valB = b[currentSortColumn];
+
+      // แปลงกรณีเป็นตัวเลขเพื่อป้องกันความผิดพลาด
+      if (['current_value_thb', 'unrealized_pnl_pct', 'daily_pnl_thb', 'units', 'current_nav'].includes(currentSortColumn)) {
+        valA = Number(valA || 0);
+        valB = Number(valB || 0);
+      } else if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB || '').toLowerCase();
       }
-      
-      if (!data || data.length === 0) {
-        listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
-        return;
-      }
 
-      const totalCurrentValue = data.reduce((sum, item) => {
-        return sum + ((item.units || 0) * (item.current_nav || 0));
-      }, 0);
+      if (valA < valB) return isSortAsc ? -1 : 1;
+      if (valA > valB) return isSortAsc ? 1 : -1;
+      return 0;
+    });
 
-      const sortedData = [...data].sort((a, b) => (b.unrealized_pnl_pct || 0) - (a.unrealized_pnl_pct || 0));
+    let rowsHtml = '';
+    sortedItems.forEach(item => {
+      // 📍 ปรับการดึงค่า PnL สะสมให้ถูกต้อง
+        const pnlThb = item.unrealized_pnl !== undefined && item.unrealized_pnl !== null
+          ? Number(item.unrealized_pnl)
+          : (Number(item.current_value_thb || item.current_value || 0) - Number(item.total_cost || 0));
 
-      sortedData.forEach(item => {
-        const pnlPct = item.unrealized_pnl_pct || 0;
-        const isProfit = pnlPct >= 0;
-        const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-        const sign = isProfit ? '+' : '';
+        const pnlPct = item.unrealized_pnl_pct !== undefined && item.unrealized_pnl_pct !== null
+          ? Number(item.unrealized_pnl_pct)
+          : (Number(item.total_cost) > 0 ? (pnlThb / Number(item.total_cost)) * 100 : 0);
+      const isProfit = pnlThb >= 0;
+      const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+      const icon = isProfit ? '▲ ' : '▼ ';
 
-        const itemValue = (item.units || 0) * (item.current_nav || 0);
-        const actualPct = totalCurrentValue > 0 ? (itemValue / totalCurrentValue) * 100 : 0;
-        const targetPct = item.target_pct || item.target_proportion || 0;
-        const diffPct = actualPct - targetPct;
+      const dailyPnlThb = item.daily_pnl_thb || 0;
+      const dailyPnlPct = item.daily_pnl_pct || 0;
+      const isDailyProfit = dailyPnlThb >= 0;
+      const dailyPnlClass = isDailyProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+      const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
 
-        let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
-        if (targetPct > 0) {
-          if (diffPct < -1) {
-            statusBadge = `<span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
-          } else if (diffPct > 1) {
-            statusBadge = `<span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
-          } else {
-            statusBadge = `<span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
-          }
+      const itemValue = Number(item.current_value_thb) || 0;
+      const actualPct = appTotalWealth > 0 ? (itemValue / appTotalWealth) * 100 : 0;
+      const targetPct = item.target_pct || item.target_proportion || 0;
+      const diffPct = actualPct - targetPct;
+
+      let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
+      if (targetPct > 0) {
+        if (diffPct < -1) {
+          statusBadge = `<span class="text-[9px] sm:text-[10px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
+        } else if (diffPct > 1) {
+          statusBadge = `<span class="text-[9px] sm:text-[10px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
+        } else {
+          statusBadge = `<span class="text-[9px] sm:text-[10px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
         }
+      }
 
-        listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-3 font-semibold text-xs text-slate-400 uppercase">${item.app_source}</td>
-            <td class="py-3 text-left">${getReadableAssetName(item)}</td>
-            <td class="py-3 text-slate-200">${formatNumber(item.units, 4)}</td>
-            <td class="py-3 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency}</td>
-            <td class="py-3 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
-            <td class="py-3 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
-            
-            <td class="px-3 py-3 text-center font-mono">
-              <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
-              <span class="text-slate-500 mx-1">/</span>
-              <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
-              <div class="mt-0.5">${statusBadge}</div>
-            </td>
+      rowsHtml += `
+        <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+          <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
+          <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
+          <td class="py-2.5 text-slate-200">${formatNumber(item.units, 4)}</td>
+          <td class="py-2.5 text-slate-200">${formatNumber(item.current_nav, 2)} THB</td>
+          <td class="py-2.5 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
+          <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlThb))} (${formatNumber(Math.abs(pnlPct), 2)}%)</td>
+          <td class="py-2.5 ${dailyPnlClass}">${dailyIcon}${formatTHB(Math.abs(dailyPnlThb))} (${formatNumber(Math.abs(dailyPnlPct), 2)}%)</td>
+          
+          <td class="px-2 py-2.5 text-center font-mono">
+            <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
+            <span class="text-slate-500 mx-0.5">/</span>
+            <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
+            <div class="mt-0.5">${statusBadge}</div>
+          </td>
 
-            <td class="py-3 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
-            <td class="py-3 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
-            <td class="py-3 text-center">
-              <div class="flex items-center justify-center gap-2">
-                <button onclick="openEditModalById('${item.id}')" class="p-1.5 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
-                <button onclick="deleteAssetById('${item.id}')" class="p-1.5 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      });
-    }
+          <td class="py-2.5 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+          <td class="py-2.5 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+          <td class="py-2.5 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="openEditModalById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
+              <button onclick="deleteAssetById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
+           </div>
+          </td>
+        </tr>
+      `;
+    });
 
-    // ----------------------------------------------------
-    // 5. ฟังก์ชันจัดการ Modal (แก้ไข / บันทึก / ลบ)
-    // ----------------------------------------------------
+    const appWeightPct = overallTotalWealth > 0 ? (appTotalWealth / overallTotalWealth) * 100 : 0;
+
+    // 📍 ใส่ `onclick="handleSort('คอลัมน์')"` และสัญลักษณ์ลูกศรที่หัวตาราง <th>
+    const cardHtml = `
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-slate-700/80 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-base sm:text-lg font-bold text-white bg-indigo-600/30 border border-indigo-500/40 px-3 py-1 rounded-lg">${app}</span>
+            <span class="text-xs text-slate-400">สัดส่วนพอร์ตรวม: <b class="text-indigo-400">${formatNumber(appWeightPct, 2)}%</b></span>
+          </div>
+          <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
+            <div>กำไรสะสม: <span class="${appPnlClass}">${appIcon}${formatTHB(Math.abs(appPnlThb))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</span></div>
+            <div>รายวัน: <span class="${appDailyPnlClass}">${appDailyIcon}${formatTHB(Math.abs(appDailyPnlThb))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</span></div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto no-scrollbar">
+          <table class="w-full text-left text-xs sm:text-sm min-w-[950px]">
+            <thead class="bg-slate-800/50">
+              <tr class="text-[11px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50 select-none">
+                <th class="py-2.5 text-left">แอป</th>
+                <th onclick="handleSort('asset_code')" class="py-2.5 text-left cursor-pointer hover:text-white transition">รหัสสินทรัพย์ ${getSortIcon('asset_code')}</th>
+                <th onclick="handleSort('units')" class="py-2.5 text-left cursor-pointer hover:text-white transition">จำนวนหน่วย ${getSortIcon('units')}</th>
+                <th onclick="handleSort('current_nav')" class="py-2.5 text-left cursor-pointer hover:text-white transition">NAV ปัจจุบัน ${getSortIcon('current_nav')}</th>
+                <th onclick="handleSort('current_value_thb')" class="py-2.5 text-left cursor-pointer hover:text-white transition">มูลค่ารวม (THB) ${getSortIcon('current_value_thb')}</th>
+                <th onclick="handleSort('unrealized_pnl_pct')" class="py-2.5 text-left cursor-pointer hover:text-white transition">กำไร/ขาดทุนสะสม (%) ${getSortIcon('unrealized_pnl_pct')}</th>
+                <th onclick="handleSort('daily_pnl_thb')" class="py-2.5 text-left cursor-pointer hover:text-white transition">กำไร/ขาดทุนรายวัน (%) ${getSortIcon('daily_pnl_thb')}</th>
+                <th class="py-2.5 text-center">สัดส่วน (จริง/เป้า)</th>
+                <th class="py-2.5 text-center">3M (%)</th>
+                <th class="py-2.5 text-center">YTD (%)</th>
+                <th class="py-2.5 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700/50">${rowsHtml}</tbody>
+            <tfoot class="bg-slate-900/60 font-bold border-t-2 border-slate-700">
+              <tr class="text-white text-xs sm:text-sm">
+                <td colspan="4" class="py-3 text-right pr-4 font-bold text-slate-300">รวมพอร์ต ${app}:</td>
+                <td class="py-3 font-bold text-emerald-400">${formatTHB(appTotalWealth)}</td>
+                <td class="py-3 font-bold ${appPnlClass}">${appIcon}${formatTHB(Math.abs(appPnlThb))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</td>
+                <td class="py-3 font-bold ${appDailyPnlClass}">${appDailyIcon}${formatTHB(Math.abs(appDailyPnlThb))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</td>
+                <td class="py-3 text-center font-bold text-indigo-400 font-mono">100.00%</td>
+                <td colspan="3" class="py-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML += cardHtml;
+  });
+}
+
     function closeEditModal() {
       document.getElementById('edit-modal').classList.add('hidden');
     }
@@ -470,7 +648,7 @@
             avg_nav: avgNav, 
             total_cost: totalCost,
             target_pct: targetPct,
-            updated_at: new Date().toISOString()
+            updated_at: new Date()
           })
           .eq('id', id);
 
@@ -488,7 +666,7 @@
 
     async function deleteAssetById(id) {
       const item = globalAssetDetails.find(i => i.id === id);
-      const codeName = item ? (item.asset_code || 'รายการนี้') : 'รายการนี้';
+      const codeName = item ? item.asset_code : 'รายการนี้';
 
       if (!confirm(`คุณต้องการลบรายการ [${codeName}] ออกจากพอร์ตใช่หรือไม่?`)) return;
 
@@ -505,37 +683,69 @@
       refreshDashboard();
     }
 
-    // ----------------------------------------------------
-    // 6. ฟังก์ชันวาดกราฟ Donut
-    // ----------------------------------------------------
-    function renderChart(labels, dataValues) {
-      const canvas = document.getElementById('allocationChart');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (chartInstance) chartInstance.destroy();
+    function renderChart(labels, chartValues) {
+  // ใช้ ID 'allocationChart' ตามของเดิมในไฟล์ index.html
+  const ctx = document.getElementById('allocationChart');
+  if (!ctx) return;
 
-      chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: dataValues,
-            backgroundColor: ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#3b82f6'],
-            borderWidth: 0
-          }]
+  if (window.myDoughnutChart) {
+    window.myDoughnutChart.destroy();
+  }
+
+  const brandColors = {
+    'GPF': '#10B981',   // เขียว
+    'MFC': '#F97316',   // ส้ม
+    'SCB': '#8B5CF6',   // ม่วง
+    'DIME': '#06B6D4'   // ฟ้า
+  };
+
+  const bgColors = labels.map(label => brandColors[label.toUpperCase()] || '#64748B');
+
+  window.myDoughnutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: chartValues,
+        backgroundColor: bgColors,
+        borderWidth: 3,
+        borderColor: '#1e293b',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '72%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#94a3b8',
+            font: { family: 'Prompt, sans-serif', size: 12 },
+            usePointStyle: true,
+            pointStyle: 'circle',
+            padding: 16,     // ระยะห่างระหว่างรายการ
+            boxWidth: 8      // ปรับขนาดจุดให้พอดีเพื่อเร่งการตัดแถว
+          }
         },
-        options: {
-          plugins: {
-            legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Prompt' } } }
-          },
-          cutout: '70%'
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const val = context.raw || 0;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? ((val / total) * 100).toFixed(2) : 0;
+              return ` ${context.label}: ${formatTHB(val)} (${pct}%)`;
+            }
+          }
         }
-      });
+      }
     }
+  });
+}
 
     function formatThaiDateTime(isoString) {
       if (!isoString || isoString === '-') return '-';
-      
       try {
         const date = new Date(isoString);
         if (isNaN(date.getTime())) return isoString;
@@ -556,7 +766,7 @@
     }
 
     window.onload = loadDashboardData;
-  
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
@@ -570,121 +780,168 @@
     }
 
     async function handlePdfUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+    const file = event.target.files[0];
+    if (!file) return;
 
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = "";
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          fullText += content.items.map(item => item.str).join(" ") + "\n";
-        }
-
-        if (fullText.includes("เอ็มเอฟซี") || fullText.includes("MPF")) {
-          parseMfcPdfStatement(fullText);
-        } else if (fullText.includes("แผนการลงทุน") || fullText.includes("กองทุนอสังหาริมทรัพย์ไทย")) {
-          parseGpfPdfStatement(fullText);
-        } else {
-          alert("❌ ไม่พบรูปแบบเอกสาร PDF ที่รองรับ");
-        }
-      } catch (err) {
-        console.error("PDF Parsing Error:", err);
-        alert("❌ เกิดข้อผิดพลาดในการอ่านไฟล์ PDF");
-      }
-    }
-
-    async function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      try {
-        const { data: { text } } = await Tesseract.recognize(file, 'eng+tha');
-
-        if (text.includes("Dime") || text.includes("Ticker") || text.includes("Avg. Cost")) {
-          parseDimeImage(text);
-        } else if (text.includes("SCB") || text.includes("ต้นทุนเฉลี่ย") || text.includes("จำนวนหน่วยลงทุน")) {
-          parseScbImage(text);
-        } else {
-          alert("❌ ไม่พบรูปแบบรูปภาพที่รองรับ");
-        }
-      } catch (err) {
-        console.error("Image OCR Error:", err);
-        alert("❌ เกิดข้อผิดพลาดในการอ่านรูปภาพ");
-      }
-    }
-
-    function parseMfcPdfStatement(text) {
-      const mfcRegex = /(MPF\d{2})[\s\S]*?([\d]+\.[\d]{4})[\s\S]*?([\d,]+\.[\d]{4})/g;
-      let match;
-      const updates = [];
-
-      while ((match = mfcRegex.exec(text)) !== null) {
-        const code = match[1];
-        const avgNav = parseFloat(match[2]);
-        const units = parseFloat(match[3].replace(/,/g, ''));
-        updates.push({ code, avgNav, units });
+    const label = event.target.closest('label');
+    const originalText = label ? label.innerHTML : '';
+    
+    try {
+      // 📍 แสดงสถานะ "กำลังอ่านเอกสาร..."
+      if (label) {
+        label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังอ่านเอกสาร...`;
+        label.style.pointerEvents = 'none';
       }
 
-      if (updates.length > 0) updateDatabaseUnitsAndCost(updates);
-      else alert("❌ ไม่พบข้อมูลรายการในเอกสาร MFC");
-    }
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
 
-    function parseGpfPdfStatement(text) {
-      alert("ℹ️ ได้รับไฟล์ GPF เรียบร้อยแล้ว (ระบบกำลังพัฒนารูปแบบการบันทึก)");
-    }
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(item => item.str).join(" ") + "\n";
+      }
 
-    function parseScbImage(text) {
-      const codeMatch = text.match(/(SCB[A-Z0-9\(\)]+)/i);
-      const costMatch = text.match(/ต้นทุนเฉลี่ย\s*([\d.,]+)/);
-      const unitMatch = text.match(/จำนวนหน่วยลงทุน\s*([\d.,]+)/);
-
-      if (codeMatch && costMatch && unitMatch) {
-        const code = codeMatch[1];
-        const avgNav = parseFloat(costMatch[1].replace(/,/g, ''));
-        const units = parseFloat(unitMatch[1].replace(/,/g, ''));
-        updateDatabaseUnitsAndCost([{ code, avgNav, units }]);
+      if (fullText.includes("เอ็มเอฟซี") || fullText.includes("MPF")) {
+        parseMfcPdfStatement(fullText);
+      } else if (fullText.includes("แผนการลงทุน") || fullText.includes("กองทุนอสังหาริมทรัพย์ไทย")) {
+        parseGpfPdfStatement(fullText);
       } else {
-        alert("❌ สแกนรูป SCB ไม่สมบูรณ์ กรุณาใช้รูปถ่ายที่ชัดเจนขึ้น");
+        showToast("ไม่พบรูปแบบเอกสาร PDF ที่รองรับ", "error");
       }
+    } catch (err) {
+      console.error("PDF Parsing Error:", err);
+      showToast("เกิดข้อผิดพลาดในการอ่านไฟล์ PDF", "error");
+    } finally {
+      // 📍 คืนค่าปุ่มเดิม
+      if (label) {
+        label.innerHTML = originalText;
+        label.style.pointerEvents = 'auto';
+      }
+      event.target.value = ''; // Reset File Input
     }
+  } // 📍 เพิ่มปีกกา } ตรงนี้อีก 1 ตัวเพื่อปิดฟังก์ชัน handlePdfUpload ให้สมบูรณ์
 
-    function parseDimeImage(text) {
-      const lines = text.split('\n');
-      const updates = [];
+// 📍 ฟังก์ชันอ่าน PDF กบข. คำนวณ NAV ต้นทุนเฉลี่ย (ใช้ supabaseClient)
+async function parseGpfPdfStatement(fullText) {
+  try {
+    const plans = [
+      { name: 'แผนหุ้นต่างประเทศ', code: 'GPF_FOREIGN' },
+      { name: 'แผนหุ้นไทย', code: 'GPF_THAI' },
+      { name: 'แผนกองทุนอสังหาริมทรัพย์ไทย', code: 'GPF_REIT' }
+    ];
 
-      lines.forEach(line => {
-        const match = line.match(/([A-Z]{2,5})\s+[\w\s.]+\s+([\d.,]+)\s+([\d.,]+)/);
-        if (match) {
-          updates.push({
-            code: match[1],
-            units: parseFloat(match[2].replace(/,/g, '')),
-            avgNav: parseFloat(match[3].replace(/,/g, ''))
-          });
+    const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    // 1. ดึงข้อมูลพอร์ตปัจจุบันผ่าน supabaseClient
+    const { data: currentPort, error: fetchErr } = await supabaseClient
+      .from('user_portfolios')
+      .select('asset_code, units, avg_nav');
+      
+    if (fetchErr) throw fetchErr;
+
+    for (const plan of plans) {
+      const planLines = lines.filter(l => l.includes(plan.name) && (l.includes('เงิน') || l.includes('เปลี่ยนแผน')));
+      
+      if (planLines.length > 0) {
+        const lastLine = planLines[planLines.length - 1];
+        const matches = lastLine.match(/([\d,]+\.\d+)/g);
+
+        if (matches && matches.length >= 2) {
+          const newNav = parseFloat(matches[0].replace(/,/g, ''));
+          const totalNewUnits = parseFloat(matches[1].replace(/,/g, ''));
+
+          const oldAsset = currentPort ? currentPort.find(a => a.asset_code === plan.code) : null;
+          const oldUnits = oldAsset ? parseFloat(oldAsset.units || 0) : 0;
+          const oldAvgNav = oldAsset ? parseFloat(oldAsset.avg_nav || 0) : 0;
+
+          const addedUnits = totalNewUnits - oldUnits;
+          let calculatedAvgNav = newNav;
+
+          // คำนวณ NAV ต้นทุนเฉลี่ยแบบ Weighted Average
+          if (addedUnits > 0 && oldUnits > 0 && oldAvgNav > 0) {
+            const totalCostBefore = oldUnits * oldAvgNav;
+            const newAddedCost = addedUnits * newNav;
+            calculatedAvgNav = (totalCostBefore + newAddedCost) / totalNewUnits;
+          }
+
+          // 2. อัปเดตข้อมูลกลับลง Supabase ผ่าน supabaseClient
+          const { error: updateErr } = await supabaseClient
+            .from('user_portfolios')
+            .update({
+              units: totalNewUnits,
+              avg_nav: calculatedAvgNav,
+              current_nav: newNav,
+              updated_at: new Date()
+            })
+            .eq('asset_code', plan.code);
+
+          if (updateErr) console.error("Update error for " + plan.code + ":", updateErr);
         }
-      });
-
-      if (updates.length > 0) updateDatabaseUnitsAndCost(updates);
-      else alert("❌ ไม่พบข้อมูลหุ้นในรูป Dime");
-    }
-
-    async function updateDatabaseUnitsAndCost(updates) {
-      for (const item of updates) {
-        await supabaseClient
-          .from('user_portfolios')
-          .update({
-            units: item.units,
-            avg_nav: item.avgNav,
-            updated_at: new Date().toISOString()
-          })
-          .eq('asset_code', item.code);
       }
-      alert("✅ บันทึกข้อมูลต้นทุนและหน่วยใหม่เรียบร้อยแล้ว!");
-      window.location.reload();
     }
+
+    showToast("อัปเดตหน่วยลงทุนและคำนวณ NAV ต้นทุนเฉลี่ยเรียบร้อย!", "success");
+    if (typeof fetchPortfolioData === 'function') fetchPortfolioData();
+
+  } catch (err) {
+    console.error("GPF Parsing Error:", err);
+    showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF", "error");
+  }
+}
+	  
+  async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const label = event.target.closest('label');
+    const originalText = label ? label.innerHTML : '';
+
+    try {
+      // 📍 แสดงสถานะ "กำลังอ่านเอกสาร..."
+      if (label) {
+        label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกนรูป...`;
+        label.style.pointerEvents = 'none';
+      }
+
+      const { data: { text } } = await Tesseract.recognize(file, 'eng+tha');
+
+      if (text.includes("Dime") || text.includes("Ticker") || text.includes("Avg. Cost")) {
+        parseDimeImage(text);
+      } else if (text.includes("SCB") || text.includes("ต้นทุนเฉลี่ย") || text.includes("จำนวนหน่วยลงทุน")) {
+        parseScbImage(text);
+      } else {
+        showToast("ไม่พบรูปแบบรูปภาพที่รองรับ", "error");
+      }
+    } catch (err) {
+      console.error("Image OCR Error:", err);
+      showToast("เกิดข้อผิดพลาดในการอ่านรูปภาพ", "error");
+    } finally {
+      // 📍 คืนค่าปุ่มเดิม
+      if (label) {
+        label.innerHTML = originalText;
+        label.style.pointerEvents = 'auto';
+      }
+      event.target.value = ''; // Reset File Input
+    }
+  }
+
+  // อัปเดตฟังก์ชันแจ้งเตือนตอนบันทึกข้อมูลใน updateDatabaseUnitsAndCost
+  async function updateDatabaseUnitsAndCost(updates) {
+    for (const item of updates) {
+      await supabaseClient
+        .from('user_portfolios')
+        .update({
+          units: item.units,
+          avg_nav: item.avgNav,
+          updated_at: new Date().toISOString()
+        })
+        .eq('asset_code', item.code);
+    }
+    showToast("บันทึกข้อมูลต้นทุนและหน่วยใหม่เรียบร้อยแล้ว!", "success");
+    setTimeout(() => refreshDashboard(), 1200);
+  }
 
     let trendChartInstance = null;
 
@@ -699,13 +956,13 @@
       if (view === 'allocation') {
         allocView.classList.remove('hidden');
         trendView.classList.add('hidden');
-        btnAlloc.className = 'px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
-        btnTrend.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
+        btnAlloc.className = 'px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
+        btnTrend.className = 'px-2.5 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
       } else {
         allocView.classList.add('hidden');
         trendView.classList.remove('hidden');
-        btnTrend.className = 'px-3 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
-        btnAlloc.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
+        btnTrend.className = 'px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
+        btnAlloc.className = 'px-2.5 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
         
         renderTrendChart();
       }
@@ -747,7 +1004,7 @@
             backgroundColor: 'rgba(99, 102, 241, 0.15)',
             fill: true,
             tension: 0.3,
-            pointRadius: 4,
+            pointRadius: 3,
             pointBackgroundColor: '#818cf8'
           }]
         },
@@ -758,12 +1015,56 @@
             legend: { display: false }
           },
           scales: {
-            x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } },
-            y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8' } }
+            x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
           }
         }
       });
     }
+  // ... ฟังก์ชันเดิมที่มีอยู่แล้ว เช่น renderTrendChart, updateDatabaseUnitsAndCost ฯลฯ ...
+
+
+    // ==========================================
+    // 📍 ฟังก์ชัน Toast Notification (วางท้ายสคริปต์ตรงนี้)
+    // ==========================================
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      
+      let bgColors = 'bg-slate-800 border-indigo-500/50 text-indigo-300';
+      let icon = 'ℹ️';
+
+      if (type === 'success') {
+        bgColors = 'bg-slate-800 border-emerald-500/50 text-emerald-300';
+        icon = '✅';
+      } else if (type === 'error') {
+        bgColors = 'bg-slate-800 border-rose-500/50 text-rose-300';
+        icon = '❌';
+      } else if (type === 'warning') {
+        bgColors = 'bg-slate-800 border-amber-500/50 text-amber-300';
+        icon = '⚠️';
+      }
+
+      toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs sm:text-sm font-medium transform transition-all duration-300 translate-y-5 opacity-0 pointer-events-auto ${bgColors}`;
+      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-5', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
   </script>
+  
+  <!-- 📍 อย่าลืมวาง Toast Container ตรงนี้ด้วยครับ -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 </body>
 </html>
