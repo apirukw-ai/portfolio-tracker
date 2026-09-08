@@ -358,11 +358,12 @@ async function fetchAppAllocation() {
         <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
         <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
       </tr>
-    `;
-  });
-}
-      renderChart(labels, chartValues);
-    }
+      `;
+    }); // <--- จบลูป sortedData.forEach
+
+    // วาดกราฟหลังจากเก็บข้อมูลครบทุกพอร์ตแล้ว
+    renderChart(labels, chartValues);
+  } // <--- จบฟังก์ชัน fetchAppAllocation
 
     async function fetchAssetDetails() {
       const { data, error } = await supabaseClient.from('v_asset_details').select('*');
