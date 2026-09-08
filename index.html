@@ -426,193 +426,198 @@
     }
 
     // Render รายละเอียดตารางสินทรัพย์แยกแต่ละพอร์ต
-    function renderAllAppTables(allData) {
-      const container = document.getElementById('app-tables-container');
-      if (!container) return;
-      container.innerHTML = '';
+function renderAllAppTables(allData) {
+  const container = document.getElementById('app-tables-container');
+  if (!container) return;
+  container.innerHTML = '';
 
-      if (allData && allData.length > 0) {
-        const rawTime = allData[0].updated_at || allData[0].nav_date || '-';
-        const timeEl = document.getElementById('last-updated-time');
-        if (timeEl) timeEl.innerText = formatThaiDateTime(rawTime);
+  if (allData && allData.length > 0) {
+    const rawTime = allData[0].updated_at || allData[0].nav_date || '-';
+    const timeEl = document.getElementById('last-updated-time');
+    if (timeEl) timeEl.innerText = formatThaiDateTime(rawTime);
+  }
+
+  const fxRate = window.currentFxRate || DEFAULT_FX_RATE;
+
+  // คำนวณมูลค่ารวมทุกพอร์ตเป็น THB สำหรับคิด % สัดส่วน
+  const overallTotalWealth = allData.reduce((sum, item) => {
+    const isUSD = (item.app_source || '').toUpperCase() === 'DIME' || item.currency === 'USD';
+    const valUSD = Number(item.units || 0) * Number(item.current_nav || 0);
+    const valTHB = isUSD ? (valUSD * fxRate) : Number(item.current_value_thb || 0);
+    return sum + valTHB;
+  }, 0);
+
+  const appOrder = ['GPF', 'MFC', 'SCB', 'DIME'];
+
+  const getSortIcon = (col) => {
+    if (currentSortColumn !== col) return '↕️';
+    return isSortAsc ? '▲' : '▼';
+  };
+
+  appOrder.forEach(app => {
+    const appItems = allData.filter(item => (item.app_source || '').toUpperCase() === app);
+    if (appItems.length === 0) return;
+
+    const isDime = app === 'DIME';
+    const currSymbol = isDime ? '$' : '฿';
+    const currFmt = isDime ? formatUSD : formatTHB;
+
+    // ยอดรวม Native Currency (USD สำหรับ DIME, THB สำหรับพอร์ตอื่น)
+    const displayTotalWealth = appItems.reduce((sum, item) => sum + (Number(item.units || 0) * Number(item.current_nav || 0)), 0);
+    const displayTotalCost = appItems.reduce((sum, item) => sum + (Number(item.units || 0) * Number(item.avg_nav || 0)), 0);
+
+    // ยอดรวม THB สำหรับคำนวณ % สัดส่วน
+    const appTotalWealthTHB = isDime ? (displayTotalWealth * fxRate) : displayTotalWealth;
+
+    const appPnlVal = displayTotalWealth - displayTotalCost;
+    const appPnlPct = displayTotalCost > 0 ? (appPnlVal / displayTotalCost) * 100 : 0;
+    const isAppProfit = appPnlVal >= 0;
+    const appPnlClass = isAppProfit ? 'text-emerald-400' : 'text-rose-400';
+    const appIcon = isAppProfit ? '▲ ' : '▼ ';
+
+    const appDailyPnlVal = isDime 
+      ? appItems.reduce((sum, item) => sum + Number(item.daily_pnl || 0), 0)
+      : appItems.reduce((sum, item) => sum + Number(item.daily_pnl_thb || 0), 0);
+    const appDailyPnlPct = displayTotalWealth > 0 ? (appDailyPnlVal / displayTotalWealth) * 100 : 0;
+    const isAppDailyProfit = appDailyPnlVal >= 0;
+    const appDailyPnlClass = isAppDailyProfit ? 'text-emerald-400' : 'text-rose-400';
+    const appDailyIcon = isAppDailyProfit ? '▲ ' : '▼ ';
+
+    const sortedItems = [...appItems].sort((a, b) => {
+      let valA = a[currentSortColumn];
+      let valB = b[currentSortColumn];
+
+      if (['current_value_thb', 'unrealized_pnl_pct', 'daily_pnl_thb', 'units', 'current_nav'].includes(currentSortColumn)) {
+        valA = Number(valA || 0);
+        valB = Number(valB || 0);
+      } else if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB || '').toLowerCase();
       }
 
-      const overallTotalWealth = allData.reduce((sum, item) => sum + Number(item.current_value_thb || 0), 0);
-      const appOrder = ['GPF', 'MFC', 'SCB', 'DIME'];
+      if (valA < valB) return isSortAsc ? -1 : 1;
+      if (valA > valB) return isSortAsc ? 1 : -1;
+      return 0;
+    });
 
-      const getSortIcon = (col) => {
-        if (currentSortColumn !== col) return '↕️';
-        return isSortAsc ? '▲' : '▼';
-      };
+    let rowsHtml = '';
+    sortedItems.forEach(item => {
+      const units = Number(item.units || 0);
+      const currentNav = Number(item.current_nav || 0);
+      const avgNav = Number(item.avg_nav || 0);
 
-      appOrder.forEach(app => {
-        const appItems = allData.filter(item => (item.app_source || '').toUpperCase() === app);
-        if (appItems.length === 0) return;
+      const currentValue = units * currentNav;
+      const costBasis = units * avgNav;
 
-        const isDime = app === 'DIME';
-        const currSymbol = isDime ? '$' : '฿';
-        const currFmt = isDime ? formatUSD : formatTHB;
+      const pnlVal = currentValue - costBasis;
+      const pnlPct = costBasis > 0 ? (pnlVal / costBasis) * 100 : 0;
 
-        // มูลค่าในพอร์ต DIME แสดงเป็น USD Native
-        const appTotalWealthUSD = appItems.reduce((sum, item) => sum + (Number(item.units || 0) * Number(item.current_nav || 0)), 0);
-        const appTotalCostUSD = appItems.reduce((sum, item) => sum + (Number(item.units || 0) * Number(item.avg_nav || 0)), 0);
-        
-        const appTotalWealthTHB = appItems.reduce((sum, item) => sum + Number(item.current_value_thb || 0), 0);
-        const appTotalCostTHB = appItems.reduce((sum, item) => sum + Number(item.total_cost_thb || 0), 0);
+      const isProfit = pnlVal >= 0;
+      const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+      const icon = isProfit ? '▲ ' : '▼ ';
 
-        const displayTotalWealth = isDime ? appTotalWealthUSD : appTotalWealthTHB;
-        const displayTotalCost = isDime ? appTotalCostUSD : appTotalCostTHB;
+      const dailyPnlVal = isDime ? Number(item.daily_pnl || 0) : Number(item.daily_pnl_thb || 0);
+      const dailyPnlPct = Number(item.daily_pnl_pct || 0);
+      const isDailyProfit = dailyPnlVal >= 0;
+      const dailyPnlClass = isDailyProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+      const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
 
-        const appPnlVal = displayTotalWealth - displayTotalCost;
-        const appPnlPct = displayTotalCost > 0 ? (appPnlVal / displayTotalCost) * 100 : 0;
-        const isAppProfit = appPnlVal >= 0;
-        const appPnlClass = isAppProfit ? 'text-emerald-400' : 'text-rose-400';
-        const appIcon = isAppProfit ? '▲ ' : '▼ ';
+      const itemValueTHB = isDime ? (currentValue * fxRate) : currentValue;
+      const actualPct = appTotalWealthTHB > 0 ? (itemValueTHB / appTotalWealthTHB) * 100 : 0;
+      const targetPct = item.target_pct || item.target_proportion || 0;
+      const diffPct = actualPct - targetPct;
 
-        const appDailyPnlVal = isDime 
-          ? appItems.reduce((sum, item) => sum + Number(item.daily_pnl || 0), 0)
-          : appItems.reduce((sum, item) => sum + Number(item.daily_pnl_thb || 0), 0);
-        const appDailyPnlPct = displayTotalWealth > 0 ? (appDailyPnlVal / displayTotalWealth) * 100 : 0;
-        const isAppDailyProfit = appDailyPnlVal >= 0;
-        const appDailyPnlClass = isAppDailyProfit ? 'text-emerald-400' : 'text-rose-400';
-        const appDailyIcon = isAppDailyProfit ? '▲ ' : '▼ ';
+      let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
+      if (targetPct > 0) {
+        if (diffPct < -1) {
+          statusBadge = `<span class="text-[9px] sm:text-[10px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
+        } else if (diffPct > 1) {
+          statusBadge = `<span class="text-[9px] sm:text-[10px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
+        } else {
+          statusBadge = `<span class="text-[9px] sm:text-[10px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
+        }
+      }
 
-        const sortedItems = [...appItems].sort((a, b) => {
-          let valA = a[currentSortColumn];
-          let valB = b[currentSortColumn];
+      rowsHtml += `
+        <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+          <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
+          <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
+          <td class="py-2.5 text-slate-200">${formatNumber(units, 4)}</td>
+          <td class="py-2.5 text-slate-200">${currSymbol}${formatNumber(currentNav, 2)}</td>
+          <td class="py-2.5 font-semibold text-white">${currFmt(currentValue)}</td>
+          <td class="py-2.5 ${pnlClass}">${icon}${currFmt(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct), 2)}%)</td>
+          <td class="py-2.5 ${dailyPnlClass}">${dailyIcon}${currFmt(Math.abs(dailyPnlVal))} (${formatNumber(Math.abs(dailyPnlPct), 2)}%)</td>
+          
+          <td class="px-2 py-2.5 text-center font-mono">
+            <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
+            <span class="text-slate-500 mx-0.5">/</span>
+            <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
+            <div class="mt-0.5">${statusBadge}</div>
+          </td>
 
-          if (['current_value_thb', 'unrealized_pnl_pct', 'daily_pnl_thb', 'units', 'current_nav'].includes(currentSortColumn)) {
-            valA = Number(valA || 0);
-            valB = Number(valB || 0);
-          } else if (typeof valA === 'string') {
-            valA = valA.toLowerCase();
-            valB = (valB || '').toLowerCase();
-          }
-
-          if (valA < valB) return isSortAsc ? -1 : 1;
-          if (valA > valB) return isSortAsc ? 1 : -1;
-          return 0;
-        });
-
-        let rowsHtml = '';
-        sortedItems.forEach(item => {
-          const units = Number(item.units || 0);
-          const currentNav = Number(item.current_nav || 0);
-          const avgNav = Number(item.avg_nav || 0);
-
-          const currentValue = isDime ? (units * currentNav) : Number(item.current_value_thb || 0);
-          const costBasis = isDime ? (units * avgNav) : Number(item.total_cost_thb || 0);
-
-          const pnlVal = currentValue - costBasis;
-          const pnlPct = costBasis > 0 ? (pnlVal / costBasis) * 100 : 0;
-
-          const isProfit = pnlVal >= 0;
-          const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-          const icon = isProfit ? '▲ ' : '▼ ';
-
-          const dailyPnlVal = isDime ? Number(item.daily_pnl || 0) : Number(item.daily_pnl_thb || 0);
-          const dailyPnlPct = Number(item.daily_pnl_pct || 0);
-          const isDailyProfit = dailyPnlVal >= 0;
-          const dailyPnlClass = isDailyProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-          const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
-
-          const itemValueTHB = Number(item.current_value_thb) || 0;
-          const actualPct = appTotalWealthTHB > 0 ? (itemValueTHB / appTotalWealthTHB) * 100 : 0;
-          const targetPct = item.target_pct || item.target_proportion || 0;
-          const diffPct = actualPct - targetPct;
-
-          let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
-          if (targetPct > 0) {
-            if (diffPct < -1) {
-              statusBadge = `<span class="text-[9px] sm:text-[10px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
-            } else if (diffPct > 1) {
-              statusBadge = `<span class="text-[9px] sm:text-[10px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
-            } else {
-              statusBadge = `<span class="text-[9px] sm:text-[10px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
-            }
-          }
-
-          rowsHtml += `
-            <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-              <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
-              <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
-              <td class="py-2.5 text-slate-200">${formatNumber(units, 4)}</td>
-              <td class="py-2.5 text-slate-200">${currSymbol}${formatNumber(currentNav, 2)}</td>
-              <td class="py-2.5 font-semibold text-white">${currFmt(currentValue)}</td>
-              <td class="py-2.5 ${pnlClass}">${icon}${currFmt(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct), 2)}%)</td>
-              <td class="py-2.5 ${dailyPnlClass}">${dailyIcon}${currFmt(Math.abs(dailyPnlVal))} (${formatNumber(Math.abs(dailyPnlPct), 2)}%)</td>
-              
-              <td class="px-2 py-2.5 text-center font-mono">
-                <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
-                <span class="text-slate-500 mx-0.5">/</span>
-                <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
-                <div class="mt-0.5">${statusBadge}</div>
-              </td>
-
-              <td class="py-2.5 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
-              <td class="py-2.5 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
-              <td class="py-2.5 text-center">
-                <div class="flex items-center justify-center gap-1.5">
-                  <button onclick="openEditModalById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
-                  <button onclick="deleteAssetById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
-               </div>
-              </td>
-            </tr>
-          `;
-        });
-
-        const appWeightPct = overallTotalWealth > 0 ? (appTotalWealthTHB / overallTotalWealth) * 100 : 0;
-        const usdNote = isDime ? `<span class="text-slate-400 text-xs ml-1">(~ ${formatTHB(appTotalWealthTHB)})</span>` : '';
-
-        const cardHtml = `
-          <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-slate-700/80 pb-3">
-              <div class="flex items-center gap-2">
-                <span class="text-base sm:text-lg font-bold text-white bg-indigo-600/30 border border-indigo-500/40 px-3 py-1 rounded-lg">${app}</span>
-                <span class="text-xs text-slate-400">สัดส่วนพอร์ตรวม: <b class="text-indigo-400">${formatNumber(appWeightPct, 2)}%</b></span>
-              </div>
-              <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
-                <div>กำไรสะสม: <span class="${appPnlClass}">${appIcon}${currFmt(Math.abs(appPnlVal))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</span></div>
-                <div>รายวัน: <span class="${appDailyPnlClass}">${appDailyIcon}${currFmt(Math.abs(appDailyPnlVal))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</span></div>
-              </div>
+          <td class="py-2.5 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+          <td class="py-2.5 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+          <td class="py-2.5 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="openEditModalById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
+              <button onclick="deleteAssetById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
             </div>
+          </td>
+        </tr>
+      `;
+    });
 
-            <div class="overflow-x-auto no-scrollbar">
-              <table class="w-full text-left text-xs sm:text-sm min-w-[950px]">
-                <thead class="bg-slate-800/50">
-                  <tr class="text-[11px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50 select-none">
-                    <th class="py-2.5 text-left">แอป</th>
-                    <th onclick="handleSort('asset_code')" class="py-2.5 text-left cursor-pointer hover:text-white transition">รหัสสินทรัพย์ ${getSortIcon('asset_code')}</th>
-                    <th onclick="handleSort('units')" class="py-2.5 text-left cursor-pointer hover:text-white transition">จำนวนหน่วย ${getSortIcon('units')}</th>
-                    <th onclick="handleSort('current_nav')" class="py-2.5 text-left cursor-pointer hover:text-white transition">NAV (${currSymbol}) ${getSortIcon('current_nav')}</th>
-                    <th onclick="handleSort('current_value_thb')" class="py-2.5 text-left cursor-pointer hover:text-white transition">มูลค่ารวม (${currSymbol}) ${getSortIcon('current_value_thb')}</th>
-                    <th onclick="handleSort('unrealized_pnl_pct')" class="py-2.5 text-left cursor-pointer hover:text-white transition">กำไร/ขาดทุนสะสม (%) ${getSortIcon('unrealized_pnl_pct')}</th>
-                    <th onclick="handleSort('daily_pnl_thb')" class="py-2.5 text-left cursor-pointer hover:text-white transition">กำไร/ขาดทุนรายวัน (%) ${getSortIcon('daily_pnl_thb')}</th>
-                    <th class="py-2.5 text-center">สัดส่วน (จริง/เป้า)</th>
-                    <th class="py-2.5 text-center">3M (%)</th>
-                    <th class="py-2.5 text-center">YTD (%)</th>
-                    <th class="py-2.5 text-center">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-700/50">${rowsHtml}</tbody>
-                <tfoot class="bg-slate-900/60 font-bold border-t-2 border-slate-700">
-                  <tr class="text-white text-xs sm:text-sm">
-                    <td colspan="4" class="py-3 text-right pr-4 font-bold text-slate-300">รวมพอร์ต ${app}:</td>
-                    <td class="py-3 font-bold text-emerald-400">${currFmt(displayTotalWealth)} ${usdNote}</td>
-                    <td class="py-3 font-bold ${appPnlClass}">${appIcon}${currFmt(Math.abs(appPnlVal))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</td>
-                    <td class="py-3 font-bold ${appDailyPnlClass}">${appDailyIcon}${currFmt(Math.abs(appDailyPnlVal))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</td>
-                    <td class="py-3 text-center font-bold text-indigo-400 font-mono">100.00%</td>
-                    <td colspan="3" class="py-3"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+    const appWeightPct = overallTotalWealth > 0 ? (appTotalWealthTHB / overallTotalWealth) * 100 : 0;
+
+    const cardHtml = `
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-slate-700/80 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-base sm:text-lg font-bold text-white bg-indigo-600/30 border border-indigo-500/40 px-3 py-1 rounded-lg">${app}</span>
+            <span class="text-xs text-slate-400">สัดส่วนพอร์ตรวม: <b class="text-indigo-400">${formatNumber(appWeightPct, 2)}%</b></span>
           </div>
-        `;
+          <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
+            <div>กำไรสะสม: <span class="${appPnlClass}">${appIcon}${currFmt(Math.abs(appPnlVal))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</span></div>
+            <div>รายวัน: <span class="${appDailyPnlClass}">${appDailyIcon}${currFmt(Math.abs(appDailyPnlVal))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</span></div>
+          </div>
+        </div>
 
-        container.innerHTML += cardHtml;
-      });
-    }
+        <div class="overflow-x-auto no-scrollbar">
+          <table class="w-full text-left text-xs sm:text-sm min-w-[950px]">
+            <thead class="bg-slate-800/50">
+              <tr class="text-[11px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50 select-none">
+                <th class="py-2.5 text-left">แอป</th>
+                <th onclick="handleSort('asset_code')" class="py-2.5 text-left cursor-pointer hover:text-white transition">รหัสสินทรัพย์ ${getSortIcon('asset_code')}</th>
+                <th onclick="handleSort('units')" class="py-2.5 text-left cursor-pointer hover:text-white transition">จำนวนหน่วย ${getSortIcon('units')}</th>
+                <th onclick="handleSort('current_nav')" class="py-2.5 text-left cursor-pointer hover:text-white transition">NAV (${currSymbol}) ${getSortIcon('current_nav')}</th>
+                <th onclick="handleSort('current_value_thb')" class="py-2.5 text-left cursor-pointer hover:text-white transition">มูลค่ารวม (${currSymbol}) ${getSortIcon('current_value_thb')}</th>
+                <th onclick="handleSort('unrealized_pnl_pct')" class="py-2.5 text-left cursor-pointer hover:text-white transition">กำไร/ขาดทุนสะสม (%) ${getSortIcon('unrealized_pnl_pct')}</th>
+                <th onclick="handleSort('daily_pnl_thb')" class="py-2.5 text-left cursor-pointer hover:text-white transition">กำไร/ขาดทุนรายวัน (%) ${getSortIcon('daily_pnl_thb')}</th>
+                <th class="py-2.5 text-center">สัดส่วน (จริง/เป้า)</th>
+                <th class="py-2.5 text-center">3M (%)</th>
+                <th class="py-2.5 text-center">YTD (%)</th>
+                <th class="py-2.5 text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700/50">${rowsHtml}</tbody>
+            <tfoot class="bg-slate-900/60 font-bold border-t-2 border-slate-700">
+              <tr class="text-white text-xs sm:text-sm">
+                <td colspan="4" class="py-3 text-right pr-4 font-bold text-slate-300">รวมพอร์ต ${app}:</td>
+                <td class="py-3 font-bold text-emerald-400">${currFmt(displayTotalWealth)}</td>
+                <td class="py-3 font-bold ${appPnlClass}">${appIcon}${currFmt(Math.abs(appPnlVal))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</td>
+                <td class="py-3 font-bold ${appDailyPnlClass}">${appDailyIcon}${currFmt(Math.abs(appDailyPnlVal))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</td>
+                <td class="py-3 text-center font-bold text-indigo-400 font-mono">100.00%</td>
+                <td colspan="3" class="py-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML += cardHtml;
+  });
+}
 
     function closeEditModal() {
       document.getElementById('edit-modal').classList.add('hidden');
