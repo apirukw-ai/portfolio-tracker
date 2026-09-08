@@ -730,7 +730,7 @@ async function loadDashboardData() {
     }
   } // 📍 เพิ่มปีกกา } ตรงนี้อีก 1 ตัวเพื่อปิดฟังก์ชัน handlePdfUpload ให้สมบูรณ์
 
-// 📍 ฟังก์ชันประมวลผล PDF กบข. นำมาไว้นอกฟังก์ชันหลัก
+// 📍 ฟังก์ชันอ่าน PDF กบข. พร้อมคำนวณ NAV ต้นทุนเฉลี่ยถัวเฉลี่ยให้อัตโนมัติ
 async function parseGpfPdfStatement(fullText) {
   try {
     const plans = [
@@ -740,47 +740,57 @@ async function parseGpfPdfStatement(fullText) {
     ];
 
     const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
-    const updatedData = [];
+    
+    // 1. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase มาเตรียมคำนวณถัวเฉลี่ย
+    const { data: currentPort, error: fetchErr } = await supabase
+      .from('user_portfolios')
+      .select('asset_code, units, avg_nav');
+      
+    if (fetchErr) throw fetchErr;
 
-    lines.forEach(line => {
-      if (line.includes('เงิน') || line.includes('เปลี่ยนแผน')) {
-        plans.forEach(plan => {
-          if (line.includes(plan.name)) {
-            const matches = line.match(/([\d,]+\.\d+)/g);
-            if (matches && matches.length >= 2) {
-              const nav = parseFloat(matches[0].replace(/,/g, ''));
-              const units = parseFloat(matches[1].replace(/,/g, ''));
-              
-              updatedData.push({
-                asset_code: plan.code,
-                current_nav: nav,
-                avg_nav: nav,
-                units: units
-              });
-            }
+    for (const plan of plans) {
+      // ดึงรายการล่าสุดของแผนนั้นๆ จาก PDF
+      const planLines = lines.filter(l => l.includes(plan.name) && (l.includes('เงิน') || l.includes('เปลี่ยนแผน')));
+      
+      if (planLines.length > 0) {
+        const lastLine = planLines[planLines.length - 1];
+        const matches = lastLine.match(/([\d,]+\.\d+)/g);
+
+        if (matches && matches.length >= 2) {
+          const newNav = parseFloat(matches[0].replace(/,/g, ''));      // NAV ที่ซื้อในสลิป
+          const totalNewUnits = parseFloat(matches[1].replace(/,/g, '')); // หน่วยสะสมรวมใหม่จากสลิป
+
+          // หาข้อมูลเดิมใน Database
+          const oldAsset = currentPort.find(a => a.asset_code === plan.code);
+          const oldUnits = oldAsset ? parseFloat(oldAsset.units || 0) : 0;
+          const oldAvgNav = oldAsset ? parseFloat(oldAsset.avg_nav || 0) : 0;
+
+          const addedUnits = totalNewUnits - oldUnits; // จำนวนหน่วยที่เพิ่มขึ้นจากการ DCA รอบนี้
+
+          let calculatedAvgNav = newNav;
+
+          // 📍 ถ้าเป็นการซื้อเพิ่ม (DCA) และมีหน่วยเดิมอยู่แล้ว ให้คำนวณต้นทุนเฉลี่ยแบบ Weighted Average
+          if (addedUnits > 0 && oldUnits > 0 && oldAvgNav > 0) {
+            const totalCostBefore = oldUnits * oldAvgNav;      // ต้นทุนรวมเดิม
+            const newAddedCost = addedUnits * newNav;          // ต้นทุนที่ใส่เพิ่มรอบนี้
+            calculatedAvgNav = (totalCostBefore + newAddedCost) / totalNewUnits; // NAV ต้นทุนเฉลี่ยใหม่
           }
-        });
+
+          // 2. อัปเดตหน่วยรวมใหม่ และ NAV ต้นทุนเฉลี่ยที่คำนวณแล้วลง Supabase
+          await supabase
+            .from('user_portfolios')
+            .update({
+              units: totalNewUnits,
+              avg_nav: calculatedAvgNav,
+              current_nav: newNav,
+              updated_at: new Date()
+            })
+            .eq('asset_code', plan.code);
+        }
       }
-    });
-
-    if (updatedData.length === 0) {
-      showToast("ไม่พบข้อมูลรายการล่าสุดในไฟล์ PDF", "error");
-      return;
     }
 
-    for (const item of updatedData) {
-      await supabase
-        .from('user_portfolios')
-        .update({
-          units: item.units,
-          avg_nav: item.avg_nav,
-          current_nav: item.current_nav,
-          updated_at: new Date()
-        })
-        .eq('asset_code', item.asset_code);
-    }
-
-    showToast("อัปเดตหน่วยลงทุนและ NAV กบข. สำเร็จ!", "success");
+    showToast("อัปเดตหน่วยลงทุนและคำนวณ NAV ต้นทุนเฉลี่ยเรียบร้อย!", "success");
     if (typeof fetchPortfolioData === 'function') fetchPortfolioData();
 
   } catch (err) {
@@ -788,7 +798,6 @@ async function parseGpfPdfStatement(fullText) {
     showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF", "error");
   }
 }
-
 
 	  
   async function handleImageUpload(event) {
