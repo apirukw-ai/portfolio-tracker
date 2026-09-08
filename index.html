@@ -258,6 +258,19 @@ if (data) {
   document.getElementById('total-wealth').innerText = formatTHB(totalWealth);
   document.getElementById('total-cost').innerText = formatTHB(totalCost);
 
+// คำนวณจำนวนแอปทั้งหมดที่มีข้อมูล
+      const appCount = data.length;
+
+      // แสดงผลข้อความใต้ยอดเงินรวม
+      const subTextEl = document.getElementById('total-wealth-subtext');
+      if (subTextEl) {
+        const isProfit = pnl >= 0;
+        const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+        const icon = isProfit ? '▲ ' : '▼ ';
+        
+        subTextEl.innerHTML = `จากทั้งหมด <span class="font-semibold text-white">${appCount}</span> แอปพลิเคชัน (<span class="${pnlClass}">${icon}${formatNumber(Math.abs(pnlPct), 2)}%</span>)`;
+      }
+	
   // 3. กำไร/ขาดทุนสะสม
   const pnlEl = document.getElementById('total-pnl');
   const pnlPctEl = document.getElementById('total-pnl-pct');
