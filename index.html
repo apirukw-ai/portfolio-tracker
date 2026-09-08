@@ -730,6 +730,67 @@ async function loadDashboardData() {
     }
   }
 
+// 📍 ฟังก์ชันประมวลผล PDF กบข. ดึงหน่วยและ NAV ล่าสุด
+async function parseGpfPdfStatement(fullText) {
+  try {
+    const plans = [
+      { name: 'แผนหุ้นต่างประเทศ', code: 'GPF_FOREIGN' },
+      { name: 'แผนหุ้นไทย', code: 'GPF_THAI' },
+      { name: 'แผนกองทุนอสังหาริมทรัพย์ไทย', code: 'GPF_REIT' }
+    ];
+
+    const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+    const updatedData = [];
+
+    lines.forEach(line => {
+      if (line.includes('เงิน') || line.includes('เปลี่ยนแผน')) {
+        plans.forEach(plan => {
+          if (line.includes(plan.name)) {
+            const matches = line.match(/([\d,]+\.\d+)/g);
+            if (matches && matches.length >= 2) {
+              const nav = parseFloat(matches[0].replace(/,/g, ''));
+              const units = parseFloat(matches[1].replace(/,/g, ''));
+              
+              updatedData.push({
+                asset_code: plan.code,
+                current_nav: nav,
+                avg_nav: nav,
+                units: units
+              });
+            }
+          }
+        });
+      }
+    });
+
+    if (updatedData.length === 0) {
+      showToast("ไม่พบข้อมูลรายการล่าสุดในไฟล์ PDF", "error");
+      return;
+    }
+
+    for (const item of updatedData) {
+      await supabase
+        .from('user_portfolios')
+        .update({
+          units: item.units,
+          avg_nav: item.avg_nav,
+          current_nav: item.current_nav,
+          updated_at: new Date()
+        })
+        .eq('asset_code', item.asset_code);
+    }
+
+    showToast("อัปเดตหน่วยลงทุนและ NAV กบข. สำเร็จ!", "success");
+    if (typeof fetchPortfolioData === 'function') fetchPortfolioData();
+
+  } catch (err) {
+    console.error("GPF Parsing Error:", err);
+    showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF", "error");
+  }
+}
+
+
+	  
   async function handleImageUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
