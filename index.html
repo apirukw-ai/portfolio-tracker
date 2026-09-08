@@ -5,26 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3309/3309991.png">
   <title>Investment Portfolio Dashboard</title>
   
-  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Chart.js สำหรับวาดกราฟ -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Google Fonts (Prompt) -->
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- CDN สำหรับสแกน PDF และ รูปภาพ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { font-family: 'Prompt', sans-serif; }
-    /* ซ่อน Scrollbar ให้ดูสะอาดตาสำหรับส่วนที่มีการเลื่อนแนวนอน */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -40,7 +33,6 @@
         <p class="text-slate-400 text-xs sm:text-sm mt-0.5">ภาพรวมการลงทุนรวมทุกแอปพลิเคชัน</p>
       </div>
 
-      <!-- ปุ่มสแกนเอกสาร + ปุ่มรีเฟรช -->
       <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto justify-end">
         <label class="cursor-pointer bg-slate-700/60 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
           📄 สแกน PDF
@@ -58,40 +50,46 @@
       </div>
     </div>
 
-    <!-- 1. Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
+    <!-- 📍 แถว 1 (บนสุด): ภาพรวมพอร์ต (เพิ่มการ์ดกำไร/ขาดทุนรายวัน) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
       <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
         <p class="text-slate-400 text-xs sm:text-sm">มูลค่าพอร์ตรวมทั้งหมด</p>
-        <h2 id="total-wealth" class="text-2xl sm:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2">฿0.00</h2>
+        <h2 id="total-wealth" class="text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2">฿0.00</h2>
         <p id="app-count" class="text-[11px] sm:text-xs text-slate-500 mt-1">จากทั้งหมด 0 แอปพลิเคชัน</p>
       </div>
 
       <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
         <p class="text-slate-400 text-xs sm:text-sm">เงินลงทุนรวม (ต้นทุน)</p>
-        <h2 id="total-cost" class="text-2xl sm:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
+        <h2 id="total-cost" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
         <p class="text-[11px] sm:text-xs text-slate-500 mt-1">ต้นทุนสะสม</p>
       </div>
 
       <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
-        <p class="text-slate-400 text-xs sm:text-sm">กำไร / ขาดทุนรวมทั้งหมด</p>
-        <h2 id="total-pnl" class="text-2xl sm:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
+        <p class="text-slate-400 text-xs sm:text-sm">กำไร/ขาดทุนสะสม</p>
+        <h2 id="total-pnl" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
         <p id="total-pnl-pct" class="text-[11px] sm:text-xs font-semibold mt-1">0.00%</p>
+      </div>
+
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+        <p class="text-slate-400 text-xs sm:text-sm">กำไร/ขาดทุนรายวัน</p>
+        <h2 id="daily-pnl" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
+        <p id="daily-pnl-pct" class="text-[11px] sm:text-xs font-semibold mt-1">0.00%</p>
       </div>
     </div>
 
-    <!-- 2. Allocation Table & Chart Section -->
+    <!-- 📍 แถว 2: ภาพรวมของแต่ละพอร์ต (กำไร/ขาดทุนสะสม อยู่หน้า รายวัน) + กราฟ -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-      <!-- สัดส่วนตามแอป -->
       <div class="lg:col-span-2 bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
-        <h3 class="text-base sm:text-lg font-bold text-white mb-3">สัดส่วนแยกตามแอปพลิเคชัน</h3>
+        <h3 class="text-base sm:text-lg font-bold text-white mb-3">ภาพรวมของแต่ละพอร์ต</h3>
         <div class="overflow-x-auto no-scrollbar">
-          <table class="w-full text-left text-xs sm:text-sm min-w-[500px]">
+          <table class="w-full text-left text-xs sm:text-sm min-w-[550px]">
             <thead class="text-slate-400 border-b border-slate-700">
               <tr>
                 <th class="pb-2 sm:pb-3">แอป</th>
                 <th class="pb-2 sm:pb-3">มูลค่าปัจจุบัน</th>
                 <th class="pb-2 sm:pb-3">ต้นทุน</th>
-                <th class="pb-2 sm:pb-3">กำไร/ขาดทุน</th>
+                <th class="pb-2 sm:pb-3">กำไร/ขาดทุนสะสม</th>
+                <th class="pb-2 sm:pb-3">กำไร/ขาดทุนรายวัน</th>
                 <th class="pb-2 sm:pb-3">สัดส่วนพอร์ต</th>
               </tr>
             </thead>
@@ -100,7 +98,6 @@
         </div>
       </div>
 
-      <!-- กราฟ -->
       <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md flex flex-col justify-between">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-base sm:text-lg font-bold text-white">ภาพรวมการลงทุน</h3>
@@ -124,45 +121,14 @@
       </div>
     </div>
 
-    <!-- 3. Asset Details Table -->
-    <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <h3 class="text-base sm:text-lg font-bold text-white">รายการกองทุน / สินทรัพย์ย่อย</h3>
-        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0" id="app-filter-buttons">
-          <button onclick="filterAssetDetails('ALL')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition filter-btn whitespace-nowrap" data-app="ALL">ทั้งหมด</button>
-          <button onclick="filterAssetDetails('GPF')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn whitespace-nowrap" data-app="GPF">GPF</button>
-          <button onclick="filterAssetDetails('DIME')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn whitespace-nowrap" data-app="DIME">Dime</button>
-          <button onclick="filterAssetDetails('MFC')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn whitespace-nowrap" data-app="MFC">MFC</button>
-          <button onclick="filterAssetDetails('SCB')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn whitespace-nowrap" data-app="SCB">SCB</button>
-        </div>
-      </div>
+    <!-- 📍 แถว 3: รายละเอียดของแต่ละพอร์ต (กำไร/ขาดทุนสะสม อยู่หน้า รายวัน) เรียง GPF -> MFC -> SCB -> DIME -->
+    <div id="app-tables-container" class="space-y-6"></div>
 
-      <!-- คุมการ Scroll บนมือถือไม่ให้ตารางย้อนเละ -->
-      <div class="overflow-x-auto no-scrollbar">
-        <table class="w-full text-left text-xs sm:text-sm min-w-[850px]">
-          <thead class="bg-slate-800/50">
-            <tr class="text-[11px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
-              <th class="py-2.5 text-left">แอป</th>
-              <th class="py-2.5 text-left">รหัสสินทรัพย์</th>
-              <th class="py-2.5 text-left">จำนวนหน่วย</th>
-              <th class="py-2.5 text-left">NAV ปัจจุบัน</th>
-              <th class="py-2.5 text-left">มูลค่ารวม (THB)</th>
-              <th class="py-2.5 text-left">กำไร/ขาดทุน (%)</th>
-              <th class="py-2.5 text-center">สัดส่วน (จริง/เป้า)</th>
-              <th class="py-2.5 text-center">3M (%)</th>
-              <th class="py-2.5 text-center">YTD (%)</th>
-              <th class="py-2.5 text-center">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody id="asset-details-list" class="divide-y divide-slate-700/50"></tbody>
-        </table>
-      </div>
-
-      <div class="flex justify-end items-center text-[11px] sm:text-xs text-slate-400 mt-3 px-1">
-        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-        🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
-      </div>
+    <div class="flex justify-end items-center text-[11px] sm:text-xs text-slate-400 mt-2 px-1">
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+      🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
     </div>
+
   </div>
 
   <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
@@ -216,6 +182,7 @@
       refreshDashboard();
     }
 
+    // 📍 1. ดึงข้อมูล แถว 1 (บนสุด)
     async function fetchSummary() {
       const { data, error } = await supabaseClient.from('v_dashboard_summary').select('*').single();
       if (error) return console.error('Error fetching summary:', error);
@@ -224,26 +191,47 @@
         document.getElementById('total-wealth').innerText = formatTHB(data.total_wealth_thb);
         document.getElementById('total-cost').innerText = formatTHB(data.total_cost_thb);
         
+        // 1.1 กำไร/ขาดทุนสะสมรวม
         const pnl = data.total_unrealized_pnl_thb || 0;
         const pnlPct = data.total_unrealized_pnl_pct || 0;
         const pnlEl = document.getElementById('total-pnl');
         const pnlPctEl = document.getElementById('total-pnl-pct');
 
-        pnlEl.innerText = formatTHB(pnl);
-        pnlPctEl.innerText = `${pnlPct >= 0 ? '+' : ''}${formatNumber(pnlPct)}%`;
+        const icon = pnl >= 0 ? '▲ ' : '▼ ';
+        pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
+        pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(pnlPct))}%`;
 
         if (pnl >= 0) {
-          pnlEl.className = 'text-2xl sm:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
+          pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
           pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
         } else {
-          pnlEl.className = 'text-2xl sm:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
+          pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
           pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
+        }
+
+        // 1.2 กำไร/ขาดทุนรายวันรวม
+        const dailyPnl = data.total_daily_pnl_thb || 0;
+        const dailyPnlPct = data.total_daily_pnl_pct || 0;
+        const dailyPnlEl = document.getElementById('daily-pnl');
+        const dailyPnlPctEl = document.getElementById('daily-pnl-pct');
+
+        const dailyIcon = dailyPnl >= 0 ? '▲ ' : '▼ ';
+        dailyPnlEl.innerText = `${dailyIcon}${formatTHB(Math.abs(dailyPnl))}`;
+        dailyPnlPctEl.innerText = `${dailyIcon}${formatNumber(Math.abs(dailyPnlPct))}%`;
+
+        if (dailyPnl >= 0) {
+          dailyPnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
+          dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
+        } else {
+          dailyPnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
+          dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
         }
 
         document.getElementById('app-count').innerText = `จากทั้งหมด ${data.total_apps || 0} แอปพลิเคชัน (${data.total_assets || 0} รายการ)`;
       }
     }
 
+    // 📍 2. ดึงข้อมูล แถว 2 (ภาพรวมแต่ละพอร์ต) -> กำไร/ขาดทุนสะสม นำหน้า รายวัน
     async function fetchAppAllocation() {
       const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
       if (error) return console.error('Error fetching allocation:', error);
@@ -252,22 +240,39 @@
       if (!listEl) return;
       listEl.innerHTML = '';
 
+      const order = ['GPF', 'MFC', 'SCB', 'DIME'];
+      const sortedData = (data || []).sort((a, b) => {
+        return order.indexOf(a.app_source.toUpperCase()) - order.indexOf(b.app_source.toUpperCase());
+      });
+
       const labels = [];
       const chartValues = [];
 
-      (data || []).forEach(item => {
+      sortedData.forEach(item => {
         labels.push(item.app_source.toUpperCase());
         chartValues.push(item.total_wealth_thb);
 
-        const isProfit = item.total_pnl_thb >= 0;
-        const pnlClass = isProfit ? 'text-emerald-400' : 'text-rose-400';
+        // กำไรสะสม
+        const pnlVal = item.total_pnl_thb || 0;
+        const pnlPct = item.pnl_pct || 0;
+        const isProfit = pnlVal >= 0;
+        const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+        const icon = isProfit ? '▲ ' : '▼ ';
+
+        // กำไรรายวัน
+        const dailyVal = item.daily_pnl_thb || 0;
+        const dailyPct = item.daily_pnl_pct || 0;
+        const isDailyProfit = dailyVal >= 0;
+        const dailyClass = isDailyProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
+        const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
 
         listEl.innerHTML += `
           <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
             <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
             <td class="py-2.5">${formatTHB(item.total_wealth_thb)}</td>
             <td class="py-2.5 text-slate-400">${formatTHB(item.total_cost_thb)}</td>
-            <td class="py-2.5 ${pnlClass}">${formatTHB(item.total_pnl_thb)} (${isProfit ? '+' : ''}${formatNumber(item.pnl_pct)}%)</td>
+            <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
+            <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
             <td class="py-2.5 font-medium text-indigo-400">${formatNumber(item.portfolio_weight_pct)}%</td>
           </tr>
         `;
@@ -281,26 +286,7 @@
       if (error) return console.error('Error fetching asset details:', error);
 
       globalAssetDetails = data || [];
-      const activeBtn = document.querySelector('.filter-btn.bg-indigo-600');
-      const activeApp = activeBtn ? activeBtn.dataset.app : 'ALL';
-      filterAssetDetails(activeApp);
-    }
-
-    function filterAssetDetails(appSource) {
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        if (btn.dataset.app === appSource) {
-          btn.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-md transition filter-btn whitespace-nowrap";
-        } else {
-          btn.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition filter-btn whitespace-nowrap";
-        }
-      });
-
-      if (appSource === 'ALL') {
-        renderAssetDetailsTable(globalAssetDetails);
-      } else {
-        const filtered = globalAssetDetails.filter(item => item.app_source.toUpperCase() === appSource);
-        renderAssetDetailsTable(filtered);
-      }
+      renderAllAppTables(globalAssetDetails);
     }
 
     function getReadableAssetName(item) {
@@ -339,77 +325,154 @@
       return `<span class="font-medium text-white">${code}</span>`;
     }
 
-    function renderAssetDetailsTable(data) {
-      const listEl = document.getElementById('asset-details-list');
-      if (!listEl) return;
-      listEl.innerHTML = '';
+    // 📍 3. ดึงข้อมูล แถว 3 (รายละเอียดแต่ละพอร์ต) -> กำไร/ขาดทุนสะสม อยู่หน้า รายวัน
+    function renderAllAppTables(allData) {
+      const container = document.getElementById('app-tables-container');
+      if (!container) return;
+      container.innerHTML = '';
 
-      if (data && data.length > 0) {
-        const rawTime = data[0].updated_at || data[0].nav_date || '-';
-        const formattedTime = formatThaiDateTime(rawTime);
+      if (allData && allData.length > 0) {
+        const rawTime = allData[0].updated_at || allData[0].nav_date || '-';
         const timeEl = document.getElementById('last-updated-time');
-        if (timeEl) timeEl.innerText = formattedTime;
-      }
-      
-      if (!data || data.length === 0) {
-        listEl.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-500 font-medium">ไม่พบรายการสินทรัพย์ในพอร์ตนี้</td></tr>`;
-        return;
+        if (timeEl) timeEl.innerText = formatThaiDateTime(rawTime);
       }
 
-      const totalCurrentValue = data.reduce((sum, item) => {
-        return sum + ((item.units || 0) * (item.current_nav || 0));
-      }, 0);
+      const overallTotalWealth = allData.reduce((sum, item) => sum + Number(item.current_value_thb || 0), 0);
+      const appOrder = ['GPF', 'MFC', 'SCB', 'DIME'];
 
-      const sortedData = [...data].sort((a, b) => (b.unrealized_pnl_pct || 0) - (a.unrealized_pnl_pct || 0));
+      appOrder.forEach(app => {
+        const appItems = allData.filter(item => item.app_source.toUpperCase() === app);
+        if (appItems.length === 0) return;
 
-      sortedData.forEach(item => {
-        const pnlPct = item.unrealized_pnl_pct || 0;
-        const isProfit = pnlPct >= 0;
-        const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-        const sign = isProfit ? '+' : '';
+        const appTotalWealth = appItems.reduce((sum, item) => sum + Number(item.current_value_thb || 0), 0);
+        const appTotalCost = appItems.reduce((sum, item) => sum + Number(item.total_cost_thb || 0), 0);
+        
+        // กำไรสะสมพอร์ต
+        const appPnlThb = appTotalWealth - appTotalCost;
+        const appPnlPct = appTotalCost > 0 ? (appPnlThb / appTotalCost) * 100 : 0;
+        const isAppProfit = appPnlThb >= 0;
+        const appPnlClass = isAppProfit ? 'text-emerald-400' : 'text-rose-400';
+        const appIcon = isAppProfit ? '▲ ' : '▼ ';
 
-        const itemValue = (item.units || 0) * (item.current_nav || 0);
-        const actualPct = totalCurrentValue > 0 ? (itemValue / totalCurrentValue) * 100 : 0;
-        const targetPct = item.target_pct || item.target_proportion || 0;
-        const diffPct = actualPct - targetPct;
+        // กำไรรายวันพอร์ต
+        const appDailyPnlThb = appItems.reduce((sum, item) => sum + Number(item.daily_pnl_thb || 0), 0);
+        const appDailyPnlPct = appTotalWealth > 0 ? (appDailyPnlThb / appTotalWealth) * 100 : 0;
+        const isAppDailyProfit = appDailyPnlThb >= 0;
+        const appDailyPnlClass = isAppDailyProfit ? 'text-emerald-400' : 'text-rose-400';
+        const appDailyIcon = isAppDailyProfit ? '▲ ' : '▼ ';
 
-        let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
-        if (targetPct > 0) {
-          if (diffPct < -1) {
-            statusBadge = `<span class="text-[9px] sm:text-[10px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
-          } else if (diffPct > 1) {
-            statusBadge = `<span class="text-[9px] sm:text-[10px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
-          } else {
-            statusBadge = `<span class="text-[9px] sm:text-[10px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
+        let rowsHtml = '';
+        const sortedItems = [...appItems].sort((a, b) => (b.unrealized_pnl_pct || 0) - (a.unrealized_pnl_pct || 0));
+
+        sortedItems.forEach(item => {
+          // กำไรสะสมสินทรัพย์
+          const pnlThb = item.unrealized_pnl_thb || ((item.current_value_thb || 0) - (item.total_cost_thb || 0));
+          const pnlPct = item.unrealized_pnl_pct || 0;
+          const isProfit = pnlThb >= 0;
+          const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+          const icon = isProfit ? '▲ ' : '▼ ';
+
+          // กำไรรายวันสินทรัพย์
+          const dailyPnlThb = item.daily_pnl_thb || 0;
+          const dailyPnlPct = item.daily_pnl_pct || 0;
+          const isDailyProfit = dailyPnlThb >= 0;
+          const dailyPnlClass = isDailyProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+          const dailyIcon = isDailyProfit ? '▲ ' : '▼ ';
+
+          const itemValue = Number(item.current_value_thb) || 0;
+          const actualPct = appTotalWealth > 0 ? (itemValue / appTotalWealth) * 100 : 0;
+          const targetPct = item.target_pct || item.target_proportion || 0;
+          const diffPct = actualPct - targetPct;
+
+          let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
+          if (targetPct > 0) {
+            if (diffPct < -1) {
+              statusBadge = `<span class="text-[9px] sm:text-[10px] bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded border border-amber-500/30">ควรซื้อเพิ่ม (${formatNumber(diffPct, 1)}%)</span>`;
+            } else if (diffPct > 1) {
+              statusBadge = `<span class="text-[9px] sm:text-[10px] bg-indigo-500/20 text-indigo-300 px-1 py-0.5 rounded border border-indigo-500/30">เกินเป้า (+${formatNumber(diffPct, 1)}%)</span>`;
+            } else {
+              statusBadge = `<span class="text-[9px] sm:text-[10px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30">ตามเป้า</span>`;
+            }
           }
-        }
 
-        listEl.innerHTML += `
-          <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
-            <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
-            <td class="py-2.5 text-slate-200">${formatNumber(item.units, 4)}</td>
-            <td class="py-2.5 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency || 'THB'}</td>
-            <td class="py-2.5 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
-            <td class="py-2.5 ${pnlClass}">${sign}${formatNumber(pnlPct, 2)}%</td>
-            
-            <td class="px-2 py-2.5 text-center font-mono">
-              <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
-              <span class="text-slate-500 mx-0.5">/</span>
-              <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
-              <div class="mt-0.5">${statusBadge}</div>
-            </td>
+          rowsHtml += `
+            <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
+              <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
+              <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
+              <td class="py-2.5 text-slate-200">${formatNumber(item.units, 4)}</td>
+              <td class="py-2.5 text-slate-200">${formatNumber(item.current_nav, 2)} ${item.currency || 'THB'}</td>
+              <td class="py-2.5 font-semibold text-white">${formatTHB(item.current_value_thb)}</td>
+              <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlThb))} (${formatNumber(Math.abs(pnlPct), 2)}%)</td>
+              <td class="py-2.5 ${dailyPnlClass}">${dailyIcon}${formatTHB(Math.abs(dailyPnlThb))} (${formatNumber(Math.abs(dailyPnlPct), 2)}%)</td>
+              
+              <td class="px-2 py-2.5 text-center font-mono">
+                <span class="text-emerald-400 font-semibold">${formatNumber(actualPct, 2)}%</span>
+                <span class="text-slate-500 mx-0.5">/</span>
+                <span class="text-slate-400">${targetPct > 0 ? formatNumber(targetPct, 2) + '%' : '-'}</span>
+                <div class="mt-0.5">${statusBadge}</div>
+              </td>
 
-            <td class="py-2.5 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
-            <td class="py-2.5 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
-            <td class="py-2.5 text-center">
-              <div class="flex items-center justify-center gap-1.5">
-                <button onclick="openEditModalById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
-                <button onclick="deleteAssetById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
-             </div>
-            </td>
-          </tr>
+              <td class="py-2.5 text-center text-slate-300">${item.return_3m ? formatNumber(item.return_3m, 2) + '%' : '0.00%'}</td>
+              <td class="py-2.5 text-center text-slate-300">${item.return_ytd ? formatNumber(item.return_ytd, 2) + '%' : '0.00%'}</td>
+              <td class="py-2.5 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button onclick="openEditModalById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition" title="แก้ไขรายการ">✏️</button>
+                  <button onclick="deleteAssetById('${item.id}')" class="p-1 rounded-md bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white transition" title="ลบรายการ">🗑️</button>
+               </div>
+              </td>
+            </tr>
+          `;
+        });
+
+        const appWeightPct = overallTotalWealth > 0 ? (appTotalWealth / overallTotalWealth) * 100 : 0;
+
+        const cardHtml = `
+          <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-slate-700/80 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-base sm:text-lg font-bold text-white bg-indigo-600/30 border border-indigo-500/40 px-3 py-1 rounded-lg">${app}</span>
+                <span class="text-xs text-slate-400">สัดส่วนพอร์ตรวม: <b class="text-indigo-400">${formatNumber(appWeightPct, 2)}%</b></span>
+              </div>
+              <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
+                <div>กำไรสะสม: <span class="${appPnlClass}">${appIcon}${formatTHB(Math.abs(appPnlThb))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</span></div>
+                <div>รายวัน: <span class="${appDailyPnlClass}">${appDailyIcon}${formatTHB(Math.abs(appDailyPnlThb))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</span></div>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto no-scrollbar">
+              <table class="w-full text-left text-xs sm:text-sm min-w-[950px]">
+                <thead class="bg-slate-800/50">
+                  <tr class="text-[11px] sm:text-xs font-medium text-slate-400 uppercase tracking-wider border-b border-slate-700/50">
+                    <th class="py-2.5 text-left">แอป</th>
+                    <th class="py-2.5 text-left">รหัสสินทรัพย์</th>
+                    <th class="py-2.5 text-left">จำนวนหน่วย</th>
+                    <th class="py-2.5 text-left">NAV ปัจจุบัน</th>
+                    <th class="py-2.5 text-left">มูลค่ารวม (THB)</th>
+                    <th class="py-2.5 text-left">กำไร/ขาดทุนสะสม (%)</th>
+                    <th class="py-2.5 text-left">กำไร/ขาดทุนรายวัน (%)</th>
+                    <th class="py-2.5 text-center">สัดส่วน (จริง/เป้า)</th>
+                    <th class="py-2.5 text-center">3M (%)</th>
+                    <th class="py-2.5 text-center">YTD (%)</th>
+                    <th class="py-2.5 text-center">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/50">${rowsHtml}</tbody>
+                <tfoot class="bg-slate-900/60 font-bold border-t-2 border-slate-700">
+                  <tr class="text-white text-xs sm:text-sm">
+                    <td colspan="4" class="py-3 text-right pr-4 font-bold text-slate-300">รวมพอร์ต ${app}:</td>
+                    <td class="py-3 font-bold text-emerald-400">${formatTHB(appTotalWealth)}</td>
+                    <td class="py-3 font-bold ${appPnlClass}">${appIcon}${formatTHB(Math.abs(appPnlThb))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</td>
+                    <td class="py-3 font-bold ${appDailyPnlClass}">${appDailyIcon}${formatTHB(Math.abs(appDailyPnlThb))} (${formatNumber(Math.abs(appDailyPnlPct), 2)}%)</td>
+                    <td class="py-3 text-center font-bold text-indigo-400 font-mono">100.00%</td>
+                    <td colspan="3" class="py-3"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         `;
+
+        container.innerHTML += cardHtml;
       });
     }
 
