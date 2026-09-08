@@ -273,43 +273,51 @@ if (data) {
         subTextEl.innerHTML = `จากทั้งหมด <span class="font-semibold text-white">${appCount}</span> แอปพลิเคชัน (<span class="${pnlClass}">${icon}${formatNumber(Math.abs(totalPnlPct), 2)}%</span>)`;
       }
 	
-  // 3. กำไร/ขาดทุนสะสม
-  const pnlEl = document.getElementById('total-pnl');
-  const pnlPctEl = document.getElementById('total-pnl-pct');
-  const icon = pnl >= 0 ? '▲ ' : '▼ ';
+ // 3. กำไร/ขาดทุนสะสม
+        const pnlEl = document.getElementById('total-pnl');
+        const pnlPctEl = document.getElementById('total-pnl-pct');
+        const icon = pnl >= 0 ? '▲ ' : '▼ ';
 
-  if (pnlEl) pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
-  if (pnlPctEl) pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(pnlPct))}%`;
-        if (pnl >= 0) {
-          pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
-          pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
-        } else {
-          pnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
-          pnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
+        if (pnlEl) {
+          pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
+          pnlEl.className = pnl >= 0 
+            ? 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2' 
+            : 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
         }
 
-        // 1.2 กำไร/ขาดทุนรายวันรวม
-        const dailyPnl = data.total_daily_pnl_thb || 0;
+        if (pnlPctEl) {
+          pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(pnlPct))}%`;
+          pnlPctEl.className = pnl >= 0 
+            ? 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1' 
+            : 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
+        }
+
+        // 4. กำไร/ขาดทุนรายวันรวม
+        const dailyPnl = data.reduce ? data.reduce((sum, item) => sum + Number(item.daily_pnl_thb || 0), 0) : (data.total_daily_pnl_thb || 0);
         const dailyPnlPct = data.total_daily_pnl_pct || 0;
         const dailyPnlEl = document.getElementById('daily-pnl');
         const dailyPnlPctEl = document.getElementById('daily-pnl-pct');
-
         const dailyIcon = dailyPnl >= 0 ? '▲ ' : '▼ ';
-        dailyPnlEl.innerText = `${dailyIcon}${formatTHB(Math.abs(dailyPnl))}`;
-        dailyPnlPctEl.innerText = `${dailyIcon}${formatNumber(Math.abs(dailyPnlPct))}%`;
 
-        if (dailyPnl >= 0) {
-          dailyPnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2';
-          dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1';
-        } else {
-          dailyPnlEl.className = 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
-          dailyPnlPctEl.className = 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
+        if (dailyPnlEl) {
+          dailyPnlEl.innerText = `${dailyIcon}${formatTHB(Math.abs(dailyPnl))}`;
+          dailyPnlEl.className = dailyPnl >= 0 
+            ? 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2' 
+            : 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
         }
 
-        document.getElementById('app-count').innerText = `จากทั้งหมด ${data.total_apps || 0} แอปพลิเคชัน (${data.total_assets || 0} รายการ)`;
-      }
-    }
+        if (dailyPnlPctEl) {
+          dailyPnlPctEl.innerText = `${dailyIcon}${formatNumber(Math.abs(dailyPnlPct))}%`;
+          dailyPnlPctEl.className = dailyPnl >= 0 
+            ? 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1' 
+            : 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
+        }
 
+        const appCountEl = document.getElementById('app-count');
+        if (appCountEl) {
+          const appCount = Array.isArray(data) ? data.length : (data.total_apps || 0);
+          appCountEl.innerText = `จากทั้งหมด ${appCount} แอปพลิเคชัน`;
+        }
     // 2. ดึงข้อมูล ส่วน 2 (ภาพรวมแต่ละพอร์ต)
 async function fetchAppAllocation() {
   const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
