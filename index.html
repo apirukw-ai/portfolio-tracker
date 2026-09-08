@@ -668,28 +668,65 @@ async function fetchAppAllocation() {
       refreshDashboard();
     }
 
-    function renderChart(labels, dataValues) {
-      const ctx = document.getElementById('allocationChart').getContext('2d');
-      if (chartInstance) chartInstance.destroy();
+    function renderChart(labels, chartValues) {
+  // ใช้ ID 'allocationChart' ตามของเดิมในไฟล์ index.html
+  const ctx = document.getElementById('allocationChart');
+  if (!ctx) return;
 
-      chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: dataValues,
-            backgroundColor: ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#3b82f6'],
-            borderWidth: 0
-          }]
+  if (window.myDoughnutChart) {
+    window.myDoughnutChart.destroy();
+  }
+
+  const brandColors = {
+    'GPF': '#10B981',   // เขียว
+    'MFC': '#F97316',   // ส้ม
+    'SCB': '#8B5CF6',   // ม่วง
+    'DIME': '#06B6D4'   // ฟ้า
+  };
+
+  const bgColors = labels.map(label => brandColors[label.toUpperCase()] || '#64748B');
+
+  window.myDoughnutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: chartValues,
+        backgroundColor: bgColors,
+        borderWidth: 3,
+        borderColor: '#1e293b',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '72%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#94a3b8',
+            font: { family: 'Prompt, sans-serif', size: 12 },
+            usePointStyle: true,
+            pointStyle: 'circle',
+            padding: 16
+          }
         },
-        options: {
-          plugins: {
-            legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Prompt', size: 11 } } }
-          },
-          cutout: '70%'
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const val = context.raw || 0;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? ((val / total) * 100).toFixed(2) : 0;
+              return ` ${context.label}: ${formatTHB(val)} (${pct}%)`;
+            }
+          }
         }
-      });
+      }
     }
+  });
+}
 
     function formatThaiDateTime(isoString) {
       if (!isoString || isoString === '-') return '-';
