@@ -938,15 +938,20 @@ async function handleImageUpload(event) {
 
 async function parseDimeImage(text) {
   try {
-    // 1. ดึง Ticker หุ้นภาษาอังกฤษ (เช่น ABBV)
-    const tickerMatch = text.match(/([A-Z]{2,5})/);
+    // 1. รวมอักขระภาษาไทยที่ถูก OCR เว้นวรรคกระจายออกเข้าด้วยกัน
+    const cleanText = text.replace(/([\u0E00-\u0E7F])\s+(?=[\u0E00-\u0E7F])/g, '$1');
 
-    // 2. ดึงจำนวนหุ้น (รองรับรูปแบบเว้นวรรคและเครื่องหมายต่าง ๆ)
-    const unitsMatch = text.match(/(?:จำนวนหุ้นคงเหลือ|จำนวนหุ้น|Units?)\s*[:\s]*([\d,]+\.?\d*)/i)
-                     || text.match(/([\d,]+\.\d{4,})/); // สำรอง: หาตัวเลขทศนิยม 4 ตำแหน่งขึ้นไป
+    // 2. หา Ticker (เช่น ABBV)
+    const tickerMatch = cleanText.match(/\b([A-Z]{2,5})\b/);
 
-    // 3. ดึงต้นทุนต่อหุ้น (USD)
-    const avgNavMatch = text.match(/(?:ต้นทุนต่อหุ้น|ต้นทุนเฉลี่ย|Avg\.?\s*Cost)\s*\(?USD\)?\s*[:\s]*([\d,]+\.?\d*)/i);
+    // 3. หาจำนวนหุ้นคงเหลือ (ดึงตัวเลขทศนิยมบรรทัดล่างจากหัวข้อ)
+    const unitsMatch = cleanText.match(/จำนวนหุ้นคงเหลือ[^\n]*\n\s*([\d,]+\.\d+)/i)
+                     || cleanText.match(/จำนวนหุ้น[^\n]*\n\s*([\d,]+\.\d+)/i)
+                     || cleanText.match(/([\d,]+\.\d{4,})/); // สำรอง: ตัวเลขทศนิยม 4 ตำแหน่งขึ้นไป
+
+    // 4. หาต้นทุนต่อหุ้น USD (ดึงตัวเลขทศนิยมบรรทัดล่างจากหัวข้อ)
+    const avgNavMatch = cleanText.match(/ต้นทุนต่อหุ้น[^\n]*\n\s*([\d,]+\.\d+)/i)
+                      || cleanText.match(/Avg\.?\s*Cost[^\n]*\n\s*([\d,]+\.\d+)/i);
 
     if (tickerMatch && unitsMatch && avgNavMatch) {
       const code = tickerMatch[1];
@@ -955,9 +960,13 @@ async function parseDimeImage(text) {
 
       console.log("สแกนสำเร็จ:", { code, units, avgNav });
       await updateDatabaseUnitsAndCost([{ code, units, avgNav }]);
-      showToast(`อัปเดต ${code} เรียบร้อยแล้ว`, "success");
+      showToast(`อัปเดต ${code} เรียบร้อยแล้ว (${units} หุ้น @ ${avgNav} USD)`, "success");
     } else {
-      console.warn("จับคู่ข้อมูลไม่ครบ:", { tickerMatch, unitsMatch, avgNavMatch });
+      console.warn("จับคู่ข้อมูลไม่ครบ:", { 
+        ticker: tickerMatch ? tickerMatch[1] : null, 
+        units: unitsMatch ? unitsMatch[1] : null, 
+        avgNav: avgNavMatch ? avgNavMatch[1] : null 
+      });
       showToast("ไม่สามารถอ่านข้อมูลหุ้น/ต้นทุนจากรูปได้ครบถ้วน", "error");
     }
   } catch (err) {
