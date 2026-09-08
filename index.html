@@ -439,8 +439,14 @@ async function loadDashboardData() {
 
     let rowsHtml = '';
     sortedItems.forEach(item => {
-      const pnlThb = item.unrealized_pnl_thb || ((item.current_value_thb || 0) - (item.total_cost_thb || 0));
-      const pnlPct = item.unrealized_pnl_pct || 0;
+      // 📍 ปรับการดึงค่า PnL สะสมให้ถูกต้อง
+        const pnlThb = item.unrealized_pnl !== undefined && item.unrealized_pnl !== null
+          ? Number(item.unrealized_pnl)
+          : (Number(item.current_value_thb || item.current_value || 0) - Number(item.total_cost || 0));
+
+        const pnlPct = item.unrealized_pnl_pct !== undefined && item.unrealized_pnl_pct !== null
+          ? Number(item.unrealized_pnl_pct)
+          : (Number(item.total_cost) > 0 ? (pnlThb / Number(item.total_cost)) * 100 : 0);
       const isProfit = pnlThb >= 0;
       const pnlClass = isProfit ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
       const icon = isProfit ? '▲ ' : '▼ ';
