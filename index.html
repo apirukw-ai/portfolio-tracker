@@ -237,7 +237,10 @@ async function loadDashboardData() {
 
     // 📍 1. ดึงข้อมูล แถว 1 (บนสุด)
     async function fetchSummary() {
-      const { data, error } = await supabaseClient.from('v_dashboard_summary').select('*').single();
+      // ✅ แก้เป็น (ดึงข้อมูลแบบ Array ทั้งหมด 4 พอร์ต)
+const { data, error } = await supabaseClient
+  .from('v_dashboard_summary')
+  .select('*');
       if (error) return console.error('Error fetching summary:', error);
 
       if (data) {
