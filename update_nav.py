@@ -1,6 +1,6 @@
-from datetime import date, datetime, timedelta, timezone
 import os
 import re
+from datetime import datetime, timedelta, timezone
 
 from bs4 import BeautifulSoup
 import requests
@@ -27,96 +27,10 @@ HEADERS = {
     "Accept-Language": "th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
-# แมป Asset Code บน Supabase เข้ากับ ชื่อกองทุนบนหน้าเว็บ MFC
-MFC_SYMBOL_MAP = {
-    "MPF07": "IGOLD-G",
-    "MPF15": "MGTECH",
-    "MPF18": "M-EM",
-    "MPF19": "MEURO-G",
-    "MPF23": "MGFPVD",
-    "MPF27": "M-ASIA",
-    "MPF16": "M-FM",
-}
-
 
 # ----------------------------------------------------
-# 2. ฟังก์ชันดึงและแกะ NAV จากหน้าเว็บ MFC (https://mfcfund.com/unit-value/)
+# 2. ฟังก์ชันดึง NAV สำหรับ GPF และ Dime
 # ----------------------------------------------------
-def fetch_mfc_html_content():
-    target_url = "https://mfcfund.com/unit-value/"
-    try:
-        print("🌐 กำลังโหลดข้อมูลจาก https://mfcfund.com/unit-value/...")
-        res = requests.get(target_url, headers=HEADERS, timeout=20)
-        if res.status_code == 200:
-            return res.text
-        else:
-            print(
-                f"❌ ไม่สามารถเข้าถึงหน้าเว็บ MFC ได้ Status Code:"
-                f" {res.status_code}"
-            )
-    except Exception as e:
-        print(f"❌ Error fetching MFC Website: {e}")
-    return ""
-
-
-def get_mfc_nav_from_web(fund_code, html_content):
-    if not html_content:
-        return None
-    try:
-        target_symbol = MFC_SYMBOL_MAP.get(
-            fund_code.upper(), fund_code
-        ).upper()
-        soup = BeautifulSoup(html_content, "html.parser")
-
-        # วนลูปหาแถวหรือบล็อกที่มีชื่อกองทุนอยู่
-        for element in soup.find_all(["tr", "div"]):
-            text = element.get_text(separator=" ", strip=True)
-
-            if target_symbol in text.upper():
-                idx = text.upper().find(target_symbol)
-                chunk = text[idx : idx + 300]
-                print(f"พบข้อมูล MFC [{target_symbol}]: {chunk}")
-
-                # ดึงตัวเลข NAV (ทศนิยม 4 ตำแหน่ง)
-                nav_match = re.search(r"(\d+\.\d{4})", chunk)
-                if nav_match:
-                    return float(nav_match.group(1))
-
-    except Exception as e:
-        print(f"⚠️ เกิดข้อผิดพลาดในการแกะ MFC [{fund_code}]: {e}")
-    return None
-
-
-# ----------------------------------------------------
-# 3. ฟังก์ชันดึง NAV แอปอื่นๆ (SCB / GPF / Dime)
-# ----------------------------------------------------
-def get_scb_nav_wealthx(code):
-    clean = code.strip()
-    variations = [
-        clean,
-        clean.replace("(", "").replace(")", ""),
-        clean.replace("(E)", "-E"),
-    ]
-    for symbol in variations:
-        try:
-            url_target = f"https://www.wealthx.co/funds/{symbol}"
-            res = requests.get(url_target, headers=HEADERS, timeout=8)
-            if res.status_code == 200:
-                soup = BeautifulSoup(res.text, "html.parser")
-                text = soup.get_text()
-                match = re.search(
-                    r"มูลค่าหน่วยลงทุน\s*\(NAV\)\s*(\d+\.\d{4})", text
-                )
-                if match:
-                    return float(match.group(1))
-                matches = re.findall(r"(\d+\.\d{4})", text)
-                if matches:
-                    return float(matches[0])
-        except Exception:
-            pass
-    return None
-
-
 def get_gpf_nav_direct():
     nav_map = {}
     try:
@@ -137,8 +51,7 @@ def get_gpf_nav_direct():
             if not cols:
                 continue
 
-            # ดึงตัวเลขทศนิยมทั้งหมดจากคอลัมน์ในแถวนั้น
-            # คอลัมน์ NAV ของ กบข. มักจะใช้ทศนิยม 4 ตำแหน่ง (เช่น 38.9041)
+            # ดึงตัวเลขทศนิยมทั้งหมดจากคอลัมน์ในแถวนั้น (คอลัมน์ NAV ของ กบข. มักจะใช้ทศนิยม 4 ตำแหน่ง)
             nav_candidates = []
             for col_text in cols:
                 match = re.search(r"^\d{1,3}(?:,\d{3})*\.\d{4}$", col_text)
@@ -150,7 +63,6 @@ def get_gpf_nav_direct():
             if not nav_candidates:
                 continue
 
-            # ตัวเลข NAV คือค่าทศนิยม 4 ตำแหน่งที่พบในตาราง
             nav_val = nav_candidates[0]
 
             if "หุ้นต่างประเทศ" in text or "1788632129596" in text:
@@ -168,6 +80,7 @@ def get_gpf_nav_direct():
 
     return nav_map
 
+
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
@@ -180,7 +93,7 @@ def get_us_stock_price(symbol):
 
 
 # ----------------------------------------------------
-# 4. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง user_portfolios
+# 3. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง user_portfolios
 # ----------------------------------------------------
 def fetch_and_update():
     try:
@@ -196,9 +109,7 @@ def fetch_and_update():
         db_res = supabase.table("user_portfolios").select("*").execute()
         portfolio_items = db_res.data or []
 
-        print(
-            f"📦 พบรายการสินทรัพย์ทั้งหมด {len(portfolio_items)} รายการ"
-        )
+        print(f"📦 พบรายการสินทรัพย์ทั้งหมดใน DB {len(portfolio_items)} รายการ")
 
         for item in portfolio_items:
             item_id = item["id"]
@@ -210,24 +121,14 @@ def fetch_and_update():
             latest_nav = None
             nav_date = today_date_str
 
+            # ข้ามรายการที่ไม่ใช่ GPF หรือ DIME
+            if app not in ["gpf", "dime"]:
+                continue
+
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
-            # ดึง NAV และ วันที่ ตามประเภทแอป
-            if app in ["mfc", "mfc_fund"]:
-                p_res = (
-                    supabase.table("policies")
-                    .select("nav, updated_at")
-                    .eq("code", code)
-                    .execute()
-                )
-                if p_res.data and len(p_res.data) > 0:
-                    latest_nav = float(p_res.data[0]["nav"])
-                    policy_date = p_res.data[0].get("updated_at")
-                    if policy_date:
-                        nav_date = policy_date
-            elif app == "scb":
-                latest_nav = get_scb_nav_wealthx(code)
-            elif app == "gpf":
+            # ดึงราคาตามประเภทแอป
+            if app == "gpf":
                 latest_nav = gpf_nav_data.get(code)
             elif app == "dime":
                 latest_nav = get_us_stock_price(code)
@@ -238,7 +139,7 @@ def fetch_and_update():
                 else current_nav
             )
 
-            # อัปเดตทั้ง current_nav, current_value และ nav_date ลง user_portfolios
+            # อัปเดตข้อมูลลง Supabase
             if latest_nav and latest_nav != current_nav:
                 supabase.table("user_portfolios").update(
                     {
@@ -261,18 +162,17 @@ def fetch_and_update():
                     " (อัปเดตสถานะเสร็จสิ้น)"
                 )
 
-        print(f"✅ อัปเดต NAV ปัจจุบันเสร็จสิ้นเมื่อ: {now_thai}")
+        print(f"✅ อัปเดต NAV ปัจจุบัน (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
 
 
 # ----------------------------------------------------
-# 5. ฟังก์ชันสำหรับบันทึก Snapshot รายวัน
+# 4. ฟังก์ชันสำหรับบันทึก Snapshot รายวัน
 # ----------------------------------------------------
 def save_daily_snapshot(supabase_client, app_source, total_thb):
     try:
-        # ดึงวันที่ปัจจุบันของไทย (UTC+7)
         today_str = (
             datetime.now(timezone.utc) + timedelta(hours=7)
         ).strftime("%Y-%m-%d")
@@ -283,7 +183,6 @@ def save_daily_snapshot(supabase_client, app_source, total_thb):
             "total_value_thb": float(total_thb),
         }
 
-        # บันทึกข้อมูลแบบ Upsert ลงตาราง portfolio_snapshots
         supabase_client.table("portfolio_snapshots").upsert(
             data, on_conflict="snapshot_date,app_source"
         ).execute()
