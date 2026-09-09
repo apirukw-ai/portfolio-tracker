@@ -834,61 +834,71 @@
   try {
     showToast("กำลังประมวลผลสลิป กบข....", "info");
 
-    // ทำความสะอาดข้อความ OCR
+    // 1. ทำความสะอาดข้อความจาก OCR
     const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไข : เป็น .
+      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไข : เป็น . (เช่น 38:8535 -> 38.8535)
       .replace(/,/g, '');               // ลบ comma
 
-    // ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
+    // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
     const { data: currentPort, error: fetchErr } = await supabaseClient
       .from('user_portfolios')
       .select('id, asset_code, units, avg_nav, last_transaction_date');
 
     if (fetchErr) throw fetchErr;
 
-    // Regex จับแพตเทิร์น: วันที่ + บรรทัดรายการ (เช่น 26 สิงหาคม 2569 ... ตัวเลขสามชุด)
-    const lineRegex = /(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})[\s\S]*?(\d+\.\d{4})\s+(\d+\.\d{4})\s+(\d+\.\d{2})/g;
+    // 3. ค้นหาวันที่รายการทั้งหมดในเอกสาร (เช่น "26 สิงหาคม 2569")
+    const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
+    const dateMatches = [...cleanText.matchAll(dateRegex)];
 
-    const matches = [...cleanText.matchAll(lineRegex)];
-
-    if (matches.length === 0) {
-      showToast("อ่านข้อมูลสลิป กบข. ไม่สำเร็จ หรือไม่พบรูปแบบรายการ", "warning");
+    if (dateMatches.length === 0) {
+      showToast("ไม่พบวันที่รายการในเอกสาร PDF กบข.", "warning");
       return;
     }
 
-    // ดึงบรรทัดรายการล่างสุด (รายการล่าสุดในสลิป)
-    const lastMatch = matches[matches.length - 1];
-    const slipDate = lastMatch[1].trim();          // เช่น "26 สิงหาคม 2569"
-    const newNav = parseFloat(lastMatch[2]);       // NAV ล่าสุด
-    const addedUnits = parseFloat(lastMatch[3]);   // หน่วยที่เพิ่มงวดนี้
-    const addedAmount = parseFloat(lastMatch[4]);  // จำนวนเงินงวดนี้
+    // หาวันที่บรรทัดล่างสุด (รายการล่าสุด)
+    const slipDate = dateMatches[dateMatches.length - 1][1].trim();
+
+    // 4. ดึงชุดตัวเลข (NAV / หน่วย / จำนวนเงิน) จากข้อความ
+    // ค้นหาแพตเทิร์นตัวเลขทศนิยม 3 ชุดติดกัน เช่น 38.9041  198.1739  7709.79
+    const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
+    const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
+
+    if (numberMatches.length === 0) {
+      showToast("อ่านตัวเลขชุดรายการจากสลิปไม่สำเร็จ", "warning");
+      return;
+    }
+
+    // ดึงชุดตัวเลขแถวล่างสุด
+    const lastMatch = numberMatches[numberMatches.length - 1];
+    const newNav = parseFloat(lastMatch[1]);       // มูลค่าต่อหน่วยล่าสุด
+    const addedUnits = parseFloat(lastMatch[2]);   // จำนวนหน่วยงวดนี้
+    const addedAmount = parseFloat(lastMatch[3]);  // จำนวนเงินงวดนี้
 
     if (isNaN(newNav) || isNaN(addedUnits)) {
-      showToast("ไม่สามารถอ่านตัวเลขจากสลิปได้ถูกต้อง", "error");
+      showToast("ไม่สามารถแปลงค่าตัวเลขจากสลิปได้", "error");
       return;
     }
 
-    // กำหนดแผนหลัก (ตัวอย่างเช่น GPF_FOREIGN หรือแผนที่คุณใช้งาน)
+    // 5. ระบุแผนที่ต้องการอัปเดต (เช่น GPF_FOREIGN)
     const targetAssetCode = 'GPF_FOREIGN'; 
     const oldAsset = currentPort ? currentPort.find(a => a.asset_code === targetAssetCode) : null;
 
     if (!oldAsset) {
-      showToast(`ไม่พบข้อมูลแผน ${targetAssetCode} ในระบบ`, "error");
+      showToast(`ไม่พบรหัสสินทรัพย์ ${targetAssetCode} ในระบบ`, "error");
       return;
     }
 
-    // 🔒 ระบบป้องกันสแกนซ้ำ: เช็กว่าวันที่ในสลิปตรงกับวันที่เคยบันทึกไว้หรือไม่
+    // 🔒 6. ระบบตรวจสอบสแกนซ้ำจากวันที่
     if (oldAsset.last_transaction_date === slipDate) {
       showToast(`⚠️ สลิปประวัติตามวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
       return;
     }
 
-    // คำนวณหน่วยรวมใหม่
+    // 7. คำนวณหน่วยสะสมรวมใหม่และ NAV ต้นทุนเฉลี่ย (Weighted Average)
     const oldUnits = parseFloat(oldAsset.units || 0);
     const oldAvgNav = parseFloat(oldAsset.avg_nav || 0);
     const totalNewUnits = oldUnits + addedUnits;
 
-    // คำนวณ NAV ต้นทุนเฉลี่ยใหม่ (Weighted Average)
     let calculatedAvgNav = newNav;
     if (oldUnits > 0 && oldAvgNav > 0) {
       const totalOldCost = oldUnits * oldAvgNav;
@@ -896,14 +906,14 @@
       calculatedAvgNav = totalNewCost / totalNewUnits;
     }
 
-    // อัปเดตข้อมูลลง Supabase พร้อมประทับตร้าวันที่รายการล่าสุด
+    // 8. บันทึกข้อมูลลง Supabase
     const { error: updateErr } = await supabaseClient
       .from('user_portfolios')
       .update({
         units: totalNewUnits,
         avg_nav: calculatedAvgNav,
         current_nav: newNav,
-        last_transaction_date: slipDate, // บันทึกวันที่เพื่อกันสแกนซ้ำ
+        last_transaction_date: slipDate,
         updated_at: new Date().toISOString()
       })
       .eq('id', oldAsset.id);
