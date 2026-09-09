@@ -836,7 +836,7 @@
 
     // 1. ทำความสะอาดข้อความจาก OCR
     const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไข : เป็น . (เช่น 38:8535 -> 38.8535)
+      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เป็น . (เช่น 38:8535 -> 38.8535)
       .replace(/,/g, '');               // ลบ comma
 
     // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
@@ -846,31 +846,18 @@
 
     if (fetchErr) throw fetchErr;
 
-    // 3. ค้นหาวันที่รายการทั้งหมดในเอกสาร (เช่น "26 สิงหาคม 2569")
-    const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
-    const dateMatches = [...cleanText.matchAll(dateRegex)];
-
-    if (dateMatches.length === 0) {
-      showToast("ไม่พบวันที่รายการในเอกสาร PDF กบข.", "warning");
-      return;
-    }
-
-    // หาวันที่บรรทัดล่างสุด (รายการล่าสุด)
-    const slipDate = dateMatches[dateMatches.length - 1][1].trim();
-
-    // 4. ดึงชุดตัวเลข (NAV / หน่วย / จำนวนเงิน) จากข้อความ
-    // ค้นหาแพตเทิร์นตัวเลขทศนิยม 3 ชุดติดกัน เช่น 38.9041  198.1739  7709.79
+    // 3. ดึงชุดตัวเลขแถวล่างสุด (NAV / จำนวนหน่วย / จำนวนเงิน)
     const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
     const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
 
     if (numberMatches.length === 0) {
-      showToast("อ่านตัวเลขชุดรายการจากสลิปไม่สำเร็จ", "warning");
+      showToast("อ่านชุดตัวเลขจากสลิปไม่สำเร็จ กรุณาตรวจสอบความชัดของเอกสาร", "error");
       return;
     }
 
-    // ดึงชุดตัวเลขแถวล่างสุด
+    // ชุดตัวเลขแถวล่างสุด (รายการล่าสุดในสลิป)
     const lastMatch = numberMatches[numberMatches.length - 1];
-    const newNav = parseFloat(lastMatch[1]);       // มูลค่าต่อหน่วยล่าสุด
+    const newNav = parseFloat(lastMatch[1]);       // NAV ล่าสุด
     const addedUnits = parseFloat(lastMatch[2]);   // จำนวนหน่วยงวดนี้
     const addedAmount = parseFloat(lastMatch[3]);  // จำนวนเงินงวดนี้
 
@@ -879,7 +866,29 @@
       return;
     }
 
-    // 5. ระบุแผนที่ต้องการอัปเดต (เช่น GPF_FOREIGN)
+    // 4. หาวันที่แบบยืดหยุ่น (Fallback System)
+    let slipDate = "";
+
+    // วิธีที่ 4.1: ค้นหาวันที่แบบเต็ม (เช่น 26 สิงหาคม 2569)
+    const fullDateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
+    const fullDateMatches = [...cleanText.matchAll(fullDateRegex)];
+
+    if (fullDateMatches.length > 0) {
+      slipDate = fullDateMatches[fullDateMatches.length - 1][1].trim();
+    } else {
+      // วิธีที่ 4.2: ค้นหาข้อความที่มีปี พ.ศ. 25XX บรรทัดล่างสุด
+      const yearRegex = /([0-9]{1,2}\s+[^\n]*?25[6-9][0-9])/g;
+      const yearMatches = [...cleanText.matchAll(yearRegex)];
+      
+      if (yearMatches.length > 0) {
+        slipDate = yearMatches[yearMatches.length - 1][1].trim();
+      } else {
+        // วิธีที่ 4.3: หากไม่เจอป้อนวันที่เลย ให้ใช้ตัวเลขแถวล่างสุดเป็น Transaction Ref แทน
+        slipDate = `TX_${newNav}_${addedUnits}_${addedAmount}`;
+      }
+    }
+
+    // 5. ระบุรหัสสินทรัพย์ที่ต้องการอัปเดต (เช่น GPF_FOREIGN)
     const targetAssetCode = 'GPF_FOREIGN'; 
     const oldAsset = currentPort ? currentPort.find(a => a.asset_code === targetAssetCode) : null;
 
@@ -888,9 +897,9 @@
       return;
     }
 
-    // 🔒 6. ระบบตรวจสอบสแกนซ้ำจากวันที่
+    // 🔒 6. ระบบป้องกันสแกนซ้ำ: เช็ก Transaction Key กับค่าใน Supabase
     if (oldAsset.last_transaction_date === slipDate) {
-      showToast(`⚠️ สลิปประวัติตามวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
+      showToast(`⚠️ สลิปประวัติรายการนี้ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
       return;
     }
 
@@ -906,21 +915,21 @@
       calculatedAvgNav = totalNewCost / totalNewUnits;
     }
 
-    // 8. บันทึกข้อมูลลง Supabase
+    // 8. อัปเดตข้อมูลลง Supabase
     const { error: updateErr } = await supabaseClient
       .from('user_portfolios')
       .update({
         units: totalNewUnits,
         avg_nav: calculatedAvgNav,
         current_nav: newNav,
-        last_transaction_date: slipDate,
+        last_transaction_date: slipDate, // บันทึก Transaction Key ป้องกันสแกนซ้ำ
         updated_at: new Date().toISOString()
       })
       .eq('id', oldAsset.id);
 
     if (updateErr) throw updateErr;
 
-    showToast(`✅ บันทึกสลิปวันที่ [${slipDate}] สำเร็จ! (ถัวเฉลี่ยต้นทุนเรียบร้อย)`, "success");
+    showToast(`✅ บันทึกสลิปสำเร็จ! [อ้างอิง: ${slipDate}] (ถัวเฉลี่ยต้นทุนเรียบร้อย)`, "success");
     refreshDashboard();
 
   } catch (err) {
