@@ -831,68 +831,86 @@
     }
 
     async function parseGpfPdfStatement(fullText) {
-      try {
-        const plans = [
-          { name: 'แผนหุ้นต่างประเทศ', code: 'GPF_FOREIGN' },
-          { name: 'แผนหุ้นไทย', code: 'GPF_THAI' },
-          { name: 'แผนกองทุนอสังหาริมทรัพย์ไทย', code: 'GPF_REIT' }
-        ];
+  try {
+    showToast("กำลังประมวลผลสลิป กบข....", "info");
 
-        const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
-        
-        const { data: currentPort, error: fetchErr } = await supabaseClient
-          .from('user_portfolios')
-          .select('asset_code, units, avg_nav');
-          
-        if (fetchErr) throw fetchErr;
+    // ทำความสะอาดข้อความจาก OCR ให้ตัวเลขและเครื่องหมายถูกต้อง
+    const cleanText = fullText
+      .replace(/(\d+):(\d+)/g, '$1.$2') // เปลี่ยน : เป็น . ในตัวเลข
+      .replace(/,/g, '');               // ลบเครื่องหมาย comma
 
-        for (const plan of plans) {
-          const planLines = lines.filter(l => l.includes(plan.name) && (l.includes('เงิน') || l.includes('เปลี่ยนแผน')));
-          
-          if (planLines.length > 0) {
-            const lastLine = planLines[planLines.length - 1];
-            const matches = lastLine.match(/([\d,]+\.\d+)/g);
+    // ดึงข้อมูลพอร์ตอนุรักษ์/ปัจจุบันจาก Supabase มาเปรียบเทียบ
+    const { data: currentPort, error: fetchErr } = await supabaseClient
+      .from('user_portfolios')
+      .select('id, asset_code, units, avg_nav');
 
-            if (matches && matches.length >= 2) {
-              const newNav = parseFloat(matches[0].replace(/,/g, ''));
-              const totalNewUnits = parseFloat(matches[1].replace(/,/g, ''));
+    if (fetchErr) throw fetchErr;
 
-              const oldAsset = currentPort ? currentPort.find(a => a.asset_code === plan.code) : null;
-              const oldUnits = oldAsset ? parseFloat(oldAsset.units || 0) : 0;
-              const oldAvgNav = oldAsset ? parseFloat(oldAsset.avg_nav || 0) : 0;
+    // นิยามแผนและตัวดึงข้อมูลแถวสุดท้ายด้วย Regex
+    const gpfPlans = [
+      { code: 'GPF_FOREIGN', name: 'แผนหุ้นต่างประเทศ', regex: /(?:เงินนำส่ง|เงินสะสม|เงินสะ|\bเงิน\b)[^\n]*?(\d+\.\d{4})\s+(\d+\.\d{4})\s+(\d+\.\d{2})/g },
+      { code: 'GPF_THAI', name: 'แผนหุ้นไทย', regex: /(\d+\.\d{4})\s+(\d+\.\d{4})\s+(\d+\.\d{2})\s*$/gm }
+    ];
 
-              const addedUnits = totalNewUnits - oldUnits;
-              let calculatedAvgNav = newNav;
+    let updateCount = 0;
 
-              if (addedUnits > 0 && oldUnits > 0 && oldAvgNav > 0) {
-                const totalCostBefore = oldUnits * oldAvgNav;
-                const newAddedCost = addedUnits * newNav;
-                calculatedAvgNav = (totalCostBefore + newAddedCost) / totalNewUnits;
-              }
+    for (const plan of gpfPlans) {
+      const matches = [...cleanText.matchAll(plan.regex)];
+      
+      if (matches.length > 0) {
+        // ดึงรายการแถวสุดท้าย (ล่าสุดในสลิป)
+        const lastMatch = matches[matches.length - 1];
+        const newNav = parseFloat(lastMatch[1]);       // มูลค่าต่อหน่วยล่าสุด
+        const addedUnits = parseFloat(lastMatch[2]);   // จำนวนหน่วยที่เพิ่มในงวดนี้
+        const addedAmount = parseFloat(lastMatch[3]);  // จำนวนเงินงวดนี้
 
-              const { error: updateErr } = await supabaseClient
-                .from('user_portfolios')
-                .update({
-                  units: totalNewUnits,
-                  avg_nav: calculatedAvgNav,
-                  current_nav: newNav,
-                  updated_at: new Date()
-                })
-                .eq('asset_code', plan.code);
+        if (isNaN(newNav) || isNaN(addedUnits)) continue;
 
-              if (updateErr) console.error("Update error for " + plan.code + ":", updateErr);
-            }
-          }
+        // ค้นหาพอร์ตเดิมเพื่อถัวเฉลี่ยค่า
+        const oldAsset = currentPort ? currentPort.find(a => a.asset_code === plan.code) : null;
+        const oldUnits = oldAsset ? parseFloat(oldAsset.units || 0) : 0;
+        const oldAvgNav = oldAsset ? parseFloat(oldAsset.avg_nav || 0) : 0;
+
+        // คำนวณหน่วยรวมใหม่
+        const totalNewUnits = oldUnits + addedUnits;
+
+        // คำนวณ NAV ต้นทุนเฉลี่ยใหม่ (Weighted Average NAV)
+        let calculatedAvgNav = newNav;
+        if (oldUnits > 0 && oldAvgNav > 0) {
+          const totalOldCost = oldUnits * oldAvgNav;
+          const totalNewCost = totalOldCost + (addedUnits * newNav);
+          calculatedAvgNav = totalNewCost / totalNewUnits;
         }
 
-        showToast("อัปเดตหน่วยลงทุนและคำนวณ NAV ต้นทุนเฉลี่ยเรียบร้อย!", "success");
-        refreshDashboard();
+        // อัปเดตลงฐานข้อมูล Supabase
+        if (oldAsset) {
+          await supabaseClient
+            .from('user_portfolios')
+            .update({
+              units: totalNewUnits,
+              avg_nav: calculatedAvgNav,
+              current_nav: newNav,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', oldAsset.id);
 
-      } catch (err) {
-        console.error("GPF Parsing Error:", err);
-        showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF", "error");
+          updateCount++;
+        }
       }
     }
+
+    if (updateCount > 0) {
+      showToast(`อัปเดตสลิป กบข. สำเร็จ ${updateCount} แผน (ถัวเฉลี่ยต้นทุนเรียบร้อย)`, "success");
+      refreshDashboard();
+    } else {
+      showToast("อ่านข้อมูลสลิป กบข. ไม่สำเร็จ หรือไม่พบรายการใหม่", "warning");
+    }
+
+  } catch (err) {
+    console.error("GPF Parsing Error:", err);
+    showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF กบข.", "error");
+  }
+}
 
     // ฟังก์ชันตั้งค่า Gemini API Key
     function configureGeminiApiKey() {
