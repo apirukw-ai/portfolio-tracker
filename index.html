@@ -878,7 +878,100 @@
         event.target.value = '';
       }
     }
+	
+	async function parseMfcPdfStatement(fullText) {
+  try {
+    showToast("กำลังประมวลผลสลิป MFC PVD...", "info");
 
+    // 1. คลีนข้อความสลิป
+    const cleanText = fullText
+      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เพี้ยนเป็น .
+      .replace(/,/g, '');               // ลบ comma
+
+    // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
+    const { data: currentPort, error: fetchErr } = await supabaseClient
+      .from('user_portfolios')
+      .select('id, asset_code, app_source, units, avg_nav, current_nav, last_transaction_date');
+
+    if (fetchErr) throw fetchErr;
+
+    // 3. สกัดวันที่ในใบรับรองยอด (เช่น "05 กันยายน 2569")
+    let slipDate = "";
+    const dateMatch = cleanText.match(/(?:ณ วันที่|As at)\s*(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})/i);
+    
+    if (dateMatch) {
+      slipDate = dateMatch[1].trim();
+    } else {
+      slipDate = `MFC_TX_${Date.now()}`;
+    }
+
+    // 4. ตัดเนื้อหาเฉพาะส่วนตารางกองทุน (ตัดสรุปยอด Grand Total ด้านล่างออกทั้งหมดทันที)
+    const tableSection = cleanText.split(/1231\s*Total|รายละเอียดการเลือก|ยอดรวมทุกนโยบาย/i)[0];
+
+    // 5. รายชื่อกองทุน MFC MPF ทั้งหมด
+    const mfcFunds = ['MPF07', 'MPF15', 'MPF18', 'MPF19', 'MPF23', 'MPF27'];
+    let updatedCount = 0;
+
+    for (const code of mfcFunds) {
+      // ดึงบล็อกข้อความของกองทุนนั้นๆ จากในโซนตาราง
+      const fundRegex = new RegExp(`${code}\\s*([\\s\\S]*?)(?=MPF\\d{2}|$)`, 'i');
+      const fundMatch = tableSection.match(fundRegex);
+
+      if (fundMatch) {
+        const blockText = fundMatch[1];
+        // ดึงตัวเลขทศนิยม 4 ตำแหน่งทั้งหมดเฉพาะในบล็อกกองทุนนั้น
+        const fourDecs = blockText.match(/\d+\.\d{4}/g);
+
+        if (fourDecs && fourDecs.length >= 2) {
+          const slipAvgNav = parseFloat(fourDecs[0]);                // ตัวแรก = Net Asset Value (NAV ต้นทุน)
+          const fundUnits  = parseFloat(fourDecs[1]); // บังคับดึงค่าทศนิยม 4 ตำแหน่งตัวที่ 2 (Units) เสมอ
+
+          if (isNaN(slipAvgNav) || isNaN(fundUnits)) continue;
+
+          // จับคู่กับรายการสินทรัพย์ใน Supabase
+          const targetAsset = currentPort ? currentPort.find(a => 
+            a.asset_code === code || 
+            (a.asset_code && a.asset_code.toUpperCase().includes(code))
+          ) : null;
+
+          if (!targetAsset) continue;
+
+          // 🔒 ระบบป้องกันสแกนซ้ำ
+          if (targetAsset.last_transaction_date === slipDate) {
+            showToast(`⚠️ สลิป MFC ประจำวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
+            return;
+          }
+
+          // อัปเดตลง Supabase
+          const { error: updateErr } = await supabaseClient
+            .from('user_portfolios')
+            .update({
+              units: fundUnits,
+              avg_nav: slipAvgNav,
+              last_transaction_date: slipDate,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetAsset.id);
+
+          if (!updateErr) updatedCount++;
+        }
+      }
+    }
+
+    if (updatedCount > 0) {
+      showToast(`✅ บันทึกสลิป MFC วันที่ [${slipDate}] สำเร็จ ${updatedCount} กองทุน!`, "success");
+      refreshDashboard();
+    } else {
+      showToast("ไม่พบรายการกองทุน MFC ในระบบ หรือรูปแบบตัวเลขไม่ถูกต้อง", "warning");
+    }
+
+  } catch (err) {
+    console.error("MFC Parsing Error:", err);
+    showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF MFC", "error");
+  }
+}
+	
+	
     async function parseGpfPdfStatement(fullText) {
       try {
         showToast("กำลังประมวลผลสลิป กบข....", "info");
