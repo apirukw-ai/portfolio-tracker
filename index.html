@@ -1008,37 +1008,29 @@
     }
 
     async function updateDatabaseUnitsAndCost(items) {
-      try {
-        for (const item of items) {
-          const updateData = {
-            units: item.units,
-            avg_nav: item.avgNav,
-            updated_at: new Date().toISOString()
-          };
-          if (item.currency) updateData.currency = item.currency;
-          if (item.currentNav) updateData.nav_price = item.currentNav;
+  try {
+    for (const item of items) {
+      // อัปเดตไปยังตาราง user_portfolios โดยตรง
+      const { error } = await supabaseClient
+        .from('user_portfolios')
+        .update({
+          units: item.units,
+          avg_nav: item.avgNav,
+          updated_at: new Date().toISOString()
+        })
+        .eq('asset_code', item.code);
 
-          await supabaseClient
-            .from('assets')
-            .update(updateData)
-            .eq('code', item.code);
-
-          await supabaseClient
-            .from('user_portfolios')
-            .update({
-              units: item.units,
-              avg_nav: item.avgNav,
-              updated_at: new Date().toISOString()
-            })
-            .eq('asset_code', item.code);
-        }
-        showToast(`บันทึกข้อมูลสำเร็จ ${items.length} รายการ`, "success");
-        refreshDashboard();
-      } catch (err) {
-        console.error("Error updating database:", err);
-        showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
+      if (error) {
+        console.error(`Error updating ${item.code}:`, error);
       }
     }
+    showToast(`บันทึกข้อมูลสำเร็จ ${items.length} รายการ`, "success");
+    refreshDashboard();
+  } catch (err) {
+    console.error("Error updating database:", err);
+    showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
+  }
+}
 
     function switchChartView(view) {
       const allocView = document.getElementById('chart-view-allocation');
