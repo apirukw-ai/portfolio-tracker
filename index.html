@@ -836,101 +836,99 @@
 
     // 1. ทำความสะอาดข้อความจาก OCR
     const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เป็น . (เช่น 38:8535 -> 38.8535)
+      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เป็น .
       .replace(/,/g, '');               // ลบ comma
 
     // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
     const { data: currentPort, error: fetchErr } = await supabaseClient
       .from('user_portfolios')
-      .select('id, asset_code, units, avg_nav, last_transaction_date');
+      .select('id, asset_code, app_source, units, avg_nav, last_transaction_date');
 
     if (fetchErr) throw fetchErr;
 
-    // 3. ดึงชุดตัวเลขแถวล่างสุด (NAV / จำนวนหน่วย / จำนวนเงิน)
+    // 3. กำหนดรายชื่อแผนในสลิปและแมตช์กับ asset_code ภาษาไทยในฐานข้อมูลของคุณ
+    const planMappings = [
+      { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
+      { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
+      { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
+    ];
+
+    // 4. หาวันที่ล่างสุด (เช่น 26 สิงหาคม 2569)
+    let slipDate = "";
+    const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
+    const dateMatches = [...cleanText.matchAll(dateRegex)];
+
+    if (dateMatches.length > 0) {
+      slipDate = dateMatches[dateMatches.length - 1][1].trim();
+    } else {
+      slipDate = `TX_${Date.now()}`;
+    }
+
+    // 5. สกัดชุดตัวเลขทั้งหมดในเอกสาร (NAV / หน่วย / จำนวนเงิน)
     const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
     const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
 
     if (numberMatches.length === 0) {
-      showToast("อ่านชุดตัวเลขจากสลิปไม่สำเร็จ กรุณาตรวจสอบความชัดของเอกสาร", "error");
+      showToast("อ่านชุดตัวเลขจากสลิปไม่สำเร็จ", "error");
       return;
     }
 
-    // ชุดตัวเลขแถวล่างสุด (รายการล่าสุดในสลิป)
-    const lastMatch = numberMatches[numberMatches.length - 1];
-    const newNav = parseFloat(lastMatch[1]);       // NAV ล่าสุด
-    const addedUnits = parseFloat(lastMatch[2]);   // จำนวนหน่วยงวดนี้
-    const addedAmount = parseFloat(lastMatch[3]);  // จำนวนเงินงวดนี้
+    // ดึง 3 ชุดตัวเลขอันล่างสุด (เพราะสลิปล่าสุดมี 3 แผน)
+    const recentMatches = numberMatches.slice(-3);
+    let updatedCount = 0;
 
-    if (isNaN(newNav) || isNaN(addedUnits)) {
-      showToast("ไม่สามารถแปลงค่าตัวเลขจากสลิปได้", "error");
-      return;
-    }
+    for (let i = 0; i < recentMatches.length; i++) {
+      const match = recentMatches[i];
+      const newNav = parseFloat(match[1]);       // NAV ล่าสุด
+      const addedUnits = parseFloat(match[2]);   // จำนวนหน่วยงวดนี้
 
-    // 4. หาวันที่แบบยืดหยุ่น (Fallback System)
-    let slipDate = "";
+      if (isNaN(newNav) || isNaN(addedUnits)) continue;
 
-    // วิธีที่ 4.1: ค้นหาวันที่แบบเต็ม (เช่น 26 สิงหาคม 2569)
-    const fullDateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
-    const fullDateMatches = [...cleanText.matchAll(fullDateRegex)];
+      // แมตช์ตามลำดับแผน
+      const mapping = planMappings[i] || planMappings[0];
+      const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
 
-    if (fullDateMatches.length > 0) {
-      slipDate = fullDateMatches[fullDateMatches.length - 1][1].trim();
-    } else {
-      // วิธีที่ 4.2: ค้นหาข้อความที่มีปี พ.ศ. 25XX บรรทัดล่างสุด
-      const yearRegex = /([0-9]{1,2}\s+[^\n]*?25[6-9][0-9])/g;
-      const yearMatches = [...cleanText.matchAll(yearRegex)];
-      
-      if (yearMatches.length > 0) {
-        slipDate = yearMatches[yearMatches.length - 1][1].trim();
-      } else {
-        // วิธีที่ 4.3: หากไม่เจอป้อนวันที่เลย ให้ใช้ตัวเลขแถวล่างสุดเป็น Transaction Ref แทน
-        slipDate = `TX_${newNav}_${addedUnits}_${addedAmount}`;
+      if (!targetAsset) continue;
+
+      // 🔒 ระบบป้องกันสแกนซ้ำ
+      if (targetAsset.last_transaction_date === slipDate) {
+        showToast(`⚠️ สลิปวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
+        return;
       }
+
+      // คำนวณหน่วยสะสมรวมใหม่ และ NAV ต้นทุนเฉลี่ย (Weighted Average)
+      const oldUnits = parseFloat(targetAsset.units || 0);
+      const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
+      const totalNewUnits = oldUnits + addedUnits;
+
+      let calculatedAvgNav = newNav;
+      if (oldUnits > 0 && oldAvgNav > 0) {
+        const totalOldCost = oldUnits * oldAvgNav;
+        const totalNewCost = totalOldCost + (addedUnits * newNav);
+        calculatedAvgNav = totalNewCost / totalNewUnits;
+      }
+
+      // อัปเดตลง Supabase
+      const { error: updateErr } = await supabaseClient
+        .from('user_portfolios')
+        .update({
+          units: totalNewUnits,
+          avg_nav: calculatedAvgNav,
+          current_nav: newNav,
+          last_transaction_date: slipDate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetAsset.id);
+
+      if (!updateErr) updatedCount++;
     }
 
-    // 5. ระบุรหัสสินทรัพย์ที่ต้องการอัปเดต (เช่น GPF_FOREIGN)
-    const targetAssetCode = 'GPF_FOREIGN'; 
-    const oldAsset = currentPort ? currentPort.find(a => a.asset_code === targetAssetCode) : null;
-
-    if (!oldAsset) {
-      showToast(`ไม่พบรหัสสินทรัพย์ ${targetAssetCode} ในระบบ`, "error");
-      return;
+    if (updatedCount > 0) {
+      showToast(`✅ บันทึกสลิปวันที่ [${slipDate}] สำเร็จ ${updatedCount} แผน!`, "success");
+      refreshDashboard();
+    } else {
+      showToast("ไม่สามารถอัปเดตรายการ GPF ได้", "error");
     }
-
-    // 🔒 6. ระบบป้องกันสแกนซ้ำ: เช็ก Transaction Key กับค่าใน Supabase
-    if (oldAsset.last_transaction_date === slipDate) {
-      showToast(`⚠️ สลิปประวัติรายการนี้ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
-      return;
-    }
-
-    // 7. คำนวณหน่วยสะสมรวมใหม่และ NAV ต้นทุนเฉลี่ย (Weighted Average)
-    const oldUnits = parseFloat(oldAsset.units || 0);
-    const oldAvgNav = parseFloat(oldAsset.avg_nav || 0);
-    const totalNewUnits = oldUnits + addedUnits;
-
-    let calculatedAvgNav = newNav;
-    if (oldUnits > 0 && oldAvgNav > 0) {
-      const totalOldCost = oldUnits * oldAvgNav;
-      const totalNewCost = totalOldCost + (addedUnits * newNav);
-      calculatedAvgNav = totalNewCost / totalNewUnits;
-    }
-
-    // 8. อัปเดตข้อมูลลง Supabase
-    const { error: updateErr } = await supabaseClient
-      .from('user_portfolios')
-      .update({
-        units: totalNewUnits,
-        avg_nav: calculatedAvgNav,
-        current_nav: newNav,
-        last_transaction_date: slipDate, // บันทึก Transaction Key ป้องกันสแกนซ้ำ
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', oldAsset.id);
-
-    if (updateErr) throw updateErr;
-
-    showToast(`✅ บันทึกสลิปสำเร็จ! [อ้างอิง: ${slipDate}] (ถัวเฉลี่ยต้นทุนเรียบร้อย)`, "success");
-    refreshDashboard();
 
   } catch (err) {
     console.error("GPF Parsing Error:", err);
