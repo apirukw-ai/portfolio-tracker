@@ -563,14 +563,23 @@
         let rightHeaderContent = '';
         if (isDime) {
           rightHeaderContent = `
-            <div class="flex items-center gap-2">
-              <label class="cursor-pointer bg-emerald-600/80 hover:bg-emerald-500 text-white border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-sm">
-                📷 สแกนรูปภาพ/สลิป (Gemini AI)
-                <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
-              </label>
-              <button onclick="configureGeminiApiKey()" class="bg-slate-700/80 hover:bg-slate-600 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1 shadow-sm" title="ตั้งค่า Gemini API Key">
-                🔑 ใส่ Key
+            <div class="flex items-center gap-1.5">
+              <button onclick="configureGeminiApiKey()" title="ตั้งค่า Gemini API Key" class="bg-slate-700/80 hover:bg-slate-700 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1 shadow-sm">
+                🔑 Key
               </button>
+              <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center shadow-sm">
+                📷 สแกนรูปภาพ/สลิป (Gemini AI)
+                <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+              </label>
+            </div>
+          `;
+        } else if (app === 'MFC') {
+          rightHeaderContent = `
+            <div class="flex items-center gap-1.5">
+              <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center shadow-sm">
+                📄 สแกนสลิป MFC (PDF)
+                <input type="file" id="mfc-pdf-input" accept="application/pdf" class="hidden" onchange="handleMfcPdfUpload(event)">
+              </label>
             </div>
           `;
         } else {
@@ -830,111 +839,151 @@
       }
     }
 
+    // ฟังก์ชันสำหรับสแกน PDF ของ MFC โดยเฉพาะ
+    async function handleMfcPdfUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const label = event.target.closest('label');
+      const originalText = label ? label.innerHTML : '';
+
+      try {
+        if (label) {
+          label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังอ่านสลิป MFC...`;
+          label.style.pointerEvents = 'none';
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          fullText += content.items.map(item => item.str).join(" ") + "\n";
+        }
+
+        if (typeof parseMfcPdfStatement === 'function') {
+          await parseMfcPdfStatement(fullText);
+        }
+
+      } catch (err) {
+        console.error("MFC PDF Parsing Error:", err);
+        showToast("เกิดข้อผิดพลาดในการอ่านไฟล์ PDF ของ MFC", "error");
+      } finally {
+        if (label) {
+          label.innerHTML = originalText;
+          label.style.pointerEvents = 'auto';
+        }
+        event.target.value = '';
+      }
+    }
+
     async function parseGpfPdfStatement(fullText) {
-  try {
-    showToast("กำลังประมวลผลสลิป กบข....", "info");
+      try {
+        showToast("กำลังประมวลผลสลิป กบข....", "info");
 
-    // 1. ทำความสะอาดข้อความจาก OCR
-    const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เป็น .
-      .replace(/,/g, '');               // ลบ comma
+        // 1. ทำความสะอาดข้อความจาก OCR
+        const cleanText = fullText
+          .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เป็น .
+          .replace(/,/g, '');               // ลบ comma
 
-    // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
-    const { data: currentPort, error: fetchErr } = await supabaseClient
-      .from('user_portfolios')
-      .select('id, asset_code, app_source, units, avg_nav, last_transaction_date');
+        // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
+        const { data: currentPort, error: fetchErr } = await supabaseClient
+          .from('user_portfolios')
+          .select('id, asset_code, app_source, units, avg_nav, last_transaction_date');
 
-    if (fetchErr) throw fetchErr;
+        if (fetchErr) throw fetchErr;
 
-    // 3. กำหนดรายชื่อแผนในสลิปและแมตช์กับ asset_code ภาษาไทยในฐานข้อมูลของคุณ
-    const planMappings = [
-      { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
-      { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
-      { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
-    ];
+        // 3. กำหนดรายชื่อแผนในสลิปและแมตช์กับ asset_code ภาษาไทยในฐานข้อมูลของคุณ
+        const planMappings = [
+          { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
+          { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
+          { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
+        ];
 
-    // 4. หาวันที่ล่างสุด (เช่น 26 สิงหาคม 2569)
-    let slipDate = "";
-    const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
-    const dateMatches = [...cleanText.matchAll(dateRegex)];
+        // 4. หาวันที่ล่างสุด (เช่น 26 สิงหาคม 2569)
+        let slipDate = "";
+        const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
+        const dateMatches = [...cleanText.matchAll(dateRegex)];
 
-    if (dateMatches.length > 0) {
-      slipDate = dateMatches[dateMatches.length - 1][1].trim();
-    } else {
-      slipDate = `TX_${Date.now()}`;
-    }
+        if (dateMatches.length > 0) {
+          slipDate = dateMatches[dateMatches.length - 1][1].trim();
+        } else {
+          slipDate = `TX_${Date.now()}`;
+        }
 
-    // 5. สกัดชุดตัวเลขทั้งหมดในเอกสาร (NAV / หน่วย / จำนวนเงิน)
-    const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
-    const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
+        // 5. สกัดชุดตัวเลขทั้งหมดในเอกสาร (NAV / หน่วย / จำนวนเงิน)
+        const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
+        const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
 
-    if (numberMatches.length === 0) {
-      showToast("อ่านชุดตัวเลขจากสลิปไม่สำเร็จ", "error");
-      return;
-    }
+        if (numberMatches.length === 0) {
+          showToast("อ่านชุดตัวเลขจากสลิปไม่สำเร็จ", "error");
+          return;
+        }
 
-    // ดึง 3 ชุดตัวเลขอันล่างสุด (เพราะสลิปล่าสุดมี 3 แผน)
-    const recentMatches = numberMatches.slice(-3);
-    let updatedCount = 0;
+        // ดึง 3 ชุดตัวเลขอันล่างสุด (เพราะสลิปล่าสุดมี 3 แผน)
+        const recentMatches = numberMatches.slice(-3);
+        let updatedCount = 0;
 
-    for (let i = 0; i < recentMatches.length; i++) {
-      const match = recentMatches[i];
-      const newNav = parseFloat(match[1]);       // NAV ล่าสุด
-      const addedUnits = parseFloat(match[2]);   // จำนวนหน่วยงวดนี้
+        for (let i = 0; i < recentMatches.length; i++) {
+          const match = recentMatches[i];
+          const newNav = parseFloat(match[1]);       // NAV ล่าสุด
+          const addedUnits = parseFloat(match[2]);   // จำนวนหน่วยงวดนี้
 
-      if (isNaN(newNav) || isNaN(addedUnits)) continue;
+          if (isNaN(newNav) || isNaN(addedUnits)) continue;
 
-      // แมตช์ตามลำดับแผน
-      const mapping = planMappings[i] || planMappings[0];
-      const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
+          // แมตช์ตามลำดับแผน
+          const mapping = planMappings[i] || planMappings[0];
+          const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
 
-      if (!targetAsset) continue;
+          if (!targetAsset) continue;
 
-      // 🔒 ระบบป้องกันสแกนซ้ำ
-      if (targetAsset.last_transaction_date === slipDate) {
-        showToast(`⚠️ สลิปวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
-        return;
+          // 🔒 ระบบป้องกันสแกนซ้ำ
+          if (targetAsset.last_transaction_date === slipDate) {
+            showToast(`⚠️ สลิปวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
+            return;
+          }
+
+          // คำนวณหน่วยสะสมรวมใหม่ และ NAV ต้นทุนเฉลี่ย (Weighted Average)
+          const oldUnits = parseFloat(targetAsset.units || 0);
+          const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
+          const totalNewUnits = oldUnits + addedUnits;
+
+          let calculatedAvgNav = newNav;
+          if (oldUnits > 0 && oldAvgNav > 0) {
+            const totalOldCost = oldUnits * oldAvgNav;
+            const totalNewCost = totalOldCost + (addedUnits * newNav);
+            calculatedAvgNav = totalNewCost / totalNewUnits;
+          }
+
+          // อัปเดตลง Supabase
+          const { error: updateErr } = await supabaseClient
+            .from('user_portfolios')
+            .update({
+              units: totalNewUnits,
+              avg_nav: calculatedAvgNav,
+              current_nav: newNav,
+              last_transaction_date: slipDate,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', targetAsset.id);
+
+          if (!updateErr) updatedCount++;
+        }
+
+        if (updatedCount > 0) {
+          showToast(`✅ บันทึกสลิปวันที่ [${slipDate}] สำเร็จ ${updatedCount} แผน!`, "success");
+          refreshDashboard();
+        } else {
+          showToast("ไม่สามารถอัปเดตรายการ GPF ได้", "error");
+        }
+
+      } catch (err) {
+        console.error("GPF Parsing Error:", err);
+        showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF กบข.", "error");
       }
-
-      // คำนวณหน่วยสะสมรวมใหม่ และ NAV ต้นทุนเฉลี่ย (Weighted Average)
-      const oldUnits = parseFloat(targetAsset.units || 0);
-      const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
-      const totalNewUnits = oldUnits + addedUnits;
-
-      let calculatedAvgNav = newNav;
-      if (oldUnits > 0 && oldAvgNav > 0) {
-        const totalOldCost = oldUnits * oldAvgNav;
-        const totalNewCost = totalOldCost + (addedUnits * newNav);
-        calculatedAvgNav = totalNewCost / totalNewUnits;
-      }
-
-      // อัปเดตลง Supabase
-      const { error: updateErr } = await supabaseClient
-        .from('user_portfolios')
-        .update({
-          units: totalNewUnits,
-          avg_nav: calculatedAvgNav,
-          current_nav: newNav,
-          last_transaction_date: slipDate,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', targetAsset.id);
-
-      if (!updateErr) updatedCount++;
     }
-
-    if (updatedCount > 0) {
-      showToast(`✅ บันทึกสลิปวันที่ [${slipDate}] สำเร็จ ${updatedCount} แผน!`, "success");
-      refreshDashboard();
-    } else {
-      showToast("ไม่สามารถอัปเดตรายการ GPF ได้", "error");
-    }
-
-  } catch (err) {
-    console.error("GPF Parsing Error:", err);
-    showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF กบข.", "error");
-  }
-}
 
     // ฟังก์ชันตั้งค่า Gemini API Key
     function configureGeminiApiKey() {
@@ -998,7 +1047,7 @@
   }
 ]`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
 		  method: 'POST',
           headers: { 
             'Content-Type': 'application/json'
@@ -1050,29 +1099,29 @@
     }
 
     async function updateDatabaseUnitsAndCost(items) {
-  try {
-    for (const item of items) {
-      // อัปเดตไปยังตาราง user_portfolios โดยตรง
-      const { error } = await supabaseClient
-        .from('user_portfolios')
-        .update({
-          units: item.units,
-          avg_nav: item.avgNav,
-          updated_at: new Date().toISOString()
-        })
-        .eq('asset_code', item.code);
+      try {
+        for (const item of items) {
+          // อัปเดตไปยังตาราง user_portfolios โดยตรง
+          const { error } = await supabaseClient
+            .from('user_portfolios')
+            .update({
+              units: item.units,
+              avg_nav: item.avgNav,
+              updated_at: new Date().toISOString()
+            })
+            .eq('asset_code', item.code);
 
-      if (error) {
-        console.error(`Error updating ${item.code}:`, error);
+          if (error) {
+            console.error(`Error updating ${item.code}:`, error);
+          }
+        }
+        showToast(`บันทึกข้อมูลสำเร็จ ${items.length} รายการ`, "success");
+        refreshDashboard();
+      } catch (err) {
+        console.error("Error updating database:", err);
+        showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
       }
     }
-    showToast(`บันทึกข้อมูลสำเร็จ ${items.length} รายการ`, "success");
-    refreshDashboard();
-  } catch (err) {
-    console.error("Error updating database:", err);
-    showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
-  }
-}
 
     function switchChartView(view) {
       const allocView = document.getElementById('chart-view-allocation');
