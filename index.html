@@ -834,77 +834,84 @@
   try {
     showToast("กำลังประมวลผลสลิป กบข....", "info");
 
-    // ทำความสะอาดข้อความจาก OCR ให้ตัวเลขและเครื่องหมายถูกต้อง
+    // ทำความสะอาดข้อความ OCR
     const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2') // เปลี่ยน : เป็น . ในตัวเลข
-      .replace(/,/g, '');               // ลบเครื่องหมาย comma
+      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไข : เป็น .
+      .replace(/,/g, '');               // ลบ comma
 
-    // ดึงข้อมูลพอร์ตอนุรักษ์/ปัจจุบันจาก Supabase มาเปรียบเทียบ
+    // ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
     const { data: currentPort, error: fetchErr } = await supabaseClient
       .from('user_portfolios')
-      .select('id, asset_code, units, avg_nav');
+      .select('id, asset_code, units, avg_nav, last_transaction_date');
 
     if (fetchErr) throw fetchErr;
 
-    // นิยามแผนและตัวดึงข้อมูลแถวสุดท้ายด้วย Regex
-    const gpfPlans = [
-      { code: 'GPF_FOREIGN', name: 'แผนหุ้นต่างประเทศ', regex: /(?:เงินนำส่ง|เงินสะสม|เงินสะ|\bเงิน\b)[^\n]*?(\d+\.\d{4})\s+(\d+\.\d{4})\s+(\d+\.\d{2})/g },
-      { code: 'GPF_THAI', name: 'แผนหุ้นไทย', regex: /(\d+\.\d{4})\s+(\d+\.\d{4})\s+(\d+\.\d{2})\s*$/gm }
-    ];
+    // Regex จับแพตเทิร์น: วันที่ + บรรทัดรายการ (เช่น 26 สิงหาคม 2569 ... ตัวเลขสามชุด)
+    const lineRegex = /(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})[\s\S]*?(\d+\.\d{4})\s+(\d+\.\d{4})\s+(\d+\.\d{2})/g;
 
-    let updateCount = 0;
+    const matches = [...cleanText.matchAll(lineRegex)];
 
-    for (const plan of gpfPlans) {
-      const matches = [...cleanText.matchAll(plan.regex)];
-      
-      if (matches.length > 0) {
-        // ดึงรายการแถวสุดท้าย (ล่าสุดในสลิป)
-        const lastMatch = matches[matches.length - 1];
-        const newNav = parseFloat(lastMatch[1]);       // มูลค่าต่อหน่วยล่าสุด
-        const addedUnits = parseFloat(lastMatch[2]);   // จำนวนหน่วยที่เพิ่มในงวดนี้
-        const addedAmount = parseFloat(lastMatch[3]);  // จำนวนเงินงวดนี้
-
-        if (isNaN(newNav) || isNaN(addedUnits)) continue;
-
-        // ค้นหาพอร์ตเดิมเพื่อถัวเฉลี่ยค่า
-        const oldAsset = currentPort ? currentPort.find(a => a.asset_code === plan.code) : null;
-        const oldUnits = oldAsset ? parseFloat(oldAsset.units || 0) : 0;
-        const oldAvgNav = oldAsset ? parseFloat(oldAsset.avg_nav || 0) : 0;
-
-        // คำนวณหน่วยรวมใหม่
-        const totalNewUnits = oldUnits + addedUnits;
-
-        // คำนวณ NAV ต้นทุนเฉลี่ยใหม่ (Weighted Average NAV)
-        let calculatedAvgNav = newNav;
-        if (oldUnits > 0 && oldAvgNav > 0) {
-          const totalOldCost = oldUnits * oldAvgNav;
-          const totalNewCost = totalOldCost + (addedUnits * newNav);
-          calculatedAvgNav = totalNewCost / totalNewUnits;
-        }
-
-        // อัปเดตลงฐานข้อมูล Supabase
-        if (oldAsset) {
-          await supabaseClient
-            .from('user_portfolios')
-            .update({
-              units: totalNewUnits,
-              avg_nav: calculatedAvgNav,
-              current_nav: newNav,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', oldAsset.id);
-
-          updateCount++;
-        }
-      }
+    if (matches.length === 0) {
+      showToast("อ่านข้อมูลสลิป กบข. ไม่สำเร็จ หรือไม่พบรูปแบบรายการ", "warning");
+      return;
     }
 
-    if (updateCount > 0) {
-      showToast(`อัปเดตสลิป กบข. สำเร็จ ${updateCount} แผน (ถัวเฉลี่ยต้นทุนเรียบร้อย)`, "success");
-      refreshDashboard();
-    } else {
-      showToast("อ่านข้อมูลสลิป กบข. ไม่สำเร็จ หรือไม่พบรายการใหม่", "warning");
+    // ดึงบรรทัดรายการล่างสุด (รายการล่าสุดในสลิป)
+    const lastMatch = matches[matches.length - 1];
+    const slipDate = lastMatch[1].trim();          // เช่น "26 สิงหาคม 2569"
+    const newNav = parseFloat(lastMatch[2]);       // NAV ล่าสุด
+    const addedUnits = parseFloat(lastMatch[3]);   // หน่วยที่เพิ่มงวดนี้
+    const addedAmount = parseFloat(lastMatch[4]);  // จำนวนเงินงวดนี้
+
+    if (isNaN(newNav) || isNaN(addedUnits)) {
+      showToast("ไม่สามารถอ่านตัวเลขจากสลิปได้ถูกต้อง", "error");
+      return;
     }
+
+    // กำหนดแผนหลัก (ตัวอย่างเช่น GPF_FOREIGN หรือแผนที่คุณใช้งาน)
+    const targetAssetCode = 'GPF_FOREIGN'; 
+    const oldAsset = currentPort ? currentPort.find(a => a.asset_code === targetAssetCode) : null;
+
+    if (!oldAsset) {
+      showToast(`ไม่พบข้อมูลแผน ${targetAssetCode} ในระบบ`, "error");
+      return;
+    }
+
+    // 🔒 ระบบป้องกันสแกนซ้ำ: เช็กว่าวันที่ในสลิปตรงกับวันที่เคยบันทึกไว้หรือไม่
+    if (oldAsset.last_transaction_date === slipDate) {
+      showToast(`⚠️ สลิปประวัติตามวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
+      return;
+    }
+
+    // คำนวณหน่วยรวมใหม่
+    const oldUnits = parseFloat(oldAsset.units || 0);
+    const oldAvgNav = parseFloat(oldAsset.avg_nav || 0);
+    const totalNewUnits = oldUnits + addedUnits;
+
+    // คำนวณ NAV ต้นทุนเฉลี่ยใหม่ (Weighted Average)
+    let calculatedAvgNav = newNav;
+    if (oldUnits > 0 && oldAvgNav > 0) {
+      const totalOldCost = oldUnits * oldAvgNav;
+      const totalNewCost = totalOldCost + (addedUnits * newNav);
+      calculatedAvgNav = totalNewCost / totalNewUnits;
+    }
+
+    // อัปเดตข้อมูลลง Supabase พร้อมประทับตร้าวันที่รายการล่าสุด
+    const { error: updateErr } = await supabaseClient
+      .from('user_portfolios')
+      .update({
+        units: totalNewUnits,
+        avg_nav: calculatedAvgNav,
+        current_nav: newNav,
+        last_transaction_date: slipDate, // บันทึกวันที่เพื่อกันสแกนซ้ำ
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', oldAsset.id);
+
+    if (updateErr) throw updateErr;
+
+    showToast(`✅ บันทึกสลิปวันที่ [${slipDate}] สำเร็จ! (ถัวเฉลี่ยต้นทุนเรียบร้อย)`, "success");
+    refreshDashboard();
 
   } catch (err) {
     console.error("GPF Parsing Error:", err);
