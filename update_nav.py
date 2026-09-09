@@ -120,35 +120,53 @@ def get_scb_nav_wealthx(code):
 def get_gpf_nav_direct():
     nav_map = {}
     try:
-        gpf_url = (
-            "https://www.gpf.or.th/thai2019/About/main.php?page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
-        )
+        gpf_url = "https://www.gpf.or.th/thai2019/About/main.php?page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
         res = requests.get(gpf_url, headers=HEADERS, timeout=15)
         res.encoding = "utf-8" if "utf-8" in res.text.lower() else "tis-620"
-        html = res.text
 
-        rows = re.findall(
-            r"<tr.*?>(.*?)</tr>", html, re.DOTALL | re.IGNORECASE
-        )
+        soup = BeautifulSoup(res.text, "html.parser")
+        rows = soup.find_all("tr")
+
         for row in rows:
-            nav_match = re.search(r"(\d+\.\d{4})", row)
-            if not nav_match:
-                continue
-            nav_val = float(nav_match.group(1))
+            text = row.get_text()
 
-            if "หุ้นต่างประเทศ" in row or "1788632129596" in row:
+            # ค้นหาคอลัมน์ (td/th) ในแถว
+            cols = [
+                re.sub(r"\s+", "", col.get_text()) for col in row.find_all(["td", "th"])
+            ]
+            if not cols:
+                continue
+
+            # ดึงตัวเลขทศนิยมทั้งหมดจากคอลัมน์ในแถวนั้น
+            # คอลัมน์ NAV ของ กบข. มักจะใช้ทศนิยม 4 ตำแหน่ง (เช่น 38.9041)
+            nav_candidates = []
+            for col_text in cols:
+                match = re.search(r"^\d{1,3}(?:,\d{3})*\.\d{4}$", col_text)
+                if match:
+                    nav_candidates.append(
+                        float(match.group(0).replace(",", ""))
+                    )
+
+            if not nav_candidates:
+                continue
+
+            # ตัวเลข NAV คือค่าทศนิยม 4 ตำแหน่งที่พบในตาราง
+            nav_val = nav_candidates[0]
+
+            if "หุ้นต่างประเทศ" in text or "1788632129596" in text:
                 nav_map["1788632129596"] = nav_val
                 nav_map["แผนหุ้นต่างประเทศ"] = nav_val
-            elif "หุ้นไทย" in row and "ต่างประเทศ" not in row:
+            elif "หุ้นไทย" in text and "ต่างประเทศ" not in text:
                 nav_map["1788631314182"] = nav_val
                 nav_map["แผนหุ้นไทย"] = nav_val
-            elif "อสังหาริมทรัพย์" in row or "1788632247228" in row:
+            elif "อสังหาริมทรัพย์" in text or "1788632247228" in text:
                 nav_map["1788632247228"] = nav_val
                 nav_map["แผนอสังหาริมทรัพย์ไทย"] = nav_val
+
     except Exception as e:
         print(f"⚠️ GPF Fetch Error: {e}")
-    return nav_map
 
+    return nav_map
 
 def get_us_stock_price(symbol):
     try:
