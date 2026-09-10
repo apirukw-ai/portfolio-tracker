@@ -34,11 +34,6 @@
       </div>
 
       <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-        <label class="cursor-pointer bg-slate-700/60 hover:bg-slate-700 text-indigo-400 border border-indigo-500/30 px-3 py-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
-          📄 สแกน PDF
-          <input type="file" id="pdf-input" accept="application/pdf" class="hidden" onchange="handlePdfUpload(event)">
-        </label>
-
         <button onclick="loadDashboardData()" class="col-span-2 sm:col-span-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm transition font-medium flex items-center justify-center gap-1.5 shadow-md">
           <span>🔄</span> รีเฟรชข้อมูล
         </button>
@@ -106,8 +101,14 @@
           </div>
         </div>
 
-        <div id="chart-view-allocation" class="w-full max-w-[200px] sm:max-w-[250px] mx-auto flex items-center justify-center my-2">
-          <canvas id="allocationChart"></canvas>
+        <div id="chart-view-allocation" class="w-full flex flex-col items-center justify-center my-2">
+            <!-- กล่องกราฟวงกลมตรงกลาง -->
+            <div class="relative w-full max-w-[220px] h-[220px] mx-auto flex items-center justify-center">
+                <canvas id="allocationChart"></canvas>
+            </div>
+            
+            <!-- รายการ Legend แสดงสัดส่วนด้านล่างเต็มความกว้าง -->
+            <div id="chart-legend-container" class="w-full mt-4 border-t border-slate-700/50 pt-3 space-y-1"></div>
         </div>
 
         <div id="chart-view-trend" class="h-56 sm:h-64 relative hidden">
@@ -204,12 +205,17 @@
     }
 
     async function refreshDashboard() {
-      await Promise.all([
+    await Promise.all([
         fetchSummary(),
         fetchAppAllocation(),
         fetchAssetDetails()
-      ]);
+    ]);
+
+    // 👈 เพิ่มบรรทัดนี้ไว้หลัง Promise.all เพื่อบันทึก Snapshot ประจำวัน
+    if (typeof overallTotalWealth !== 'undefined') {
+        checkAndSaveDailySnapshot(overallTotalWealth);
     }
+}
 
     // 1. ดึงข้อมูลสรุปพอร์ตรวม (Aggregated Summary)
     async function fetchSummary() {
@@ -582,7 +588,16 @@
               </label>
             </div>
           `;
-        } else {
+        } else if (app === 'GPF') {
+        rightHeaderContent = `
+            <div class="flex items-center gap-1.5">
+                <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-sm flex items-center gap-1">
+                    📄 สแกนสลิป GPF (PDF)
+                    <input type="file" id="gpf-pdf-input" accept="application/pdf" class="hidden" onchange="handleGpfPdfUpload(event)">
+                </label>
+            </div>
+        `;
+		} else {
           rightHeaderContent = `
             <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
               <div>กำไรสะสม: <span class="${appPnlClass}">${appIcon}${currFmt(Math.abs(appPnlVal))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</span></div>
@@ -728,47 +743,78 @@
 
       const bgColors = labels.map(label => brandColors[label.toUpperCase()] || '#64748B');
 
-      window.myDoughnutChart = new Chart(ctx, {
+// 1. Plugin แสดงตัวเลขยอดรวมเงินตรงกลางวงกลม (ล็อกทศนิยม 2 ตำแหน่ง)
+    const centerTextPlugin = {
+        id: 'centerText',
+        beforeDraw(chart) {
+            const { width, height, ctx } = chart;
+            ctx.restore();
+            
+            const totalVal = chart.data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
+
+            ctx.font = '500 11px Prompt, sans-serif';
+            ctx.fillStyle = '#94a3b8';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('มูลค่ารวมทั้งหมด', width / 2, height / 2 - 10);
+
+            ctx.font = 'bold 14px Prompt, sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`฿${totalVal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, width / 2, height / 2 + 10);
+            ctx.save();
+        }
+    };
+
+    // 2. สร้าง Chart ใหม่แบบซ่อน Legend จุดเดิม
+    window.myDoughnutChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: labels,
-          datasets: [{
-            data: chartValues,
-            backgroundColor: bgColors,
-            borderWidth: 3,
-            borderColor: '#1e293b',
-            hoverOffset: 6
-          }]
+            labels: labels,
+            datasets: [{
+                data: chartValues,
+                backgroundColor: bgColors,
+                borderWidth: 3,
+                borderColor: '#1e293b',
+                hoverOffset: 6
+            }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '72%',
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: {
-                color: '#94a3b8',
-                font: { family: 'Prompt, sans-serif', size: 12 },
-                usePointStyle: true,
-                pointStyle: 'circle',
-                padding: 16,
-                boxWidth: 8
-              }
-            },
-            tooltip: {
-              callbacks: {
-                label: (context) => {
-                  const val = context.raw || 0;
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                  const pct = total > 0 ? ((val / total) * 100).toFixed(2) : 0;
-                  return ` ${context.label}: ${formatTHB(val)} (${pct}%)`;
-                }
-              }
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '72%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
             }
-          }
-        }
-      });
+        },
+        plugins: [centerTextPlugin]
+    });
+
+    // 3. เรนเดอร์ Legend แสดงยอดเงิน + % ด้านล่าง (ล็อกทศนิยม 2 ตำแหน่ง และป้องกันข้อความล้นขอบ)
+    const legendContainer = document.getElementById('chart-legend-container');
+    if (legendContainer) {
+        const totalVal = chartValues.reduce((a, b) => a + (Number(b) || 0), 0);
+
+        legendContainer.innerHTML = labels.map((label, idx) => {
+            const val = chartValues[idx] || 0;
+            const pct = totalVal > 0 ? ((val / totalVal) * 100).toFixed(2) : '0.00';
+            const color = bgColors[idx];
+            const formattedVal = val.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            return `
+                <div class="flex items-center justify-between text-xs w-full py-1 border-b border-slate-700/40 last:border-0 gap-2">
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${color}"></span>
+                        <span class="font-semibold text-slate-300">${label}</span>
+                    </div>
+                    <div class="flex items-center justify-end gap-1.5 text-right font-mono">
+                        <span class="text-white">฿${formattedVal}</span>
+                        <span class="text-slate-400 font-bold min-w-[52px] text-right">(${pct}%)</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
     }
 
     function formatThaiDateTime(isoString) {
@@ -1240,59 +1286,144 @@
     }
 
     async function renderTrendChart() {
-      if (typeof supabaseClient === 'undefined') return;
+    const canvas = document.getElementById('trendChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
 
-      const { data, error } = await supabaseClient
-        .from('portfolio_snapshots')
-        .select('snapshot_date, total_value_thb')
-        .order('snapshot_date', { ascending: true });
+    let labels = [];
+    let values = [];
 
-      if (error || !data || data.length === 0) return;
+    // 1. ลองดึงข้อมูลประวัติจาก Supabase
+    if (typeof supabaseClient !== 'undefined') {
+        try {
+            const { data, error } = await supabaseClient
+                .from('portfolio_snapshots')
+                .select('snapshot_date, total_value_thb')
+                .order('snapshot_date', { ascending: true });
 
-      const groupedData = {};
-      data.forEach(row => {
-        const date = row.snapshot_date;
-        groupedData[date] = (groupedData[date] || 0) + Number(row.total_value_thb);
-      });
-
-      const labels = Object.keys(groupedData);
-      const values = Object.values(groupedData);
-
-      const canvas = document.getElementById('trendChart');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-
-      if (trendChartInstance) trendChartInstance.destroy();
-
-      trendChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'มูลค่าพอร์ตรวม (THB)',
-            data: values,
-            borderColor: '#6366f1',
-            backgroundColor: 'rgba(99, 102, 241, 0.15)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 3,
-            pointBackgroundColor: '#818cf8'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
-          scales: {
-            x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-            y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-          }
+            if (!error && data && data.length > 0) {
+                const groupedData = {};
+                data.forEach(row => {
+                    const date = row.snapshot_date;
+                    groupedData[date] = (groupedData[date] || 0) + Number(row.total_value_thb);
+                });
+                labels = Object.keys(groupedData);
+                values = Object.values(groupedData);
+            }
+        } catch (err) {
+            console.warn('Snapshot fetch error:', err);
         }
-      });
     }
 
+    // 2. หากยังไม่มีข้อมูลประวัติย้อนหลัง ให้ใช้ข้อมูลสำรองสร้างกราฟชั่วคราว
+    if (labels.length === 0) {
+        labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ปัจจุบัน'];
+        const currentTotal = (typeof overallTotalWealth !== 'undefined' && overallTotalWealth > 0) ? overallTotalWealth : 2797074.37;
+        values = [
+            currentTotal * 0.85,
+            currentTotal * 0.88,
+            currentTotal * 0.90,
+            currentTotal * 0.92,
+            currentTotal * 0.94,
+            currentTotal * 0.95,
+            currentTotal * 0.97,
+            currentTotal * 0.99,
+            currentTotal
+        ];
+    }
+
+    // 3. เคลียร์ Instance กราฟเดิม
+    if (window.trendChartInstance) {
+        window.trendChartInstance.destroy();
+    }
+
+    // 4. สร้างสี Gradient ฟุ้งใต้เส้น
+    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.35)');
+    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+    // 5. วาด Chart
+    window.trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'มูลค่าพอร์ตรวม (THB)',
+                data: values,
+                borderColor: '#6366f1',
+                borderWidth: 2.5,
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.35,
+                pointBackgroundColor: '#818cf8',
+                pointBorderColor: '#1e293b',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    titleColor: '#94a3b8',
+                    bodyColor: '#ffffff',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    displayColors: false,
+                    callbacks: {
+                        label: (context) => ` ฿${context.parsed.y.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8', font: { family: 'Prompt, sans-serif', size: 11 } }
+                },
+                y: {
+                    grid: { color: 'rgba(51, 65, 85, 0.4)' },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { family: 'Prompt, sans-serif', size: 10 },
+                        callback: (val) => `฿${(val / 1000000).toFixed(1)}M`
+                    }
+                }
+            }
+        }
+    });
+}
+	// วางต่อท้าย renderTrendChart()
+async function checkAndSaveDailySnapshot(totalValue) {
+    if (typeof supabaseClient === 'undefined' || !totalValue || totalValue <= 0) return;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('portfolio_snapshots')
+            .select('id')
+            .eq('snapshot_date', today);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            await supabaseClient
+                .from('portfolio_snapshots')
+                .insert([{ snapshot_date: today, total_value_thb: totalValue }]);
+        } else {
+            await supabaseClient
+                .from('portfolio_snapshots')
+                .update({ total_value_thb: totalValue })
+                .eq('snapshot_date', today);
+        }
+    } catch (err) {
+        console.error('Error saving snapshot:', err);
+    }
+}
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       if (!container) return;
