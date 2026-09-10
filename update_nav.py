@@ -82,12 +82,16 @@ def get_gpf_nav_direct():
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        current_price = ticker.fast_info.last_price
-        prev_close = ticker.fast_info.previous_close
         
-        # ส่งค่ากลับทั้งราคาปัจจุบันและราคาปิดเมื่อวาน
-        if current_price and prev_close:
-            return float(current_price), float(prev_close)
+        # ดึงราคาปิดตลาดรอบปกติ (ตัดปัญหา After-hours)
+        todays_data = ticker.history(period="1d")
+        
+        if not todays_data.empty:
+            current_price = float(todays_data["Close"].iloc[-1])
+            prev_close = float(ticker.fast_info.previous_close)
+            
+            return current_price, prev_close
+            
     except Exception as e:
         print(f"⚠️ yfinance Error [{symbol}]: {e}")
     return None, None
