@@ -44,14 +44,12 @@ def get_gpf_nav_direct():
         for row in rows:
             text = row.get_text()
 
-            # ค้นหาคอลัมน์ (td/th) ในแถว
             cols = [
                 re.sub(r"\s+", "", col.get_text()) for col in row.find_all(["td", "th"])
             ]
             if not cols:
                 continue
 
-            # ดึงตัวเลขทศนิยมทั้งหมดจากคอลัมน์ในแถวนั้น (คอลัมน์ NAV ของ กบข. มักจะใช้ทศนิยม 4 ตำแหน่ง)
             nav_candidates = []
             for col_text in cols:
                 match = re.search(r"^\d{1,3}(?:,\d{3})*\.\d{4}$", col_text)
@@ -84,12 +82,15 @@ def get_gpf_nav_direct():
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        todays_data = ticker.history(period="1d")
-        if not todays_data.empty:
-            return float(todays_data["Close"].iloc[-1])
+        current_price = ticker.fast_info.last_price
+        prev_close = ticker.fast_info.previous_close
+        
+        # ส่งค่ากลับทั้งราคาปัจจุบันและราคาปิดเมื่อวาน
+        if current_price and prev_close:
+            return float(current_price), float(prev_close)
     except Exception as e:
         print(f"⚠️ yfinance Error [{symbol}]: {e}")
-    return None
+    return None, None
 
 
 # ----------------------------------------------------
@@ -102,10 +103,7 @@ def fetch_and_update():
         now_thai = now_thai_dt.strftime("%Y-%m-%dT%H:%M:%S+07:00")
         today_date_str = now_thai_dt.strftime("%d/%m/%Y")
 
-        # 1. โหลดข้อมูล GPF ล่วงหน้า
         gpf_nav_data = get_gpf_nav_direct()
-
-        # 2. ดึงรายการสินทรัพย์ทั้งหมดจาก user_portfolios
         db_res = supabase.table("user_portfolios").select("*").execute()
         portfolio_items = db_res.data or []
 
@@ -118,20 +116,21 @@ def fetch_and_update():
             name = item.get("asset_name", "")
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
+            
             latest_nav = None
+            latest_prev_nav = None
             nav_date = today_date_str
 
-            # ข้ามรายการที่ไม่ใช่ GPF หรือ DIME
             if app not in ["gpf", "dime"]:
                 continue
 
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
-            # ดึงราคาตามประเภทแอป
             if app == "gpf":
                 latest_nav = gpf_nav_data.get(code)
             elif app == "dime":
-                latest_nav = get_us_stock_price(code)
+                # รับค่า 2 ตัวแปรจาก yfinance
+                latest_nav, latest_prev_nav = get_us_stock_price(code)
 
             final_nav = (
                 latest_nav
@@ -139,28 +138,28 @@ def fetch_and_update():
                 else current_nav
             )
 
-            # อัปเดตข้อมูลลง Supabase
+            # จัดเตรียมข้อมูลอัปเดตพื้นฐาน
+            update_payload = {
+                "nav_date": nav_date, 
+                "updated_at": now_thai
+            }
+
+            # หากมีการเปลี่ยนแปลงของราคา Current
             if latest_nav and latest_nav != current_nav:
-                supabase.table("user_portfolios").update(
-                    {
-                        "current_nav": final_nav,
-                        "current_value": units * final_nav,
-                        "nav_date": nav_date,
-                        "updated_at": now_thai,
-                    }
-                ).eq("id", item_id).execute()
-                print(
-                    f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔"
-                    f" {final_nav} ({nav_date})"
-                )
+                update_payload["current_nav"] = round(final_nav, 4)
+                update_payload["current_value"] = round(units * final_nav, 4)
+
+            # บังคับอัปเดต Previous Close สำหรับ Dime เสมอ (ป้องกันตัวเลขเพี้ยน)
+            if app == "dime" and latest_prev_nav:
+                update_payload["prev_nav"] = round(latest_prev_nav, 4)
+
+            # อัปเดตข้อมูลลง Supabase แบบรวบยอด
+            supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
+
+            if latest_nav and latest_nav != current_nav:
+                print(f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav} ({nav_date})")
             else:
-                supabase.table("user_portfolios").update(
-                    {"nav_date": nav_date, "updated_at": now_thai}
-                ).eq("id", item_id).execute()
-                print(
-                    f" ℹ️ {code} ราคาล่าสุด: {final_nav} ({nav_date})"
-                    " (อัปเดตสถานะเสร็จสิ้น)"
-                )
+                print(f" ℹ️ {code} ราคาล่าสุด: {final_nav} ({nav_date}) (อัปเดตสถานะเสร็จสิ้น)")
 
         print(f"✅ อัปเดต NAV ปัจจุบัน (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
 
