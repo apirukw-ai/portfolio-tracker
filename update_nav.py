@@ -8,7 +8,7 @@ from supabase import Client, create_client
 import yfinance as yf
 
 # ----------------------------------------------------
-# 1. เชื่อมต่อ Supabase
+# 1. เชื่อมต่อ Supabase และตั้งค่าคงที่
 # ----------------------------------------------------
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
@@ -21,8 +21,8 @@ supabase: Client = create_client(url, key)
 
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,"
-        " like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     ),
     "Accept-Language": "th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7",
 }
@@ -34,7 +34,10 @@ HEADERS = {
 def get_gpf_nav_direct():
     nav_map = {}
     try:
-        gpf_url = "https://www.gpf.or.th/thai2019/About/main.php?page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
+        gpf_url = (
+            "https://www.gpf.or.th/thai2019/About/main.php?"
+            "page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
+        )
         res = requests.get(gpf_url, headers=HEADERS, timeout=15)
         res.encoding = "utf-8" if "utf-8" in res.text.lower() else "tis-620"
 
@@ -43,9 +46,9 @@ def get_gpf_nav_direct():
 
         for row in rows:
             text = row.get_text()
-
             cols = [
-                re.sub(r"\s+", "", col.get_text()) for col in row.find_all(["td", "th"])
+                re.sub(r"\s+", "", col.get_text())
+                for col in row.find_all(["td", "th"])
             ]
             if not cols:
                 continue
@@ -54,9 +57,7 @@ def get_gpf_nav_direct():
             for col_text in cols:
                 match = re.search(r"^\d{1,3}(?:,\d{3})*\.\d{4}$", col_text)
                 if match:
-                    nav_candidates.append(
-                        float(match.group(0).replace(",", ""))
-                    )
+                    nav_candidates.append(float(match.group(0).replace(",", "")))
 
             if not nav_candidates:
                 continue
@@ -82,16 +83,15 @@ def get_gpf_nav_direct():
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        
+
         # ดึงราคาปิดตลาดรอบปกติ (ตัดปัญหา After-hours)
         todays_data = ticker.history(period="1d")
-        
+
         if not todays_data.empty:
-            current_price = float(todays_data["Close"].iloc[-1])
-            prev_close = float(ticker.fast_info.previous_close)
-            
+            current_price = round(float(todays_data["Close"].iloc[-1]), 4)
+            prev_close = round(float(ticker.fast_info.previous_close), 4)
             return current_price, prev_close
-            
+
     except Exception as e:
         print(f"⚠️ yfinance Error [{symbol}]: {e}")
     return None, None
@@ -120,7 +120,7 @@ def fetch_and_update():
             name = item.get("asset_name", "")
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
-            
+
             latest_nav = None
             latest_prev_nav = None
             nav_date = today_date_str
@@ -137,16 +137,11 @@ def fetch_and_update():
                 latest_nav, latest_prev_nav = get_us_stock_price(code)
 
             final_nav = (
-                latest_nav
-                if (latest_nav and latest_nav > 0)
-                else current_nav
+                latest_nav if (latest_nav and latest_nav > 0) else current_nav
             )
 
             # จัดเตรียมข้อมูลอัปเดตพื้นฐาน
-            update_payload = {
-                "nav_date": nav_date, 
-                "updated_at": now_thai
-            }
+            update_payload = {"nav_date": nav_date, "updated_at": now_thai}
 
             # หากมีการเปลี่ยนแปลงของราคา Current
             if latest_nav and latest_nav != current_nav:
@@ -158,12 +153,20 @@ def fetch_and_update():
                 update_payload["prev_nav"] = round(latest_prev_nav, 4)
 
             # อัปเดตข้อมูลลง Supabase แบบรวบยอด
-            supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
+            supabase.table("user_portfolios").update(update_payload).eq(
+                "id", item_id
+            ).execute()
 
             if latest_nav and latest_nav != current_nav:
-                print(f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav} ({nav_date})")
+                print(
+                    f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav} "
+                    f"({nav_date})"
+                )
             else:
-                print(f" ℹ️ {code} ราคาล่าสุด: {final_nav} ({nav_date}) (อัปเดตสถานะเสร็จสิ้น)")
+                print(
+                    f" ℹ️ {code} ราคาล่าสุด: {final_nav} ({nav_date}) "
+                    f"(อัปเดตสถานะเสร็จสิ้น)"
+                )
 
         print(f"✅ อัปเดต NAV ปัจจุบัน (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
 
@@ -176,9 +179,9 @@ def fetch_and_update():
 # ----------------------------------------------------
 def save_daily_snapshot(supabase_client, app_source, total_thb):
     try:
-        today_str = (
-            datetime.now(timezone.utc) + timedelta(hours=7)
-        ).strftime("%Y-%m-%d")
+        today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime(
+            "%Y-%m-%d"
+        )
 
         data = {
             "snapshot_date": today_str,
