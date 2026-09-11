@@ -597,6 +597,15 @@
                 </label>
             </div>
         `;
+		} else if (app.toLowerCase() === 'scb') {
+		rightHeaderContent = `
+			<div class="flex items-center gap-1.5">
+				<label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-purple-400 border border-purple-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+					📷 สแกนพอร์ต SCB
+					<input type="file" id="scb-image-input" accept="image/*" class="hidden" onchange="scanScbCard(event)">
+				</label>
+			</div>
+		`;
 		} else {
           rightHeaderContent = `
             <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
@@ -1468,6 +1477,107 @@ async function checkAndSaveDailySnapshot(totalValue) {
           .catch(err => console.log('❌ SW Registration Failed:', err));
       });
     }
+	
+async function scanScbCard(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const label = event.target.closest('label');
+  const originalText = label ? label.innerHTML : '';
+
+  // 📍 1. ตรวจสอบและดึง GEMINI_API_KEY จาก localStorage ภายในฟังก์ชันนี้เท่านั้น
+  let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || '';
+
+  if (!GEMINI_API_KEY) {
+    GEMINI_API_KEY = prompt('กรุณากรอก Gemini API Key ก่อนใช้งาน:');
+    if (GEMINI_API_KEY && GEMINI_API_KEY.trim()) {
+      GEMINI_API_KEY = GEMINI_API_KEY.trim();
+      localStorage.setItem('GEMINI_API_KEY', GEMINI_API_KEY);
+    } else {
+      showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
+      event.target.value = '';
+      return; // ปลอดภัยเพราะอยู่ในฟังก์ชันแล้ว
+    }
+  }
+
+  // 📍 2. ทำงานประมวลผลต่อตามปกติ...
+  try {
+    if (label) {
+      label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกน SCB...`;
+      label.style.pointerEvents = 'none';
+    }
+    const base64Image = await fileToBase64(file);
+    const base64Data = base64Image.split(',')[1];
+
+    // กำหนดชื่อโมเดลเป็นรุ่นที่ระบบ Google รองรับ
+    const MODEL_NAME = 'gemini-3.6-flash'; 
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const prompt = `วิเคราะห์ภาพหน้าจอพอร์ตการลงทุนนี้ ค้นหาข้อมูลกองทุนทั้งหมดที่ปรากฏในภาพ 
+    และคืนค่ากลับมาเป็นรูปแบบ JSON Array เท่านั้น โครงสร้าง:
+    [{"asset_code": "SCBAXJ(E)", "avg_nav": 15.1046, "units": 1746.4907}] 
+    ห้ามมีข้อความอื่นหรือแท็ก json ติดมาเด็ดขาด`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: file.type, data: base64Data } }
+          ]
+        }]
+      })
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
+    }
+
+    let textOutput = result.candidates[0].content.parts[0].text.trim();
+    textOutput = textOutput.replace(/```json|```/g, '').trim();
+    const extractedFunds = JSON.parse(textOutput);
+
+    // เขียนทับค่า avg_nav และ units ใน Supabase
+    for (const fund of extractedFunds) {
+      const { error } = await supabaseClient
+        .from('user_portfolios')
+        .update({
+          avg_nav: fund.avg_nav,
+          units: fund.units
+        })
+        .eq('asset_code', fund.asset_code);
+
+      if (error) console.error("Update Error:", error);
+    }
+
+    alert("✅ สแกนและอัปเดตข้อมูลกองทุน SCB เรียบร้อยแล้ว!");
+    
+    if (typeof loadPortfolioData === 'function') {
+      loadPortfolioData();
+    } else {
+      location.reload();
+    }
+
+  } catch (err) {
+    console.error("Scan Error:", err);
+    alert("❌ เกิดข้อผิดพลาด: " + err.message);
+  } finally {
+    event.target.value = '';
+  }
+}
+// ฟังก์ชันช่วยแปลงรูปเป็น Base64
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
   </script>
   
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
