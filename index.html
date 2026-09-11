@@ -928,12 +928,12 @@ async function fetchSummary() {
         window.myDoughnutChart.destroy();
       }
 
-      const brandColors = {
-        'GPF': '#10B981',
-        'MFC': '#F97316',
-        'SCB': '#8B5CF6',
-        'DIME': '#06B6D4'
-      };
+        const brandColors = {
+            'GPF': '#38BDF8',   // เปลี่ยนเป็นสีฟ้าสว่าง กบข. (ตามที่เราใช้ในตารางและกราฟเส้น)
+            'MFC': '#FF9800',   // เปลี่ยนเป็นสีส้มสว่าง MFC (ส้มเดิมที่คุณชอบ)
+            'SCB': '#C084FC',   // เปลี่ยนเป็นสีม่วงพาสเทลสว่าง SCB
+            'DIME': '#00FF66'   // เปลี่ยนเป็นสีเขียวนีออนหลัก DIME!
+        };
 
       const bgColors = labels.map(label => brandColors[label.toUpperCase()] || '#64748B');
 
