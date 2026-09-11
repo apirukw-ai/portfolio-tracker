@@ -568,18 +568,26 @@
         // สลับแสดงปุ่ม Gemini AI สำหรับ DIME และแสดงสรุปกำไรสำหรับพอร์ตอื่นๆ
         let rightHeaderContent = '';
         if (isDime) {
-          rightHeaderContent = `
-            <div class="flex items-center gap-1.5">
-              <button onclick="configureGeminiApiKey()" title="ตั้งค่า Gemini API Key" class="bg-slate-700/80 hover:bg-slate-700 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1 shadow-sm">
-                🔑 Key
-              </button>
-              <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center shadow-sm">
-                📷 สแกนรูปภาพ/สลิป (Gemini AI)
-                <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
-              </label>
-            </div>
-          `;
-        } else if (app === 'MFC') {
+  rightHeaderContent = `
+    <div class="flex items-center gap-1.5">
+      <button onclick="configureGeminiApiKey()" title="ตั้งค่า Gemini API Key" class="bg-slate-700/80 hover:bg-slate-700 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1">
+        🔑 Key
+      </button>
+
+      <!-- ปุ่มสแกนรูปภาพเดิม -->
+      <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+        📷 สแกนรูป
+        <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+      </label>
+
+      <!-- ปุ่มสแกน PDF Dime เพิ่มใหม่ -->
+      <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+        📄 สแกน PDF
+        <input type="file" id="dime-pdf-input" accept="application/pdf" class="hidden" onchange="scanDimePdfCard(event)">
+      </label>
+    </div>
+  `;
+} else if (app === 'MFC') {
           rightHeaderContent = `
             <div class="flex items-center gap-1.5">
               <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center shadow-sm">
@@ -1565,6 +1573,170 @@ async function scanScbCard(event) {
   } catch (err) {
     console.error("Scan Error:", err);
     alert("❌ เกิดข้อผิดพลาด: " + err.message);
+  } finally {
+    event.target.value = '';
+  }
+}
+async function scanDimePdfCard(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  alert("🔍 AI กำลังอ่านข้อมูลเอกสาร PDF DIME กรุณารอสักครู่...");
+
+  try {
+    const base64Pdf = await fileToBase64(file);
+    const base64Data = base64Pdf.split(',')[1];
+
+    const MODEL_NAME = 'gemini-3.6-flash';
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
+
+    // 🟢 1. ดึง order_id มาด้วยเพื่อใช้เช็กรายการซ้ำ
+    const prompt = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
+    ค้นหาและดึงรายการซื้อขายทั้งหมด (BUY หรือ SELL) ออกมาเป็น JSON Array เท่านั้น
+    โครงสร้าง JSON:
+    [
+      {
+        "order_id": "979038",
+        "asset_code": "AMZN",
+        "transaction_type": "BUY",
+        "units": 0.0595177,
+        "unit_price": 251.69
+      }
+    ]
+    เงื่อนไขสำคัญ:
+    1. order_id คือ เลขที่คำสั่ง เช่น 979038, 978689
+    2. asset_code คือ ชื่อย่อหุ้น เช่น AMZN, GOOGL
+    3. หากพบทศนิยมที่ใช้เครื่องหมายจุลภาค เช่น 0,0606622 ให้แปลงเป็นจุด 0.0606622
+    4. คืนค่าเฉพาะ JSON Array ห้ามมีข้อความอื่นเด็ดขาด`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: 'application/pdf', data: base64Data } }
+          ]
+        }]
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
+    }
+
+    let textOutput = result.candidates[0].content.parts[0].text.trim();
+    textOutput = textOutput.replace(/```json|```/g, '').trim();
+    const transactions = JSON.parse(textOutput);
+
+    let skippedCount = 0;
+    let successCount = 0;
+
+    for (const tx of transactions) {
+      const { order_id, asset_code, transaction_type, units, unit_price } = tx;
+      if (!asset_code || !units || !unit_price) continue;
+
+      // 🟢 2. ตรวจสอบในตารางประวัติธุรกรรม (dime_orders) ว่า Order ID นี้เคยบันทึกแล้วหรือยัง
+      if (order_id) {
+        const { data: existingOrder } = await supabaseClient
+          .from('dime_orders')
+          .select('order_id')
+          .eq('order_id', order_id)
+          .maybeSingle();
+
+        if (existingOrder) {
+          console.warn(`⚠️ ข้ามรายการซ้ำ Order ID: ${order_id} (${asset_code})`);
+          skippedCount++;
+          continue; // ข้ามการคำนวณถัดไปทันที
+        }
+      }
+
+      const numUnits = Number(units);
+      const numPrice = Number(unit_price);
+
+      // ดึงข้อมูลหุ้นเดิมในพอร์ต Dime
+      const { data: portfolioItems } = await supabaseClient
+        .from('user_portfolios')
+        .select('*')
+        .eq('app_source', 'dime')
+        .eq('asset_code', asset_code);
+
+      if (!portfolioItems || portfolioItems.length === 0) {
+        if (transaction_type === 'BUY') {
+          const totalCost = Number((numUnits * numPrice).toFixed(4));
+          await supabaseClient.from('user_portfolios').insert({
+            app_source: 'dime',
+            asset_code: asset_code,
+            asset_name: asset_code,
+            units: Number(numUnits.toFixed(7)),
+            avg_nav: Number(numPrice.toFixed(4)),
+            total_cost: totalCost,
+            current_nav: Number(numPrice.toFixed(4)),
+            prev_nav: Number(numPrice.toFixed(4)),
+            current_value: totalCost
+          });
+        }
+      } else {
+        const item = portfolioItems[0];
+        const oldUnits = Number(item.units || 0);
+        const oldAvgNav = Number(item.avg_nav || 0);
+        const currentNav = Number(item.current_nav || numPrice);
+
+        let updatedUnits = 0;
+        let updatedAvgNav = 0;
+
+        if (transaction_type === 'BUY') {
+          updatedUnits = oldUnits + numUnits;
+          const updatedTotalCost = (oldUnits * oldAvgNav) + (numUnits * numPrice);
+          updatedAvgNav = updatedUnits > 0 ? (updatedTotalCost / updatedUnits) : 0;
+        } else {
+          updatedUnits = Math.max(0, oldUnits - numUnits);
+          updatedAvgNav = oldAvgNav;
+        }
+
+        updatedUnits = Number(updatedUnits.toFixed(7));
+        updatedAvgNav = Number(updatedAvgNav.toFixed(4));
+        const updatedTotalCost = Number((updatedUnits * updatedAvgNav).toFixed(4));
+        const updatedCurrentValue = Number((updatedUnits * currentNav).toFixed(4));
+
+        await supabaseClient.from('user_portfolios').update({
+          units: updatedUnits,
+          avg_nav: updatedAvgNav,
+          total_cost: updatedTotalCost,
+          current_value: updatedCurrentValue
+        }).eq('id', item.id);
+      }
+
+      // 🟢 3. บันทึก Order ID เข้าตารางดักซ้ำ
+      if (order_id) {
+        await supabaseClient.from('dime_orders').insert({
+          order_id: String(order_id),
+          asset_code: asset_code,
+          units: numUnits,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      successCount++;
+    }
+
+    if (skippedCount > 0 && successCount === 0) {
+      alert("⚠️ เอกสาร PDF นี้เคยสแกนเข้าระบบไปแล้ว (พบ Order ID ซ้ำทั้งหมด)");
+    } else {
+      alert(`✅ สแกนสำเร็จ ${successCount} รายการ ${skippedCount > 0 ? `(ข้ามรายการซ้ำ ${skippedCount} รายการ)` : ''}`);
+    }
+    
+    if (typeof loadPortfolioData === 'function') {
+      loadPortfolioData();
+    } else {
+      location.reload();
+    }
+
+  } catch (err) {
+    console.error("Dime PDF Scan Error:", err);
+    alert("❌ เกิดข้อผิดพลาดในการอ่าน PDF: " + err.message);
   } finally {
     event.target.value = '';
   }
