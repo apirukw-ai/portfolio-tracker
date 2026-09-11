@@ -1581,6 +1581,15 @@ async function scanDimePdfCard(event) {
   const file = event.target.files[0];
   if (!file) return;
 
+  // 🟢 ดึง API Key จาก localStorage หรือ Global variable
+  const apiKey = localStorage.getItem('GEMINI_API_KEY') || (typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : '');
+
+  if (!apiKey) {
+    alert("🔑 กรุณาตั้งค่า Gemini API Key ก่อนใช้งาน (กดปุ่ม 🔑 Key ที่มุมขวาของการ์ด Dime)");
+    event.target.value = '';
+    return;
+  }
+
   alert("🔍 AI กำลังอ่านข้อมูลเอกสาร PDF DIME กรุณารอสักครู่...");
 
   try {
@@ -1588,9 +1597,9 @@ async function scanDimePdfCard(event) {
     const base64Data = base64Pdf.split(',')[1];
 
     const MODEL_NAME = 'gemini-3.6-flash';
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
+    // 🟢 ใช้ตัวแปร apiKey ที่ดึงมาสำเร็จ
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
 
-    // 🟢 1. ดึง order_id มาด้วยเพื่อใช้เช็กรายการซ้ำ
     const prompt = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
     ค้นหาและดึงรายการซื้อขายทั้งหมด (BUY หรือ SELL) ออกมาเป็น JSON Array เท่านั้น
     โครงสร้าง JSON:
@@ -1638,25 +1647,24 @@ async function scanDimePdfCard(event) {
       const { order_id, asset_code, transaction_type, units, unit_price } = tx;
       if (!asset_code || !units || !unit_price) continue;
 
-      // 🟢 2. ตรวจสอบในตารางประวัติธุรกรรม (dime_orders) ว่า Order ID นี้เคยบันทึกแล้วหรือยัง
+      // ตรวจสอบรายการซ้ำในตาราง dime_orders
       if (order_id) {
         const { data: existingOrder } = await supabaseClient
           .from('dime_orders')
           .select('order_id')
-          .eq('order_id', order_id)
+          .eq('order_id', String(order_id))
           .maybeSingle();
 
         if (existingOrder) {
           console.warn(`⚠️ ข้ามรายการซ้ำ Order ID: ${order_id} (${asset_code})`);
           skippedCount++;
-          continue; // ข้ามการคำนวณถัดไปทันที
+          continue;
         }
       }
 
       const numUnits = Number(units);
       const numPrice = Number(unit_price);
 
-      // ดึงข้อมูลหุ้นเดิมในพอร์ต Dime
       const { data: portfolioItems } = await supabaseClient
         .from('user_portfolios')
         .select('*')
@@ -1709,13 +1717,12 @@ async function scanDimePdfCard(event) {
         }).eq('id', item.id);
       }
 
-      // 🟢 3. บันทึก Order ID เข้าตารางดักซ้ำ
+      // บันทึก Order ID ลงตารางป้องกันซ้ำ
       if (order_id) {
         await supabaseClient.from('dime_orders').insert({
           order_id: String(order_id),
           asset_code: asset_code,
-          units: numUnits,
-          created_at: new Date().toISOString()
+          units: numUnits
         });
       }
 
@@ -1727,7 +1734,7 @@ async function scanDimePdfCard(event) {
     } else {
       alert(`✅ สแกนสำเร็จ ${successCount} รายการ ${skippedCount > 0 ? `(ข้ามรายการซ้ำ ${skippedCount} รายการ)` : ''}`);
     }
-    
+
     if (typeof loadPortfolioData === 'function') {
       loadPortfolioData();
     } else {
