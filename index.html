@@ -42,25 +42,25 @@
 
     <!-- แถว 1: ภาพรวมพอร์ตรวม (Aggregated Summary) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+      <div class="bg-slate-800/90 p-4 sm:p-6 rounded-2xl border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.08)] transition-all duration-300 hover:border-emerald-500/50">
         <p class="text-slate-400 text-xs sm:text-sm">มูลค่าพอร์ตรวมทั้งหมด</p>
         <h2 id="total-wealth" class="text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2">฿0.00</h2>
         <p id="total-wealth-subtext" class="text-[11px] sm:text-xs text-slate-500 mt-1">กำลังคำนวณ...</p>
       </div>
 
-      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700/60 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-slate-500/40">
         <p class="text-slate-400 text-xs sm:text-sm">เงินลงทุนรวม (ต้นทุน)</p>
         <h2 id="total-cost" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
         <p class="text-[11px] sm:text-xs text-slate-500 mt-1">ต้นทุนสะสมรวมทุกพอร์ต</p>
       </div>
 
-      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700/60 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-emerald-500/40 hover:shadow-[0_0_15px_rgba(16,185,129,0.05)]">
         <p class="text-slate-400 text-xs sm:text-sm">กำไร/ขาดทุนสะสม</p>
         <h2 id="total-pnl" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
         <p id="total-pnl-pct" class="text-[11px] sm:text-xs font-semibold mt-1">0.00%</p>
       </div>
 
-      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
+      <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700/60 shadow-md transition-all duration-300 hover:scale-[1.01] hover:border-rose-500/40 hover:shadow-[0_0_15px_rgba(244,63,94,0.05)]">
         <p class="text-slate-400 text-xs sm:text-sm">กำไร/ขาดทุนรายวัน</p>
         <h2 id="daily-pnl" class="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-200 mt-1 sm:mt-2">฿0.00</h2>
         <p id="daily-pnl-pct" class="text-[11px] sm:text-xs font-semibold mt-1">0.00%</p>
@@ -219,31 +219,33 @@
 
 	// 🟢 1. วางตัวแปรและฟังก์ชันระบายสีธีมตรงนี้ (เหนือบรรทัด async function fetchSummary)
 const APP_THEMES = {
-    gpf: {
-    badgeBg: '#0A192F',       // พื้นหลังสีน้ำเงินเข้ม
-    badgeText: '#D4AF37',     // ตัวอักษรสีทอง
-    borderColor: '#D4AF37',   // เส้นขอบสีทอง
-    accentColor: '#E5C158'
-  },
-  mfc: {
-    badgeBg: '#F58220',       // พื้นหลังสีส้ม MFC
-    badgeText: '#FFFFFF',     // ตัวอักษรสีขาว
-    borderColor: '#64748B',   // เส้นขอบสีเทา
-    accentColor: '#FF9800'
-  },
-  scb: {
-    badgeBg: '#4E2A84',       // พื้นหลังสีม่วง SCB
-    badgeText: '#FFFFFF',     // ตัวอักษรสีขาว
-    borderColor: '#7A33B8',   // เส้นขอบสีม่วงอ่อน
-    accentColor: '#A855F7'
-  },
-  dime: {
-    badgeBg: '#00FF66',       // พื้นหลังสีเขียวสะท้อนแสง DIME
-    badgeText: '#000000',     // ตัวอักษรสีดำ
-    borderColor: '#00FF66',   // เส้นขอบสีเขียวสะท้อนแสง
-    accentColor: '#00FF66'
-  }
+    'GPF': {
+        badge: '#38BDF8',    // สีฟ้าสว่าง กบข. (ตามหน้าจอจริง)
+        text: '#FFFFFF',     // ตัวอักษรสีขาว
+        border: '#1E293B',   // เส้นขอบสีเทาเข้มอมน้ำเงิน (Slate-800) เนียนไปกับจอภาพ
+        accent: '#C5A059',   // สีทองกบข. สไตล์พรีเมียม
+    },
+    'MFC': {
+        badge: '#FF9800',    // สีส้มสว่าง MFC (เด่นชัดเจนบนจอภาพมืด)
+        text: '#FFFFFF',     // ตัวอักษรสีขาว
+        border: '#1E293B',   // เส้นขอบ Slate-800
+        accent: '#FFB74D',   // สีส้มอ่อน/เหลืองพาสเทล สำหรับตัวหนังสือหรือเส้นเน้นย่อย
+    },
+    'SCB': {
+        badge: '#C084FC',    // สีม่วงพาสเทลสว่าง SCB (เด้งขึ้นมาจากความมืด)
+        text: '#FFFFFF',     // ตัวอักษรสีขาว
+        border: '#1E293B',   // เส้นขอบ Slate-800
+        accent: '#E9D5FF',   // สีม่วงอ่อนพิเศษ (Purple-200) เพื่อให้เห็นข้อความเน้นย้ำได้ชัดเจนยิ่งขึ้น
+    },
+    'DIME': {
+        badge: '#00FF66',    // สีเขียวนีออนหลัก DIME!
+        text: '#000000',     // ตัวอักษรสีดำบน badge นีออน (อ่านง่ายที่สุด)
+        border: '#1E293B',   // เส้นขอบ Slate-800
+        accent: '#4ADE80',   // สีเขียวสว่าง (Green-400) สำหรับเน้นข้อความ
+    }
 };
+
+
 function applyAppBrandColors() {
   const portfolioSections = document.querySelectorAll('[id^="portfolio-"], .portfolio-card, div');
 
@@ -507,10 +509,19 @@ async function fetchSummary() {
         const usdCostText = isUSD ? `<span class="text-xs text-slate-400 block">($${formatNumber(item.total_cost_thb || 0, 2)})</span>` : '';
 
         const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
+		
+	    const tableTextColors = {
+            'GPF': 'text-[#38BDF8]',  // ฟ้าสว่าง
+            'MFC': 'text-[#FF9800]',  // ส้มสว่าง
+            'SCB': 'text-[#C084FC]',  // ม่วงพาสเทล
+            'DIME': 'text-[#00FF66]'  // เขียวนีออน
+        };
+        const currentBrandColor = tableTextColors[appName] || 'text-indigo-400';
 
+		
         listEl.innerHTML += `
           <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-            <td class="py-2.5 font-semibold text-white uppercase">${item.app_source}</td>
+            <td class="py-2.5 font-semibold uppercase ${currentBrandColor}">${item.app_source}</td>
             <td class="py-2.5">
               ${formatTHB(wealthVal)}
               ${usdWealthText}
@@ -671,7 +682,16 @@ async function fetchSummary() {
           const actualPct = appTotalWealthTHB > 0 ? (itemValueTHB / appTotalWealthTHB) * 100 : 0;
           const targetPct = item.target_pct || item.target_proportion || 0;
           const diffPct = actualPct - targetPct;
+		
+          const brandRowColors = {
+            'GPF': 'text-[#38BDF8]',   // ฟ้าสว่าง
+            'MFC': 'text-[#FF9800]',   // ส้มสว่าง
+            'SCB': 'text-[#C084FC]',   // ม่วงพาสเทล
+            'DIME': 'text-[#00FF66]'   // เขียวนีออน
+        };
+        const subBrandColor = brandRowColors[(item.app_source || '').toUpperCase()] || 'text-slate-400';
 
+		
           let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
           if (targetPct > 0) {
             if (diffPct < -1) {
@@ -685,7 +705,7 @@ async function fetchSummary() {
 
           rowsHtml += `
             <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
-              <td class="py-2.5 font-semibold text-[11px] sm:text-xs text-slate-400 uppercase">${item.app_source}</td>
+              <td class="py-2.5 font-semibold text-[11px] sm:text-xs uppercase ${subBrandColor}">${item.app_source}</td>
               <td class="py-2.5 text-left">${getReadableAssetName(item)}</td>
               <td class="py-2.5 text-slate-200">${formatNumber(units, 4)}</td>
               <td class="py-2.5 text-slate-200">${currSymbol}${formatNumber(currentNav, 2)}</td>
@@ -772,12 +792,20 @@ async function fetchSummary() {
           `;
         }
 
+        const brandHeaderColors = {
+            'GPF': { badge: 'bg-[#38BDF8]/10 text-[#38BDF8] border-[#38BDF8]/30', text: 'text-[#38BDF8]' },
+            'MFC': { badge: 'bg-[#FF9800]/10 text-[#FF9800] border-[#FF9800]/30', text: 'text-[#FF9800]' },
+            'SCB': { badge: 'bg-[#C084FC]/10 text-[#C084FC] border-[#C084FC]/30', text: 'text-[#C084FC]' },
+            'DIME': { badge: 'bg-[#00FF66]/10 text-[#00FF66] border-[#00FF66]/30', text: 'text-[#00FF66]' }
+        };
+        const headUi = brandHeaderColors[(app || '').toUpperCase()] || { badge: 'bg-indigo-600/30 text-white border-indigo-500/40', text: 'text-indigo-400' };
+
         const cardHtml = `
           <div class="bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-slate-700/80 pb-3">
               <div class="flex items-center gap-2">
-                <span class="text-base sm:text-lg font-bold text-white bg-indigo-600/30 border border-indigo-500/40 px-3 py-1 rounded-lg">${app}</span>
-                <span class="text-xs text-slate-400">สัดส่วนพอร์ตรวม: <b class="text-indigo-400">${formatNumber(appWeightPct, 2)}%</b></span>
+                <span class="text-base sm:text-lg font-bold border px-3 py-1 rounded-lg ${headUi.badge}">${app}</span>
+                <span class="text-xs text-slate-400">สัดส่วนพอร์ตรวม: <b class="${headUi.text}">${formatNumber(appWeightPct, 2)}%</b></span>
               </div>
               ${rightHeaderContent}
             </div>
@@ -1439,13 +1467,13 @@ async function fetchSummary() {
       if (view === 'allocation') {
         allocView.classList.remove('hidden');
         trendView.classList.add('hidden');
-        btnAlloc.className = 'px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
-        btnTrend.className = 'px-2.5 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
+        btnAlloc.className = 'px-3 py-1.5 text-xs font-semibold text-white bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm transition';
+        btnTrend.className = 'px-3 py-1.5 text-xs font-medium text-slate-400 rounded-lg hover:text-white transition';
       } else {
         allocView.classList.add('hidden');
         trendView.classList.remove('hidden');
-        btnTrend.className = 'px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium transition';
-        btnAlloc.className = 'px-2.5 py-1 rounded-md text-slate-400 hover:text-white font-medium transition';
+        btnTrend.className = 'px-3 py-1.5 text-xs font-semibold text-white bg-slate-700/50 border border-slate-600 rounded-lg shadow-sm transition';
+        btnAlloc.className = 'px-3 py-1.5 text-xs font-medium text-slate-400 rounded-lg hover:text-white transition';
         
         renderTrendChart();
       }
@@ -1516,12 +1544,12 @@ async function fetchSummary() {
             datasets: [{
                 label: 'มูลค่าพอร์ตรวม (THB)',
                 data: values,
-                borderColor: '#6366f1',
-                borderWidth: 2.5,
+                borderColor: '#38BDF8',
+                borderWidth: 3,
                 backgroundColor: gradient,
                 fill: true,
                 tension: 0.35,
-                pointBackgroundColor: '#818cf8',
+                pointBackgroundColor: '#00FF66',
                 pointBorderColor: '#1e293b',
                 pointBorderWidth: 2,
                 pointRadius: 4,
