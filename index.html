@@ -217,95 +217,178 @@
     }
 }
 
-    // 1. ดึงข้อมูลสรุปพอร์ตรวม (Aggregated Summary)
-    async function fetchSummary() {
+// 1. ดึงข้อมูลสรุปพอร์ตรวม (Aggregated Summary)
+async function fetchSummary() {
+  try {
+    // 1. โหลด FX Rate ล่าสุด
+    let fxRate = window.currentFxRate;
+    if (!fxRate || fxRate === 1) {
       try {
-        const { data: assets, error } = await supabaseClient.from('v_asset_details').select('*');
-        if (error) {
-          console.error('Error fetching summary:', error);
-          return;
-        }
-
-        const fxRate = window.currentFxRate || DEFAULT_FX_RATE;
-        let totalWealthTHB = 0;
-        let totalCostTHB = 0;
-        let totalDailyPnlTHB = 0;
-        const appSet = new Set();
-
-        (assets || []).forEach(asset => {
-          const appName = (asset.app_source || asset.app_name || '').toUpperCase();
-          if (appName) appSet.add(appName);
-
-          const isUSD = asset.currency === 'USD' || appName === 'DIME';
-          const units = Number(asset.units || 0);
-          const currentNav = Number(asset.current_nav || asset.nav_price || 0);
-          const avgNav = Number(asset.avg_nav || 0);
-
-          let marketValueTHB = 0;
-          let costBasisTHB = 0;
-          let dailyPnlTHB = 0;
-
-          if (isUSD) {
-            marketValueTHB = (units * currentNav) * fxRate;
-            costBasisTHB = (units * avgNav) * fxRate;
-            dailyPnlTHB = Number(asset.daily_pnl || 0) * fxRate;
-          } else {
-            marketValueTHB = Number(asset.current_value_thb) || (units * currentNav);
-            costBasisTHB = Number(asset.total_cost_thb) || (units * avgNav);
-            dailyPnlTHB = Number(asset.daily_pnl_thb || 0);
-          }
-
-          totalWealthTHB += marketValueTHB;
-          totalCostTHB += costBasisTHB;
-          totalDailyPnlTHB += dailyPnlTHB;
-        });
-
-        const pnl = totalWealthTHB - totalCostTHB;
-        const totalPnlPct = totalCostTHB > 0 ? (pnl / totalCostTHB) * 100 : 0;
-        const dailyPnlPct = totalWealthTHB > 0 ? (totalDailyPnlTHB / totalWealthTHB) * 100 : 0;
-        const appCount = appSet.size;
-
-        document.getElementById('total-wealth').innerText = formatTHB(totalWealthTHB);
-        document.getElementById('total-cost').innerText = formatTHB(totalCostTHB);
-
-        const subTextEl = document.getElementById('total-wealth-subtext');
-        if (subTextEl) {
-          const isProfit = pnl >= 0;
-          const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
-          const icon = isProfit ? '▲ ' : '▼ ';
-          subTextEl.innerHTML = `จากทั้งหมด <span class="font-semibold text-white">${appCount}</span> แอปพลิเคชัน (<span class="${pnlClass}">${icon}${formatNumber(Math.abs(totalPnlPct), 2)}%</span>)`;
-        }
-
-        const pnlEl = document.getElementById('total-pnl');
-        const pnlPctEl = document.getElementById('total-pnl-pct');
-        const icon = pnl >= 0 ? '▲ ' : '▼ ';
-
-        if (pnlEl) {
-          pnlEl.innerText = `${icon}${formatTHB(Math.abs(pnl))}`;
-          pnlEl.className = pnl >= 0 ? 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2' : 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
-        }
-        if (pnlPctEl) {
-          pnlPctEl.innerText = `${icon}${formatNumber(Math.abs(totalPnlPct))}%`;
-          pnlPctEl.className = pnl >= 0 ? 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1' : 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
-        }
-
-        const dailyPnlEl = document.getElementById('daily-pnl');
-        const dailyPnlPctEl = document.getElementById('daily-pnl-pct');
-        const dailyIcon = totalDailyPnlTHB >= 0 ? '▲ ' : '▼ ';
-
-        if (dailyPnlEl) {
-          dailyPnlEl.innerText = `${dailyIcon}${formatTHB(Math.abs(totalDailyPnlTHB))}`;
-          dailyPnlEl.className = totalDailyPnlTHB >= 0 ? 'text-xl sm:text-2xl lg:text-3xl font-bold text-emerald-400 mt-1 sm:mt-2' : 'text-xl sm:text-2xl lg:text-3xl font-bold text-rose-400 mt-1 sm:mt-2';
-        }
-        if (dailyPnlPctEl) {
-          dailyPnlPctEl.innerText = `${dailyIcon}${formatNumber(Math.abs(dailyPnlPct))}%`;
-          dailyPnlPctEl.className = totalDailyPnlTHB >= 0 ? 'text-[11px] sm:text-xs font-semibold text-emerald-400 mt-1' : 'text-[11px] sm:text-xs font-semibold text-rose-400 mt-1';
-        }
-      } catch (err) {
-        console.error('Error in fetchSummary:', err);
+        const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        const data = await res.json();
+        fxRate = data?.rates?.THB || 36.5;
+        window.currentFxRate = fxRate;
+      } catch (e) {
+        fxRate = window.DEFAULT_FX_RATE || 36.5;
       }
     }
 
+    // 2. ดึงข้อมูลจาก Supabase
+    const { data: assets, error } = await supabaseClient.from('user_portfolios').select('*');
+    if (error || !assets || assets.length === 0) {
+      console.error('Error fetching summary:', error);
+      return;
+    }
+
+    let totalWealthTHB = 0;
+    let totalCostTHB = 0;
+    let totalDailyProfitTHB = 0;
+    const appsSet = new Set();
+
+    assets.forEach(item => {
+      if (item.app_source) appsSet.add(item.app_source);
+
+      const isUSD = (item.app_source === 'dime') || (item.currency === 'USD');
+      const rate = isUSD ? fxRate : 1;
+
+      const units = Number(item.units ?? item.amount ?? 0);
+      const currentNav = Number(item.current_nav ?? item.nav ?? 0);
+      const prevNav = Number(item.prev_nav ?? currentNav);
+      const avgNav = Number(item.avg_cost ?? item.avg_nav ?? item.cost_price ?? 0);
+
+      const currentVal = units * currentNav * rate;
+      const costVal = units * avgNav * rate;
+      const dailyProfit = (currentNav - prevNav) * units * rate;
+
+      totalWealthTHB += currentVal;
+      totalCostTHB += costVal;
+      totalDailyProfitTHB += dailyProfit;
+    });
+
+    const totalProfitTHB = totalWealthTHB - totalCostTHB;
+    const totalProfitPct = totalCostTHB > 0 ? (totalProfitTHB / totalCostTHB) * 100 : 0;
+
+    const prevTotalValue = totalWealthTHB - totalDailyProfitTHB;
+    const dailyProfitPct = prevTotalValue > 0 ? (totalDailyProfitTHB / prevTotalValue) * 100 : 0;
+
+    window.overallTotalWealth = totalWealthTHB;
+
+    // ค่าสีตามดีไซน์
+    const GREEN = '#10b981';
+    const RED = '#ef4444';
+    const WHITE = '#ffffff';
+
+    const accSign = totalProfitTHB >= 0 ? '▲ ' : '▼ ';
+    const accColor = totalProfitTHB >= 0 ? GREEN : RED;
+    const accValText = `${accSign}฿${Math.abs(totalProfitTHB).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const accPctText = `${accSign}${Math.abs(totalProfitPct).toFixed(2)}%`;
+
+    const dailySign = totalDailyProfitTHB >= 0 ? '▲ ' : '▼ ';
+    const dailyColor = totalDailyProfitTHB >= 0 ? GREEN : RED;
+    const dailyValText = `${dailySign}฿${Math.abs(totalDailyProfitTHB).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const dailyPctText = `${dailySign}${Math.abs(dailyProfitPct).toFixed(2)}%`;
+
+    const appCount = appsSet.size || 4;
+
+    // 3. อัปเดตผ่าน Element ID ก่อนถ้ามีอยู่ใน HTML
+    const safeSetText = (id, text, color) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.innerText = text;
+        if (color) el.style.color = color;
+        return true;
+      }
+      return false;
+    };
+
+    safeSetText('total-portfolio-value', `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, GREEN);
+    safeSetText('total-portfolio-cost', `฿${totalCostTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, WHITE);
+    safeSetText('total-portfolio-profit', accValText, accColor);
+    safeSetText('total-portfolio-profit-pct', accPctText, accColor);
+    safeSetText('daily-portfolio-profit', dailyValText, dailyColor);
+    safeSetText('daily-portfolio-profit-pct', dailyPctText, dailyColor);
+
+    // 4. อัปเดตลงการ์ด UI โดยตรงอย่างปลอดภัย (ค้นหาเฉพาะการ์ดสรุปบนสุด)
+    const allDivs = document.querySelectorAll('div');
+    allDivs.forEach(div => {
+      const fullText = div.innerText || '';
+      
+      // ป้องกันไม่ให้ไปแก้ไขส่วนตารางหรือกราฟ
+      if (fullText.includes('ภาพรวมของแต่ละพอร์ต') || fullText.includes('ภาพรวมการลงทุน')) return;
+
+      // การ์ดที่ 1: มูลค่าพอร์ตรวมทั้งหมด
+      if (fullText.includes('มูลค่าพอร์ตรวมทั้งหมด') && div.children.length > 0) {
+        const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+        if (valEl) {
+          valEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valEl.style.color = GREEN;
+        }
+        const subEl = Array.from(div.querySelectorAll('p, span, div')).find(e => e.children.length === 0 && (e.innerText.includes('กำลังคำนวณ') || e.innerText.includes('จากทั้งหมด')));
+        if (subEl) {
+          const pctSign = totalProfitPct >= 0 ? '▲' : '▼';
+          const pctColor = totalProfitPct >= 0 ? GREEN : RED;
+          subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิเคชัน (<span style="color:${pctColor}">${pctSign} ${Math.abs(totalProfitPct).toFixed(2)}%</span>)`;
+        }
+      }
+
+      // การ์ดที่ 2: เงินลงทุนรวม (ต้นทุน)
+      else if (fullText.includes('เงินลงทุนรวม') && div.children.length > 0) {
+        const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+        if (valEl) {
+          valEl.innerText = `฿${totalCostTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          valEl.style.color = WHITE;
+        }
+      }
+
+      // การ์ดที่ 3: กำไร/ขาดทุนสะสม
+      else if (fullText.includes('กำไร/ขาดทุนสะสม') && div.children.length > 0) {
+        const targets = Array.from(div.querySelectorAll('*')).filter(el => el.children.length === 0 && el.innerText.trim() !== '');
+        
+        // ยอดเงินตรงกลาง
+        const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold') || targets.find(e => e.innerText.includes('฿') || e.innerText.includes('0.00'));
+        if (valEl) {
+          valEl.innerText = accValText;
+          valEl.style.color = accColor;
+        }
+
+        // เปอร์เซ็นต์ด้านล่าง
+        const pctEl = targets.find(e => e !== valEl && (e.innerText.includes('%') || e.innerText.includes('0.00')));
+        if (pctEl) {
+          pctEl.innerText = accPctText;
+          pctEl.style.color = accColor;
+        }
+      }
+
+      // การ์ดที่ 4: กำไร/ขาดทุนรายวัน
+      else if (fullText.includes('กำไร/ขาดทุนรายวัน') && div.children.length > 0) {
+        const targets = Array.from(div.querySelectorAll('*')).filter(el => el.children.length === 0 && el.innerText.trim() !== '');
+        
+        // ยอดเงินตรงกลาง
+        const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold') || targets.find(e => e.innerText.includes('฿') || e.innerText.includes('0.00'));
+        if (valEl) {
+          valEl.innerText = dailyValText;
+          valEl.style.color = dailyColor;
+        }
+
+        // เปอร์เซ็นต์ด้านล่าง
+        const pctEl = targets.find(e => e !== valEl && (e.innerText.includes('%') || e.innerText.includes('0.00')));
+        if (pctEl) {
+          pctEl.innerText = dailyPctText;
+          pctEl.style.color = dailyColor;
+        }
+      }
+    });
+
+    // 5. อัปเดตตัวเลขกลางกราฟวงกลม
+    const chartCenterValueEl = document.getElementById('chart-total-value');
+    if (chartCenterValueEl) {
+      chartCenterValueEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+  } catch (err) {
+    console.error('Fetch summary error:', err);
+  }
+}
     // 2. ดึงข้อมูลภาพรวมแต่ละพอร์ต
     async function fetchAppAllocation() {
       const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
