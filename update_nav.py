@@ -29,8 +29,20 @@ HEADERS = {
 
 
 # ----------------------------------------------------
-# 2. ฟังก์ชันดึง NAV สำหรับ GPF และ Dime
+# 2. ฟังก์ชันดึง NAV และอัตราแลกเปลี่ยน
 # ----------------------------------------------------
+def get_usd_thb_rate():
+    """ดึงอัตราแลกเปลี่ยน USD/THB ล่าสุด"""
+    try:
+        ticker = yf.Ticker("THB=X")
+        hist = ticker.history(period="1d")
+        if not hist.empty:
+            return float(hist["Close"].iloc[-1])
+    except Exception as e:
+        print(f"⚠️ Exchange Rate Fetch Error: {e}")
+    return 33.00
+
+
 def get_gpf_nav_direct():
     nav_map = {}
     try:
@@ -81,10 +93,6 @@ def get_gpf_nav_direct():
 
 
 def get_us_stock_price(symbol):
-    """
-    ดึงราคาปิดล่าสุด (iloc[-1]) และราคาปิดวันก่อนหน้า (iloc[-2]) โดยตรงจากประวัติย้อนหลัง 5 วัน
-    ช่วยแก้ปัญหา fast_info คลาดเคลื่อนช่วงตลาดปิดหรือวันหยุด
-    """
     try:
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period="5d")
@@ -100,7 +108,7 @@ def get_us_stock_price(symbol):
 
 
 # ----------------------------------------------------
-# 3. ฟังก์ชันหลักสำหรับประมวลผลและอัปเดตลง user_portfolios
+# 3. ฟังก์ชันหลักสำหรับประมวลผล อัปเดต NAV และ Snapshot
 # ----------------------------------------------------
 def fetch_and_update():
     try:
@@ -110,11 +118,14 @@ def fetch_and_update():
         today_date_str = now_thai_dt.strftime("%d/%m/%Y")
 
         gpf_nav_data = get_gpf_nav_direct()
+        usd_rate = get_usd_thb_rate()
+
         db_res = supabase.table("user_portfolios").select("*").execute()
         portfolio_items = db_res.data or []
 
         print(f"📦 พบรายการสินทรัพย์ทั้งหมดใน DB {len(portfolio_items)} รายการ")
 
+        # --- อัปเดต current_nav และ prev_nav รายตัว ---
         for item in portfolio_items:
             item_id = item["id"]
             app = item.get("app_source", "").lower()
@@ -146,7 +157,7 @@ def fetch_and_update():
                 if latest_prev_nav and latest_prev_nav > 0:
                     update_payload["prev_nav"] = round(latest_prev_nav, 4)
 
-            # อัปเดตข้อมูลลง Supabase
+            # อัปเดตลง Supabase
             supabase.table("user_portfolios").update(update_payload).eq(
                 "id", item_id
             ).execute()
@@ -155,7 +166,23 @@ def fetch_and_update():
             p_nav = update_payload.get("prev_nav", "-")
             print(f" ✅ อัปเดตสำเร็จ {code}: NAV={c_nav}, PrevNAV={p_nav}")
 
-        print(f"✅ อัปเดต NAV ปัจจุบัน (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
+        # --- ดึงข้อมูลล่าสุดหลังอัปเดตเพื่อบันทึก Snapshot รายวัน ---
+        updated_db = supabase.table("user_portfolios").select("*").execute()
+        latest_items = updated_db.data or []
+
+        for app in ["gpf", "dime"]:
+            app_items = [i for i in latest_items if i.get("app_source", "").lower() == app]
+            
+            if app == "gpf":
+                total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+            elif app == "dime":
+                total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
+                total_thb = total_usd * usd_rate  # แปลง USD เป็น THB
+
+            if total_thb > 0:
+                save_daily_snapshot(supabase, app, total_thb)
+
+        print(f"✅ อัปเดต NAV และ Snapshot (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
