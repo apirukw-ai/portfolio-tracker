@@ -278,7 +278,7 @@ async function renderSnapshotDashboard() {
   tableBody.innerHTML = data.map(row => {
     let returnText = '-';
     const appKey = (row.app_source || '').trim().toLowerCase();
-    const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default;
+    const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default || { textClass: 'text-slate-300' };
 
     if (appKey === 'gpf') {
       const parts = [];
