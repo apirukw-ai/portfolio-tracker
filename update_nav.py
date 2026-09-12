@@ -81,15 +81,17 @@ def get_gpf_nav_direct():
 
 
 def get_us_stock_price(symbol):
+    """
+    ดึงราคาปิดล่าสุด (iloc[-1]) และราคาปิดวันก่อนหน้า (iloc[-2]) โดยตรงจากประวัติย้อนหลัง 5 วัน
+    ช่วยแก้ปัญหา fast_info คลาดเคลื่อนช่วงตลาดปิดหรือวันหยุด
+    """
     try:
         ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="5d")
 
-        # ดึงราคาปิดตลาดรอบปกติ (ตัดปัญหา After-hours)
-        todays_data = ticker.history(period="1d")
-
-        if not todays_data.empty:
-            current_price = round(float(todays_data["Close"].iloc[-1]), 4)
-            prev_close = round(float(ticker.fast_info.previous_close), 4)
+        if len(hist) >= 2:
+            current_price = round(float(hist["Close"].iloc[-1]), 4)
+            prev_close = round(float(hist["Close"].iloc[-2]), 4)
             return current_price, prev_close
 
     except Exception as e:
@@ -121,52 +123,37 @@ def fetch_and_update():
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
 
-            latest_nav = None
-            latest_prev_nav = None
-            nav_date = today_date_str
-
             if app not in ["gpf", "dime"]:
                 continue
 
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
+            update_payload = {"nav_date": today_date_str, "updated_at": now_thai}
+
             if app == "gpf":
                 latest_nav = gpf_nav_data.get(code)
+                if latest_nav and latest_nav > 0:
+                    update_payload["current_nav"] = round(latest_nav, 4)
+                    update_payload["current_value"] = round(units * latest_nav, 4)
+
             elif app == "dime":
-                # รับค่า 2 ตัวแปรจาก yfinance
                 latest_nav, latest_prev_nav = get_us_stock_price(code)
+                
+                if latest_nav and latest_nav > 0:
+                    update_payload["current_nav"] = round(latest_nav, 4)
+                    update_payload["current_value"] = round(units * latest_nav, 4)
+                
+                if latest_prev_nav and latest_prev_nav > 0:
+                    update_payload["prev_nav"] = round(latest_prev_nav, 4)
 
-            final_nav = (
-                latest_nav if (latest_nav and latest_nav > 0) else current_nav
-            )
-
-            # จัดเตรียมข้อมูลอัปเดตพื้นฐาน
-            update_payload = {"nav_date": nav_date, "updated_at": now_thai}
-
-            # หากมีการเปลี่ยนแปลงของราคา Current
-            if latest_nav and latest_nav != current_nav:
-                update_payload["current_nav"] = round(final_nav, 4)
-                update_payload["current_value"] = round(units * final_nav, 4)
-
-            # บังคับอัปเดต Previous Close สำหรับ Dime เสมอ (ป้องกันตัวเลขเพี้ยน)
-            if app == "dime" and latest_prev_nav:
-                update_payload["prev_nav"] = round(latest_prev_nav, 4)
-
-            # อัปเดตข้อมูลลง Supabase แบบรวบยอด
+            # อัปเดตข้อมูลลง Supabase
             supabase.table("user_portfolios").update(update_payload).eq(
                 "id", item_id
             ).execute()
 
-            if latest_nav and latest_nav != current_nav:
-                print(
-                    f" ✅ อัปเดตสำเร็จ {code}: {current_nav} ➔ {final_nav} "
-                    f"({nav_date})"
-                )
-            else:
-                print(
-                    f" ℹ️ {code} ราคาล่าสุด: {final_nav} ({nav_date}) "
-                    f"(อัปเดตสถานะเสร็จสิ้น)"
-                )
+            c_nav = update_payload.get("current_nav", current_nav)
+            p_nav = update_payload.get("prev_nav", "-")
+            print(f" ✅ อัปเดตสำเร็จ {code}: NAV={c_nav}, PrevNAV={p_nav}")
 
         print(f"✅ อัปเดต NAV ปัจจุบัน (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
 
