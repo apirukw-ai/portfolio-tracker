@@ -202,17 +202,40 @@ def save_daily_snapshot(supabase_client, app_source, total_thb):
         today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime(
             "%Y-%m-%d"
         )
+        app_upper = app_source.upper()
+
+        # 1. ค้นหาค่า % ผลตอบแทนล่าสุดของแอปนี้จากประวัติเดิมก่อน
+        prev_res = (
+            supabase_client.table("portfolio_snapshots")
+            .select("reported_ytd_pct, reported_5y_pct, reported_since_inception_pct")
+            .ilike("app_source", app_upper)
+            .order("snapshot_date", desc=True)
+            .limit(1)
+            .execute()
+        )
 
         data = {
             "snapshot_date": today_str,
-            "app_source": app_source.upper(),  # บันทึกเป็นตัวพิมพ์ใหญ่เสมอ (GPF, DIME, SCB, MFC)
+            "app_source": app_upper,
             "total_value_thb": float(total_thb),
         }
 
+        # 2. หากพบค่า % เดิมในประวัติ ให้นำแนบไปใน payload ด้วยเพื่อไม่ให้กลายเป็น NULL
+        if prev_res.data and len(prev_res.data) > 0:
+            last_record = prev_res.data[0]
+            if last_record.get("reported_ytd_pct") is not None:
+                data["reported_ytd_pct"] = last_record["reported_ytd_pct"]
+            if last_record.get("reported_5y_pct") is not None:
+                data["reported_5y_pct"] = last_record["reported_5y_pct"]
+            if last_record.get("reported_since_inception_pct") is not None:
+                data["reported_since_inception_pct"] = last_record["reported_since_inception_pct"]
+
+        # 3. สั่ง Upsert ข้อมูลรายวัน
         supabase_client.table("portfolio_snapshots").upsert(
             data, on_conflict="snapshot_date,app_source"
         ).execute()
-        print(f"✅ Saved snapshot for {app_source.upper()}: ฿{total_thb:,.2f}")
+        
+        print(f"✅ Saved snapshot for {app_upper}: ฿{total_thb:,.2f} (Preserved % metrics)")
     except Exception as e:
         print(f"⚠️ Failed to save snapshot for {app_source}: {e}")
 
