@@ -124,62 +124,56 @@
       <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
       🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
     </div>
-<!-- ================= Snapshot History Section ================= -->
-<section id="snapshot-history-section" class="mt-8 p-6 bg-slate-800/90 border border-sky-500/20 rounded-2xl shadow-[0_0_25px_rgba(56,189,248,0.04)]">
-  <!-- แทนที่เฉพาะส่วนหัวข้อด้วย <div> นี้ -->
-<div class="flex items-center justify-between mb-4">
-  <h2 class="text-lg font-bold text-white flex items-center gap-2">
-    📊 ประวัติบันทึกพอร์ตการลงทุน (Snapshots History)
-  </h2>
 
-  <!-- ปุ่มสแกนรูปภาพ -->
-  <button 
-    type="button"
-    onclick="document.getElementById('file-input-snapshot').click()"
-    class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
-  >
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-    <span>สแกนรูปภาพ</span>
-  </button>
+    <!-- Snapshot History Section -->
+    <section id="snapshot-history-section" class="mt-8 p-6 bg-slate-800/90 border border-sky-500/20 rounded-2xl shadow-[0_0_25px_rgba(56,189,248,0.04)]">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          📊 ประวัติบันทึกพอร์ตการลงทุน (Snapshots History)
+        </h2>
 
-  <!-- Hidden File Input -->
-<!-- เพิ่ม attribute "multiple" ตรงนี้ -->
-<input 
-  type="file" 
-  id="file-input-snapshot" 
-  accept="image/*" 
-  multiple 
-  class="hidden" 
-  onchange="handleSnapshotScan(event)"
-/>
-</div>
+        <button 
+          type="button"
+          onclick="document.getElementById('file-input-snapshot').click()"
+          class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>สแกนรูปภาพ</span>
+        </button>
 
-<!-- ส่วนแสดงกราฟ (คงไว้เหมือนเดิม ห้ามลบ) -->
-<div class="max-w-4xl mx-auto my-6">
-  <canvas id="portfolioChart"></canvas>
-</div>
+        <input 
+          type="file" 
+          id="file-input-snapshot" 
+          accept="image/*" 
+          multiple 
+          class="hidden" 
+          onchange="handleSnapshotScan(event)"
+        />
+      </div>
 
-  <!-- ส่วนตารางข้อมูล -->
-  <!-- โค้ดใหม่ (ล็อกความสูง + หัวตารางค้างไว้) -->
-<div class="overflow-x-auto overflow-y-auto max-h-80 mt-4 rounded-xl border border-slate-700/30">
-  <table class="w-full text-left text-sm text-slate-300 border-collapse">
-    <thead class="bg-slate-900 text-slate-400 uppercase text-xs sticky top-0 z-10 shadow">
-      <tr>
-        <th class="p-3 border-b border-slate-700/80">วันที่</th>
-        <th class="p-3 border-b border-slate-700/80">แอปพลิเคชัน</th>
-        <th class="p-3 border-b border-slate-700/80">มูลค่ารวม (บาท)</th>
-        <th class="p-3 border-b border-slate-700/80">ผลตอบแทน (%)</th>
-      </tr>
-    </thead>
-    <tbody id="snapshot-table-body" class="divide-y divide-slate-700/50">
-      <tr><td colspan="4" class="text-center p-4 text-slate-400">กำลังโหลดข้อมูล...</td></tr>
-    </tbody>
-  </table>
-</div>
-</section>
+      <div class="max-w-4xl mx-auto my-6">
+        <canvas id="portfolioChart"></canvas>
+      </div>
+
+      <div class="overflow-x-auto overflow-y-auto max-h-80 mt-4 rounded-xl border border-slate-700/30">
+        <table class="w-full text-left text-sm text-slate-300 border-collapse">
+          <thead class="bg-slate-900 text-slate-400 uppercase text-xs sticky top-0 z-10 shadow">
+            <tr>
+              <th class="p-3 border-b border-slate-700/80">วันที่</th>
+              <th class="p-3 border-b border-slate-700/80">แอปพลิเคชัน</th>
+              <th class="p-3 border-b border-slate-700/80">มูลค่ารวม (บาท)</th>
+              <th class="p-3 border-b border-slate-700/80">ผลตอบแทน (%)</th>
+            </tr>
+          </thead>
+          <tbody id="snapshot-table-body" class="divide-y divide-slate-700/50">
+            <tr><td colspan="4" class="text-center p-4 text-slate-400">กำลังโหลดข้อมูล...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
   <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
@@ -211,7 +205,6 @@
       </div>
     </div>
   </div>
-
 
   <script>
     const SUPABASE_URL = 'https://iproktvvetsbxxmpptuj.supabase.co';
@@ -255,15 +248,13 @@
       if (container) container.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">${loadingTemplate}${loadingTemplate}</div>`;
     }
 
-// ฟังก์ชันดึงข้อมูล Snapshots มาแสดง
-// 1. กำหนดธีมสีประจำแอปพลิเคชัน
-const SNAPSHOT_APP_THEMES = {
-  gpf:  { bg: '#2563eb', textClass: 'text-blue-400' },    // กบข. (น้ำเงิน)
-  mfc:  { bg: '#f43f5e', textClass: 'text-rose-400' },    // MFC (ชมพู/แดง)
-  scb:  { bg: '#8b5cf6', textClass: 'text-purple-400' },  // SCB (ม่วง)
-  dime: { bg: '#10b981', textClass: 'text-emerald-400' }, // DIME (เขียว)
-  default: { bg: '#64748b', textClass: 'text-slate-400' }
-};
+    const SNAPSHOT_APP_THEMES = {
+      gpf:  { bg: '#2563eb', textClass: 'text-blue-400' },
+      mfc:  { bg: '#f43f5e', textClass: 'text-rose-400' },
+      scb:  { bg: '#8b5cf6', textClass: 'text-purple-400' },
+      dime: { bg: '#10b981', textClass: 'text-emerald-400' },
+      default: { bg: '#64748b', textClass: 'text-slate-400' }
+    };
 
 async function renderSnapshotDashboard() {
   const { data, error } = await supabaseClient
@@ -283,6 +274,7 @@ async function renderSnapshotDashboard() {
     return;
   }
 
+  // 1. เรนเดอร์ข้อมูลลงตาราง
   tableBody.innerHTML = data.map(row => {
     let returnText = '-';
     const appKey = (row.app_source || '').trim().toLowerCase();
@@ -318,52 +310,94 @@ async function renderSnapshotDashboard() {
     `;
   }).join('');
 
+  // 2. ดึงข้อมูลล่าสุดของแต่ละแอปพลิเคชันมาทำกราฟแท่งแนวนอน
   const latestByApp = {};
+  // วนลูปตามลำดับ (data ถูกเรียง snapshot_date จากใหม่ไปเก่าแล้ว)
   data.forEach(row => {
-    const appKey = (row.app_source || '').trim().toLowerCase();
+    const appKey = (row.app_source || '').trim().toUpperCase();
     if (!latestByApp[appKey]) {
-      latestByApp[appKey] = row.total_value_thb;
+      latestByApp[appKey] = parseFloat(row.total_value_thb) || 0;
     }
   });
 
-  const labels = Object.keys(latestByApp).map(app => app.toUpperCase());
-  const values = Object.values(latestByApp);
-  const barColors = Object.keys(latestByApp).map(appKey => (SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default).bg);
+  // ลำดับแอปที่ต้องการแสดง
+  const appOrder = ['SCB', 'MFC', 'DIME', 'GPF'];
+  const labels = [];
+  const chartValues = [];
+  const barColors = [];
 
+  const colorMap = {
+    'SCB': '#8b5cf6',   // สีม่วง SCB
+    'MFC': '#f43f5e',   // สีชมพู/แดง MFC
+    'DIME': '#10b981',  // สีเขียว DIME
+    'GPF': '#2563eb'    // สีน้ำเงิน GPF
+  };
+
+  appOrder.forEach(app => {
+    if (latestByApp[app] !== undefined) {
+      labels.push(app);
+      chartValues.push(latestByApp[app]);
+      barColors.push(colorMap[app] || '#64748b');
+    }
+  });
+
+  // 3. วาดกราฟแท่งแนวนอน (Horizontal Bar Chart)
   const ctx = document.getElementById('portfolioChart')?.getContext('2d');
   if (ctx && typeof Chart !== 'undefined') {
     if (window.mySnapshotChart) {
       window.mySnapshotChart.destroy();
     }
+
     window.mySnapshotChart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
         datasets: [{
-          label: 'มูลค่าล่าสุด (บาท)',
-          data: values,
+          data: chartValues,
           backgroundColor: barColors,
-          borderRadius: 6
+          borderRadius: 8,
+          barThickness: 32
         }]
       },
-options: {
-  indexAxis: 'y', // 👈 เปลี่ยนเป็นแนวนอน
-  responsive: true,
-  plugins: {
-    legend: { display: false },
-    title: { display: true, text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)', color: '#94a3b8' }
-  },
-  scales: {
-    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.4)' } },
-    y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
-  }
-}
+      options: {
+        indexAxis: 'y', // กำหนดเป็นแนวนอน
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: { 
+            display: true, 
+            text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)', 
+            color: '#94a3b8',
+            font: { family: 'Prompt', size: 13 }
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` มูลค่า: ฿${ctx.parsed.x.toLocaleString('th-TH', {minimumFractionDigits: 2})}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#94a3b8',
+              callback: (val) => val.toLocaleString()
+            },
+            grid: { color: 'rgba(51, 65, 85, 0.3)' }
+          },
+          y: {
+            ticks: { 
+              color: '#ffffff',
+              font: { family: 'Prompt', weight: 'bold' }
+            },
+            grid: { display: false }
+          }
+        }
+      }
     });
   }
 }
-// เรียกทำงานเมื่อโหลดหน้าเว็บเรียบร้อย
-document.addEventListener('DOMContentLoaded', renderSnapshotDashboard);
 
+    document.addEventListener('DOMContentLoaded', renderSnapshotDashboard);
 
     async function loadDashboardData() {
       showSkeletonLoaders();
@@ -371,259 +405,221 @@ document.addEventListener('DOMContentLoaded', renderSnapshotDashboard);
     }
 
     async function refreshDashboard() {
-    await Promise.all([
-        fetchSummary(),
-        fetchAppAllocation(),
-        fetchAssetDetails()
-    ]);
+      await Promise.all([
+          fetchSummary(),
+          fetchAppAllocation(),
+          fetchAssetDetails()
+      ]);
 
-    // 👈 เพิ่มบรรทัดนี้ไว้หลัง Promise.all เพื่อบันทึก Snapshot ประจำวัน
-    if (typeof overallTotalWealth !== 'undefined') {
-        checkAndSaveDailySnapshot(overallTotalWealth);
-    }
-}
-
-	// 🟢 1. วางตัวแปรและฟังก์ชันระบายสีธีมตรงนี้ (เหนือบรรทัด async function fetchSummary)
-const APP_THEMES = {
-    'GPF': {
-        badge: '#38BDF8',    // สีฟ้าสว่าง กบข. (ตามหน้าจอจริง)
-        text: '#FFFFFF',     // ตัวอักษรสีขาว
-        border: '#1E293B',   // เส้นขอบสีเทาเข้มอมน้ำเงิน (Slate-800) เนียนไปกับจอภาพ
-        accent: '#C5A059',   // สีทองกบข. สไตล์พรีเมียม
-    },
-    'MFC': {
-        badge: '#FF9800',    // สีส้มสว่าง MFC (เด่นชัดเจนบนจอภาพมืด)
-        text: '#FFFFFF',     // ตัวอักษรสีขาว
-        border: '#1E293B',   // เส้นขอบ Slate-800
-        accent: '#FFB74D',   // สีส้มอ่อน/เหลืองพาสเทล สำหรับตัวหนังสือหรือเส้นเน้นย่อย
-    },
-    'SCB': {
-        badge: '#C084FC',    // สีม่วงพาสเทลสว่าง SCB (เด้งขึ้นมาจากความมืด)
-        text: '#FFFFFF',     // ตัวอักษรสีขาว
-        border: '#1E293B',   // เส้นขอบ Slate-800
-        accent: '#E9D5FF',   // สีม่วงอ่อนพิเศษ (Purple-200) เพื่อให้เห็นข้อความเน้นย้ำได้ชัดเจนยิ่งขึ้น
-    },
-    'DIME': {
-        badge: '#00FF66',    // สีเขียวนีออนหลัก DIME!
-        text: '#000000',     // ตัวอักษรสีดำบน badge นีออน (อ่านง่ายที่สุด)
-        border: '#1E293B',   // เส้นขอบ Slate-800
-        accent: '#4ADE80',   // สีเขียวสว่าง (Green-400) สำหรับเน้นข้อความ
-    }
-};
-
-
-function applyAppBrandColors() {
-  const portfolioSections = document.querySelectorAll('[id^="portfolio-"], .portfolio-card, div');
-
-  portfolioSections.forEach(section => {
-    const text = section.innerText || '';
-    
-    let appKey = null;
-    if (text.includes('GPF')) appKey = 'gpf';
-    else if (text.includes('MFC')) appKey = 'mfc';
-    else if (text.includes('SCB')) appKey = 'scb';
-    else if (text.includes('DIME')) appKey = 'dime';
-
-    if (appKey && APP_THEMES[appKey]) {
-      const theme = APP_THEMES[appKey];
-
-      const badge = Array.from(section.querySelectorAll('span, div, button')).find(
-        el => el.children.length === 0 && el.innerText.trim().toUpperCase() === appKey.toUpperCase()
-      );
-
-      if (badge) {
-        badge.style.backgroundColor = theme.badgeBg;
-        badge.style.color = theme.badgeText;
-        badge.style.fontWeight = 'bold';
-        badge.style.border = `1px solid ${theme.borderColor}`;
-        badge.style.borderRadius = '6px';
-        badge.style.padding = '4px 12px';
-      }
-
-      const ratioEl = Array.from(section.querySelectorAll('span, p')).find(
-        el => el.innerText.includes('สัดส่วนพอร์ตรวม:')
-      );
-      if (ratioEl) {
-        const percentSpan = ratioEl.querySelector('span') || ratioEl;
-        percentSpan.style.color = theme.accentColor;
-      }
-    }
-  });
-}
-
-// 1. ดึงข้อมูลสรุปพอร์ตรวม (Aggregated Summary)
-async function fetchSummary() {
-  try {
-    let fxRate = window.currentFxRate;
-    if (!fxRate || fxRate === 1) {
-      try {
-        const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-        const data = await res.json();
-        fxRate = data?.rates?.THB || 36.5;
-        window.currentFxRate = fxRate;
-      } catch (e) {
-        fxRate = window.DEFAULT_FX_RATE || 36.5;
+      if (typeof overallTotalWealth !== 'undefined') {
+          checkAndSaveDailySnapshot(overallTotalWealth);
       }
     }
 
-    const { data: assets, error } = await supabaseClient.from('user_portfolios').select('*');
-    if (error || !assets || assets.length === 0) {
-      console.error('Error fetching summary:', error);
-      return;
-    }
-
-    let totalWealthTHB = 0;
-    let totalCostTHB = 0;
-    let totalDailyProfitTHB = 0;
-    const appsSet = new Set();
-
-    assets.forEach(item => {
-      if (item.app_source) appsSet.add(item.app_source);
-
-      const isUSD = (item.app_source === 'dime') || (item.currency === 'USD');
-      const rate = isUSD ? fxRate : 1;
-
-      const units = Number(item.units ?? item.amount ?? 0);
-      const currentNav = Number(item.current_nav ?? item.nav ?? 0);
-      const prevNav = Number(item.prev_nav ?? currentNav);
-      const avgNav = Number(item.avg_cost ?? item.avg_nav ?? item.cost_price ?? 0);
-
-      const currentVal = units * currentNav * rate;
-      const costVal = units * avgNav * rate;
-      const dailyProfit = (currentNav - prevNav) * units * rate;
-
-      totalWealthTHB += currentVal;
-      totalCostTHB += costVal;
-      totalDailyProfitTHB += dailyProfit;
-    });
-
-    const totalProfitTHB = totalWealthTHB - totalCostTHB;
-    const totalProfitPct = totalCostTHB > 0 ? (totalProfitTHB / totalCostTHB) * 100 : 0;
-
-    const prevTotalValue = totalWealthTHB - totalDailyProfitTHB;
-    const dailyProfitPct = prevTotalValue > 0 ? (totalDailyProfitTHB / prevTotalValue) * 100 : 0;
-
-    window.overallTotalWealth = totalWealthTHB;
-
-    const GREEN = '#10b981';
-    const RED = '#ef4444';
-    const WHITE = '#ffffff';
-
-    const accSign = totalProfitTHB >= 0 ? '▲ ' : '▼ ';
-    const accColor = totalProfitTHB >= 0 ? GREEN : RED;
-    const accValText = `${accSign}฿${Math.abs(totalProfitTHB).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const accPctText = `${accSign}${Math.abs(totalProfitPct).toFixed(2)}%`;
-
-    const dailySign = totalDailyProfitTHB >= 0 ? '▲ ' : '▼ ';
-    const dailyColor = totalDailyProfitTHB >= 0 ? GREEN : RED;
-    const dailyValText = `${dailySign}฿${Math.abs(totalDailyProfitTHB).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const dailyPctText = `${dailySign}${Math.abs(dailyProfitPct).toFixed(2)}%`;
-
-    const appCount = appsSet.size || 4;
-
-    // อัปเดตผ่าน Element ID (ถ้ามี)
-    const setById = (id, text, color) => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.innerText = text;
-        if (color) el.style.color = color;
-      }
+    const APP_THEMES = {
+        'GPF': { badge: '#38BDF8', text: '#FFFFFF', border: '#1E293B', accent: '#C5A059' },
+        'MFC': { badge: '#FF9800', text: '#FFFFFF', border: '#1E293B', accent: '#FFB74D' },
+        'SCB': { badge: '#C084FC', text: '#FFFFFF', border: '#1E293B', accent: '#E9D5FF' },
+        'DIME': { badge: '#00FF66', text: '#000000', border: '#1E293B', accent: '#4ADE80' }
     };
 
-    setById('total-portfolio-value', `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, GREEN);
-    setById('total-portfolio-cost', `฿${totalCostTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, WHITE);
-    setById('total-portfolio-profit', accValText, accColor);
-    setById('total-portfolio-profit-pct', accPctText, accColor);
-    setById('daily-portfolio-profit', dailyValText, dailyColor);
-    setById('daily-portfolio-profit-pct', dailyPctText, dailyColor);
+    function applyAppBrandColors() {
+      const portfolioSections = document.querySelectorAll('[id^="portfolio-"], .portfolio-card, div');
 
-    // 🟢 เจาะจงเฉพาะการ์ดสรุป 4 ใบด้านบนแบบปลอดภัย ไม่แตะการ์ดย่อย GPF/MFC ด้านล่าง
-    const allDivs = document.querySelectorAll('div');
-    allDivs.forEach(div => {
-      const t = div.innerText || '';
-      
-      // ข้ามส่วนตาราง และส่วนรวมพอร์ตรวมย่อยด้านล่าง
-      if (t.includes('ภาพรวมของแต่ละพอร์ต') || t.includes('สแกนสลิป') || t.includes('รวมพอร์ต')) return;
-
-      // ทำงานเฉพาะการ์ดที่มีลูกน้อยกว่า 8 ตัว (ป้องกันไปแก้ Container ใหญ่)
-      if (div.children.length >= 1 && div.children.length <= 8) {
+      portfolioSections.forEach(section => {
+        const text = section.innerText || '';
         
-        // 1. มูลค่าพอร์ตรวมทั้งหมด
-        if (t.includes('มูลค่าพอร์ตรวมทั้งหมด')) {
-          const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
-          if (valEl) {
-            valEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            valEl.style.color = GREEN;
+        let appKey = null;
+        if (text.includes('GPF')) appKey = 'gpf';
+        else if (text.includes('MFC')) appKey = 'mfc';
+        else if (text.includes('SCB')) appKey = 'scb';
+        else if (text.includes('DIME')) appKey = 'dime';
+
+        if (appKey && APP_THEMES[appKey]) {
+          const theme = APP_THEMES[appKey];
+
+          const badge = Array.from(section.querySelectorAll('span, div, button')).find(
+            el => el.children.length === 0 && el.innerText.trim().toUpperCase() === appKey.toUpperCase()
+          );
+
+          if (badge) {
+            badge.style.backgroundColor = theme.badgeBg;
+            badge.style.color = theme.badgeText;
+            badge.style.fontWeight = 'bold';
+            badge.style.border = `1px solid ${theme.borderColor}`;
+            badge.style.borderRadius = '6px';
+            badge.style.padding = '4px 12px';
           }
-          const subEl = Array.from(div.querySelectorAll('p, span, div')).find(e => e.children.length === 0 && (e.innerText.includes('กำลังคำนวณ') || e.innerText.includes('จากทั้งหมด')));
-          if (subEl) {
-            const pctSign = totalProfitPct >= 0 ? '▲' : '▼';
-            const pctColor = totalProfitPct >= 0 ? GREEN : RED;
-            subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิเคชัน (<span style="color:${pctColor}">${pctSign} ${Math.abs(totalProfitPct).toFixed(2)}%</span>)`;
+
+          const ratioEl = Array.from(section.querySelectorAll('span, p')).find(
+            el => el.innerText.includes('สัดส่วนพอร์ตรวม:')
+          );
+          if (ratioEl) {
+            const percentSpan = ratioEl.querySelector('span') || ratioEl;
+            percentSpan.style.color = theme.accentColor;
           }
         }
-
-        // 2. เงินลงทุนรวม (ต้นทุน)
-        else if (t.includes('เงินลงทุนรวม') && !t.includes('กำไร/ขาดทุน')) {
-          const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
-          if (valEl) {
-            valEl.innerText = `฿${totalCostTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            valEl.style.color = WHITE;
-          }
-        }
-
-        // 3. กำไร/ขาดทุนสะสม
-        else if (t.includes('กำไร/ขาดทุนสะสม')) {
-          const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
-          if (valEl) {
-            valEl.innerText = accValText;
-            valEl.style.color = accColor;
-          }
-          const leaves = Array.from(div.querySelectorAll('*')).filter(e => e.children.length === 0 && e !== valEl && !e.innerText.includes('กำไร/ขาดทุนสะสม'));
-          if (leaves.length >= 2) {
-            leaves[0].innerText = ''; // ลบ % ด้านบนออก
-            leaves[leaves.length - 1].innerText = accPctText; // ย้ายลงล่าง
-            leaves[leaves.length - 1].style.color = accColor;
-          } else if (leaves.length === 1) {
-            leaves[0].innerText = accPctText;
-            leaves[0].style.color = accColor;
-          }
-        }
-
-        // 4. กำไร/ขาดทุนรายวัน
-        else if (t.includes('กำไร/ขาดทุนรายวัน')) {
-          const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
-          if (valEl) {
-            valEl.innerText = dailyValText;
-            valEl.style.color = dailyColor;
-          }
-          const leaves = Array.from(div.querySelectorAll('*')).filter(e => e.children.length === 0 && e !== valEl && !e.innerText.includes('กำไร/ขาดทุนรายวัน'));
-          if (leaves.length >= 2) {
-            leaves[0].innerText = ''; // ลบ % ด้านบนออก
-            leaves[leaves.length - 1].innerText = dailyPctText; // ย้ายลงล่าง
-            leaves[leaves.length - 1].style.color = dailyColor;
-          } else if (leaves.length === 1) {
-            leaves[0].innerText = dailyPctText;
-            leaves[0].style.color = dailyColor;
-          }
-        }
-      }
-    });
-
-    // อัปเดตตัวเลขกลางกราฟวงกลม
-    const chartCenterValueEl = document.getElementById('chart-total-value');
-    if (chartCenterValueEl) {
-      chartCenterValueEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      });
     }
 
-    // เรียกใช้งานการปรับสีตามแบรนด์
-    applyAppBrandColors();
+    async function fetchSummary() {
+      try {
+        let fxRate = window.currentFxRate;
+        if (!fxRate || fxRate === 1) {
+          try {
+            const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+            const data = await res.json();
+            fxRate = data?.rates?.THB || 36.5;
+            window.currentFxRate = fxRate;
+          } catch (e) {
+            fxRate = window.DEFAULT_FX_RATE || 36.5;
+          }
+        }
 
-  } catch (err) {
-    console.error('Fetch summary error:', err);
-  }
-}
-    // 2. ดึงข้อมูลภาพรวมแต่ละพอร์ต
+        const { data: assets, error } = await supabaseClient.from('user_portfolios').select('*');
+        if (error || !assets || assets.length === 0) {
+          console.error('Error fetching summary:', error);
+          return;
+        }
+
+        let totalWealthTHB = 0;
+        let totalCostTHB = 0;
+        let totalDailyProfitTHB = 0;
+        const appsSet = new Set();
+
+        assets.forEach(item => {
+          if (item.app_source) appsSet.add(item.app_source);
+
+          const isUSD = (item.app_source === 'dime') || (item.currency === 'USD');
+          const rate = isUSD ? fxRate : 1;
+
+          const units = Number(item.units ?? item.amount ?? 0);
+          const currentNav = Number(item.current_nav ?? item.nav ?? 0);
+          const prevNav = Number(item.prev_nav ?? currentNav);
+          const avgNav = Number(item.avg_cost ?? item.avg_nav ?? item.cost_price ?? 0);
+
+          const currentVal = units * currentNav * rate;
+          const costVal = units * avgNav * rate;
+          const dailyProfit = (currentNav - prevNav) * units * rate;
+
+          totalWealthTHB += currentVal;
+          totalCostTHB += costVal;
+          totalDailyProfitTHB += dailyProfit;
+        });
+
+        const totalProfitTHB = totalWealthTHB - totalCostTHB;
+        const totalProfitPct = totalCostTHB > 0 ? (totalProfitTHB / totalCostTHB) * 100 : 0;
+
+        const prevTotalValue = totalWealthTHB - totalDailyProfitTHB;
+        const dailyProfitPct = prevTotalValue > 0 ? (totalDailyProfitTHB / prevTotalValue) * 100 : 0;
+
+        window.overallTotalWealth = totalWealthTHB;
+
+        const GREEN = '#10b981';
+        const RED = '#ef4444';
+        const WHITE = '#ffffff';
+
+        const accSign = totalProfitTHB >= 0 ? '▲ ' : '▼ ';
+        const accColor = totalProfitTHB >= 0 ? GREEN : RED;
+        const accValText = `${accSign}฿${Math.abs(totalProfitTHB).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const accPctText = `${accSign}${Math.abs(totalProfitPct).toFixed(2)}%`;
+
+        const dailySign = totalDailyProfitTHB >= 0 ? '▲ ' : '▼ ';
+        const dailyColor = totalDailyProfitTHB >= 0 ? GREEN : RED;
+        const dailyValText = `${dailySign}฿${Math.abs(totalDailyProfitTHB).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const dailyPctText = `${dailySign}${Math.abs(dailyProfitPct).toFixed(2)}%`;
+
+        const appCount = appsSet.size || 4;
+
+        const setById = (id, text, color) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.innerText = text;
+            if (color) el.style.color = color;
+          }
+        };
+
+        setById('total-portfolio-value', `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, GREEN);
+        setById('total-portfolio-cost', `฿${totalCostTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, WHITE);
+        setById('total-portfolio-profit', accValText, accColor);
+        setById('total-portfolio-profit-pct', accPctText, accColor);
+        setById('daily-portfolio-profit', dailyValText, dailyColor);
+        setById('daily-portfolio-profit-pct', dailyPctText, dailyColor);
+
+        const allDivs = document.querySelectorAll('div');
+        allDivs.forEach(div => {
+          const t = div.innerText || '';
+          
+          if (t.includes('ภาพรวมของแต่ละพอร์ต') || t.includes('สแกนสลิป') || t.includes('รวมพอร์ต')) return;
+
+          if (div.children.length >= 1 && div.children.length <= 8) {
+            if (t.includes('มูลค่าพอร์ตรวมทั้งหมด')) {
+              const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+              if (valEl) {
+                valEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                valEl.style.color = GREEN;
+              }
+              const subEl = Array.from(div.querySelectorAll('p, span, div')).find(e => e.children.length === 0 && (e.innerText.includes('กำลังคำนวณ') || e.innerText.includes('จากทั้งหมด')));
+              if (subEl) {
+                const pctSign = totalProfitPct >= 0 ? '▲' : '▼';
+                const pctColor = totalProfitPct >= 0 ? GREEN : RED;
+                subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิเคชัน (<span style="color:${pctColor}">${pctSign} ${Math.abs(totalProfitPct).toFixed(2)}%</span>)`;
+              }
+            }
+            else if (t.includes('เงินลงทุนรวม') && !t.includes('กำไร/ขาดทุน')) {
+              const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+              if (valEl) {
+                valEl.innerText = `฿${totalCostTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                valEl.style.color = WHITE;
+              }
+            }
+            else if (t.includes('กำไร/ขาดทุนสะสม')) {
+              const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+              if (valEl) {
+                valEl.innerText = accValText;
+                valEl.style.color = accColor;
+              }
+              const leaves = Array.from(div.querySelectorAll('*')).filter(e => e.children.length === 0 && e !== valEl && !e.innerText.includes('กำไร/ขาดทุนสะสม'));
+              if (leaves.length >= 2) {
+                leaves[0].innerText = '';
+                leaves[leaves.length - 1].innerText = accPctText;
+                leaves[leaves.length - 1].style.color = accColor;
+              } else if (leaves.length === 1) {
+                leaves[0].innerText = accPctText;
+                leaves[0].style.color = accColor;
+              }
+            }
+            else if (t.includes('กำไร/ขาดทุนรายวัน')) {
+              const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+              if (valEl) {
+                valEl.innerText = dailyValText;
+                valEl.style.color = dailyColor;
+              }
+              const leaves = Array.from(div.querySelectorAll('*')).filter(e => e.children.length === 0 && e !== valEl && !e.innerText.includes('กำไร/ขาดทุนรายวัน'));
+              if (leaves.length >= 2) {
+                leaves[0].innerText = '';
+                leaves[leaves.length - 1].innerText = dailyPctText;
+                leaves[leaves.length - 1].style.color = dailyColor;
+              } else if (leaves.length === 1) {
+                leaves[0].innerText = dailyPctText;
+                leaves[0].style.color = dailyColor;
+              }
+            }
+          }
+        });
+
+        const chartCenterValueEl = document.getElementById('chart-total-value');
+        if (chartCenterValueEl) {
+          chartCenterValueEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        applyAppBrandColors();
+
+      } catch (err) {
+        console.error('Fetch summary error:', err);
+      }
+    }
+
     async function fetchAppAllocation() {
       const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
       if (error) return console.error('Error fetching allocation:', error);
@@ -676,15 +672,14 @@ async function fetchSummary() {
 
         const portfolioWeight = totalWealth > 0 ? (wealthVal / totalWealth) * 100 : 0;
 		
-	    const tableTextColors = {
-            'GPF': 'text-[#38BDF8]',  // ฟ้าสว่าง
-            'MFC': 'text-[#FF9800]',  // ส้มสว่าง
-            'SCB': 'text-[#C084FC]',  // ม่วงพาสเทล
-            'DIME': 'text-[#00FF66]'  // เขียวนีออน
+        const tableTextColors = {
+            'GPF': 'text-[#38BDF8]',
+            'MFC': 'text-[#FF9800]',
+            'SCB': 'text-[#C084FC]',
+            'DIME': 'text-[#00FF66]'
         };
         const currentBrandColor = tableTextColors[appName] || 'text-indigo-400';
 
-		
         listEl.innerHTML += `
           <tr class="hover:bg-slate-700/30 transition border-b border-slate-700/30">
             <td class="py-2.5 font-semibold uppercase ${currentBrandColor}">${item.app_source}</td>
@@ -750,7 +745,6 @@ async function fetchSummary() {
       return `<span class="font-medium text-white">${code}</span>`;
     }
 
-    // Render รายละเอียดตารางสินทรัพย์แยกแต่ละพอร์ต
     function renderAllAppTables(allData) {
       const container = document.getElementById('app-tables-container');
       if (!container) return;
@@ -850,14 +844,13 @@ async function fetchSummary() {
           const diffPct = actualPct - targetPct;
 		
           const brandRowColors = {
-            'GPF': 'text-[#38BDF8]',   // ฟ้าสว่าง
-            'MFC': 'text-[#FF9800]',   // ส้มสว่าง
-            'SCB': 'text-[#C084FC]',   // ม่วงพาสเทล
-            'DIME': 'text-[#00FF66]'   // เขียวนีออน
-        };
-        const subBrandColor = brandRowColors[(item.app_source || '').toUpperCase()] || 'text-slate-400';
+            'GPF': 'text-[#38BDF8]',
+            'MFC': 'text-[#FF9800]',
+            'SCB': 'text-[#C084FC]',
+            'DIME': 'text-[#00FF66]'
+          };
+          const subBrandColor = brandRowColors[(item.app_source || '').toUpperCase()] || 'text-slate-400';
 
-		
           let statusBadge = '<span class="text-[10px] text-slate-500">-</span>';
           if (targetPct > 0) {
             if (diffPct < -1) {
@@ -900,29 +893,24 @@ async function fetchSummary() {
 
         const appWeightPct = overallTotalWealth > 0 ? (appTotalWealthTHB / overallTotalWealth) * 100 : 0;
 
-        // สลับแสดงปุ่ม Gemini AI สำหรับ DIME และแสดงสรุปกำไรสำหรับพอร์ตอื่นๆ
         let rightHeaderContent = '';
         if (isDime) {
-  rightHeaderContent = `
-    <div class="flex items-center gap-1.5">
-      <button onclick="configureGeminiApiKey()" title="ตั้งค่า Gemini API Key" class="bg-slate-700/80 hover:bg-slate-700 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1">
-        🔑 Key
-      </button>
-
-      <!-- ปุ่มสแกนรูปภาพเดิม -->
-      <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
-        📷 สแกนรูป
-        <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
-      </label>
-
-      <!-- ปุ่มสแกน PDF Dime เพิ่มใหม่ -->
-      <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
-        📄 สแกน PDF
-        <input type="file" id="dime-pdf-input" accept="application/pdf" class="hidden" onchange="scanDimePdfCard(event)">
-      </label>
-    </div>
-  `;
-} else if (app === 'MFC') {
+          rightHeaderContent = `
+            <div class="flex items-center gap-1.5">
+              <button onclick="configureGeminiApiKey()" title="ตั้งค่า Gemini API Key" class="bg-slate-700/80 hover:bg-slate-700 text-amber-300 border border-amber-500/30 px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center gap-1">
+                🔑 Key
+              </button>
+              <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+                📷 สแกนรูป
+                <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+              </label>
+              <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+                📄 สแกน PDF
+                <input type="file" id="dime-pdf-input" accept="application/pdf" class="hidden" onchange="scanDimePdfCard(event)">
+              </label>
+            </div>
+          `;
+        } else if (app === 'MFC') {
           rightHeaderContent = `
             <div class="flex items-center gap-1.5">
               <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center shadow-sm">
@@ -932,24 +920,24 @@ async function fetchSummary() {
             </div>
           `;
         } else if (app === 'GPF') {
-        rightHeaderContent = `
+          rightHeaderContent = `
             <div class="flex items-center gap-1.5">
                 <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition-all shadow-sm flex items-center gap-1">
                     📄 สแกนสลิป GPF (PDF)
                     <input type="file" id="gpf-pdf-input" accept="application/pdf" class="hidden" onchange="handleGpfPdfUpload(event)">
                 </label>
             </div>
-        `;
-		} else if (app.toLowerCase() === 'scb') {
-		rightHeaderContent = `
-			<div class="flex items-center gap-1.5">
-				<label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-purple-400 border border-purple-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
-					📷 สแกนพอร์ต SCB
-					<input type="file" id="scb-image-input" accept="image/*" class="hidden" onchange="scanScbCard(event)">
-				</label>
-			</div>
-		`;
-		} else {
+          `;
+        } else if (app.toLowerCase() === 'scb') {
+          rightHeaderContent = `
+            <div class="flex items-center gap-1.5">
+              <label class="cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-purple-400 border border-purple-500/30 px-3 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 text-center">
+                📷 สแกนพอร์ต SCB
+                <input type="file" id="scb-image-input" accept="image/*" class="hidden" onchange="scanScbCard(event)">
+              </label>
+            </div>
+          `;
+        } else {
           rightHeaderContent = `
             <div class="flex items-center gap-4 text-xs sm:text-sm font-semibold">
               <div>กำไรสะสม: <span class="${appPnlClass}">${appIcon}${currFmt(Math.abs(appPnlVal))} (${formatNumber(Math.abs(appPnlPct), 2)}%)</span></div>
@@ -1094,87 +1082,84 @@ async function fetchSummary() {
         window.myDoughnutChart.destroy();
       }
 
-        const brandColors = {
-            'GPF': '#38BDF8',   // เปลี่ยนเป็นสีฟ้าสว่าง กบข. (ตามที่เราใช้ในตารางและกราฟเส้น)
-            'MFC': '#FF9800',   // เปลี่ยนเป็นสีส้มสว่าง MFC (ส้มเดิมที่คุณชอบ)
-            'SCB': '#C084FC',   // เปลี่ยนเป็นสีม่วงพาสเทลสว่าง SCB
-            'DIME': '#00FF66'   // เปลี่ยนเป็นสีเขียวนีออนหลัก DIME!
-        };
+      const brandColors = {
+          'GPF': '#38BDF8',
+          'MFC': '#FF9800',
+          'SCB': '#C084FC',
+          'DIME': '#00FF66'
+      };
 
       const bgColors = labels.map(label => brandColors[label.toUpperCase()] || '#64748B');
 
-// 1. Plugin แสดงตัวเลขยอดรวมเงินตรงกลางวงกลม (ล็อกทศนิยม 2 ตำแหน่ง)
-    const centerTextPlugin = {
-        id: 'centerText',
-        beforeDraw(chart) {
-            const { width, height, ctx } = chart;
-            ctx.restore();
-            
-            const totalVal = chart.data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
+      const centerTextPlugin = {
+          id: 'centerText',
+          beforeDraw(chart) {
+              const { width, height, ctx } = chart;
+              ctx.restore();
+              
+              const totalVal = chart.data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
 
-            ctx.font = '500 11px Prompt, sans-serif';
-            ctx.fillStyle = '#94a3b8';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('มูลค่ารวมทั้งหมด', width / 2, height / 2 - 10);
+              ctx.font = '500 11px Prompt, sans-serif';
+              ctx.fillStyle = '#94a3b8';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('มูลค่ารวมทั้งหมด', width / 2, height / 2 - 10);
 
-            ctx.font = 'bold 14px Prompt, sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(`฿${totalVal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, width / 2, height / 2 + 10);
-            ctx.save();
-        }
-    };
+              ctx.font = 'bold 14px Prompt, sans-serif';
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText(`฿${totalVal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, width / 2, height / 2 + 10);
+              ctx.save();
+          }
+      };
 
-    // 2. สร้าง Chart ใหม่แบบซ่อน Legend จุดเดิม
-    window.myDoughnutChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: chartValues,
-                backgroundColor: bgColors,
-                borderWidth: 3,
-                borderColor: '#1e293b',
-                hoverOffset: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '72%',
-            plugins: {
-                legend: { display: false },
-                tooltip: { enabled: true }
-            }
-        },
-        plugins: [centerTextPlugin]
-    });
+      window.myDoughnutChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+              labels: labels,
+              datasets: [{
+                  data: chartValues,
+                  backgroundColor: bgColors,
+                  borderWidth: 3,
+                  borderColor: '#1e293b',
+                  hoverOffset: 6
+              }]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '72%',
+              plugins: {
+                  legend: { display: false },
+                  tooltip: { enabled: true }
+              }
+          },
+          plugins: [centerTextPlugin]
+      });
 
-    // 3. เรนเดอร์ Legend แสดงยอดเงิน + % ด้านล่าง (ล็อกทศนิยม 2 ตำแหน่ง และป้องกันข้อความล้นขอบ)
-    const legendContainer = document.getElementById('chart-legend-container');
-    if (legendContainer) {
-        const totalVal = chartValues.reduce((a, b) => a + (Number(b) || 0), 0);
+      const legendContainer = document.getElementById('chart-legend-container');
+      if (legendContainer) {
+          const totalVal = chartValues.reduce((a, b) => a + (Number(b) || 0), 0);
 
-        legendContainer.innerHTML = labels.map((label, idx) => {
-            const val = chartValues[idx] || 0;
-            const pct = totalVal > 0 ? ((val / totalVal) * 100).toFixed(2) : '0.00';
-            const color = bgColors[idx];
-            const formattedVal = val.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          legendContainer.innerHTML = labels.map((label, idx) => {
+              const val = chartValues[idx] || 0;
+              const pct = totalVal > 0 ? ((val / totalVal) * 100).toFixed(2) : '0.00';
+              const color = bgColors[idx];
+              const formattedVal = val.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            return `
-                <div class="flex items-center justify-between text-xs w-full py-1 border-b border-slate-700/40 last:border-0 gap-2">
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${color}"></span>
-                        <span class="font-semibold text-slate-300">${label}</span>
-                    </div>
-                    <div class="flex items-center justify-end gap-1.5 text-right font-mono">
-                        <span class="text-white">฿${formattedVal}</span>
-                        <span class="text-slate-400 font-bold min-w-[52px] text-right">(${pct}%)</span>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
+              return `
+                  <div class="flex items-center justify-between text-xs w-full py-1 border-b border-slate-700/40 last:border-0 gap-2">
+                      <div class="flex items-center gap-1.5 shrink-0">
+                          <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${color}"></span>
+                          <span class="font-semibold text-slate-300">${label}</span>
+                      </div>
+                      <div class="flex items-center justify-end gap-1.5 text-right font-mono">
+                          <span class="text-white">฿${formattedVal}</span>
+                          <span class="text-slate-400 font-bold min-w-[52px] text-right">(${pct}%)</span>
+                      </div>
+                  </div>
+              `;
+          }).join('');
+      }
     }
 
     function formatThaiDateTime(isoString) {
@@ -1198,7 +1183,6 @@ async function fetchSummary() {
       }
     }
 
-    // ฟังก์ชันจัดการ PDF
     if (window.pdfjsLib) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
@@ -1245,7 +1229,6 @@ async function fetchSummary() {
       }
     }
 
-    // ฟังก์ชันสำหรับสแกน PDF ของ MFC โดยเฉพาะ
     async function handleMfcPdfUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -1285,123 +1268,107 @@ async function fetchSummary() {
       }
     }
 	
-	async function parseMfcPdfStatement(fullText) {
-  try {
-    showToast("กำลังประมวลผลสลิป MFC PVD...", "info");
+    async function parseMfcPdfStatement(fullText) {
+      try {
+        showToast("กำลังประมวลผลสลิป MFC PVD...", "info");
 
-    // 1. คลีนข้อความสลิป
-    const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เพี้ยนเป็น .
-      .replace(/,/g, '');               // ลบ comma
+        const cleanText = fullText
+          .replace(/(\d+):(\d+)/g, '$1.$2')
+          .replace(/,/g, '');
 
-    // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
-    const { data: currentPort, error: fetchErr } = await supabaseClient
-      .from('user_portfolios')
-      .select('id, asset_code, app_source, units, avg_nav, current_nav, last_transaction_date');
+        const { data: currentPort, error: fetchErr } = await supabaseClient
+          .from('user_portfolios')
+          .select('id, asset_code, app_source, units, avg_nav, current_nav, last_transaction_date');
 
-    if (fetchErr) throw fetchErr;
+        if (fetchErr) throw fetchErr;
 
-    // 3. สกัดวันที่ในใบรับรองยอด (เช่น "05 กันยายน 2569")
-    let slipDate = "";
-    const dateMatch = cleanText.match(/(?:ณ วันที่|As at)\s*(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})/i);
-    
-    if (dateMatch) {
-      slipDate = dateMatch[1].trim();
-    } else {
-      slipDate = `MFC_TX_${Date.now()}`;
-    }
-
-    // 4. ตัดเนื้อหาเฉพาะส่วนตารางกองทุน (ตัดสรุปยอด Grand Total ด้านล่างออกทั้งหมดทันที)
-    const tableSection = cleanText.split(/1231\s*Total|รายละเอียดการเลือก|ยอดรวมทุกนโยบาย/i)[0];
-
-    // 5. รายชื่อกองทุน MFC MPF ทั้งหมด
-    const mfcFunds = ['MPF07', 'MPF15', 'MPF18', 'MPF19', 'MPF23', 'MPF27'];
-    let updatedCount = 0;
-
-    for (const code of mfcFunds) {
-      // ดึงบล็อกข้อความของกองทุนนั้นๆ จากในโซนตาราง
-      const fundRegex = new RegExp(`${code}\\s*([\\s\\S]*?)(?=MPF\\d{2}|$)`, 'i');
-      const fundMatch = tableSection.match(fundRegex);
-
-      if (fundMatch) {
-        const blockText = fundMatch[1];
-        // ดึงตัวเลขทศนิยม 4 ตำแหน่งทั้งหมดเฉพาะในบล็อกกองทุนนั้น
-        const fourDecs = blockText.match(/\d+\.\d{4}/g);
-
-        if (fourDecs && fourDecs.length >= 2) {
-          const slipAvgNav = parseFloat(fourDecs[0]);                // ตัวแรก = Net Asset Value (NAV ต้นทุน)
-          const fundUnits  = parseFloat(fourDecs[1]); // บังคับดึงค่าทศนิยม 4 ตำแหน่งตัวที่ 2 (Units) เสมอ
-
-          if (isNaN(slipAvgNav) || isNaN(fundUnits)) continue;
-
-          // จับคู่กับรายการสินทรัพย์ใน Supabase
-          const targetAsset = currentPort ? currentPort.find(a => 
-            a.asset_code === code || 
-            (a.asset_code && a.asset_code.toUpperCase().includes(code))
-          ) : null;
-
-          if (!targetAsset) continue;
-
-          // 🔒 ระบบป้องกันสแกนซ้ำ
-          if (targetAsset.last_transaction_date === slipDate) {
-            showToast(`⚠️ สลิป MFC ประจำวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
-            return;
-          }
-
-          // อัปเดตลง Supabase
-          const { error: updateErr } = await supabaseClient
-            .from('user_portfolios')
-            .update({
-              units: fundUnits,
-              avg_nav: slipAvgNav,
-              last_transaction_date: slipDate,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', targetAsset.id);
-
-          if (!updateErr) updatedCount++;
+        let slipDate = "";
+        const dateMatch = cleanText.match(/(?:ณ วันที่|As at)\s*(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})/i);
+        
+        if (dateMatch) {
+          slipDate = dateMatch[1].trim();
+        } else {
+          slipDate = `MFC_TX_${Date.now()}`;
         }
+
+        const tableSection = cleanText.split(/1231\s*Total|รายละเอียดการเลือก|ยอดรวมทุกนโยบาย/i)[0];
+        const mfcFunds = ['MPF07', 'MPF15', 'MPF18', 'MPF19', 'MPF23', 'MPF27'];
+        let updatedCount = 0;
+
+        for (const code of mfcFunds) {
+          const fundRegex = new RegExp(`${code}\\s*([\\s\\S]*?)(?=MPF\\d{2}|$)`, 'i');
+          const fundMatch = tableSection.match(fundRegex);
+
+          if (fundMatch) {
+            const blockText = fundMatch[1];
+            const fourDecs = blockText.match(/\d+\.\d{4}/g);
+
+            if (fourDecs && fourDecs.length >= 2) {
+              const slipAvgNav = parseFloat(fourDecs[0]);
+              const fundUnits  = parseFloat(fourDecs[1]);
+
+              if (isNaN(slipAvgNav) || isNaN(fundUnits)) continue;
+
+              const targetAsset = currentPort ? currentPort.find(a => 
+                a.asset_code === code || 
+                (a.asset_code && a.asset_code.toUpperCase().includes(code))
+              ) : null;
+
+              if (!targetAsset) continue;
+
+              if (targetAsset.last_transaction_date === slipDate) {
+                showToast(`⚠️ สลิป MFC ประจำวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
+                return;
+              }
+
+              const { error: updateErr } = await supabaseClient
+                .from('user_portfolios')
+                .update({
+                  units: fundUnits,
+                  avg_nav: slipAvgNav,
+                  last_transaction_date: slipDate,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', targetAsset.id);
+
+              if (!updateErr) updatedCount++;
+            }
+          }
+        }
+
+        if (updatedCount > 0) {
+          showToast(`✅ บันทึกสลิป MFC วันที่ [${slipDate}] สำเร็จ ${updatedCount} กองทุน!`, "success");
+          refreshDashboard();
+        } else {
+          showToast("ไม่พบรายการกองทุน MFC ในระบบ หรือรูปแบบตัวเลขไม่ถูกต้อง", "warning");
+        }
+
+      } catch (err) {
+        console.error("MFC Parsing Error:", err);
+        showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF MFC", "error");
       }
     }
-
-    if (updatedCount > 0) {
-      showToast(`✅ บันทึกสลิป MFC วันที่ [${slipDate}] สำเร็จ ${updatedCount} กองทุน!`, "success");
-      refreshDashboard();
-    } else {
-      showToast("ไม่พบรายการกองทุน MFC ในระบบ หรือรูปแบบตัวเลขไม่ถูกต้อง", "warning");
-    }
-
-  } catch (err) {
-    console.error("MFC Parsing Error:", err);
-    showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ PDF MFC", "error");
-  }
-}
-	
 	
     async function parseGpfPdfStatement(fullText) {
       try {
         showToast("กำลังประมวลผลสลิป กบข....", "info");
 
-        // 1. ทำความสะอาดข้อความจาก OCR
         const cleanText = fullText
-          .replace(/(\d+):(\d+)/g, '$1.$2') // แก้ไขเครื่องหมาย : เป็น .
-          .replace(/,/g, '');               // ลบ comma
+          .replace(/(\d+):(\d+)/g, '$1.$2')
+          .replace(/,/g, '');
 
-        // 2. ดึงข้อมูลพอร์ตปัจจุบันจาก Supabase
         const { data: currentPort, error: fetchErr } = await supabaseClient
           .from('user_portfolios')
           .select('id, asset_code, app_source, units, avg_nav, last_transaction_date');
 
         if (fetchErr) throw fetchErr;
 
-        // 3. กำหนดรายชื่อแผนในสลิปและแมตช์กับ asset_code ภาษาไทยในฐานข้อมูลของคุณ
         const planMappings = [
           { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
           { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
           { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
         ];
 
-        // 4. หาวันที่ล่างสุด (เช่น 26 สิงหาคม 2569)
         let slipDate = "";
         const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
         const dateMatches = [...cleanText.matchAll(dateRegex)];
@@ -1412,7 +1379,6 @@ async function fetchSummary() {
           slipDate = `TX_${Date.now()}`;
         }
 
-        // 5. สกัดชุดตัวเลขทั้งหมดในเอกสาร (NAV / หน่วย / จำนวนเงิน)
         const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
         const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
 
@@ -1421,30 +1387,26 @@ async function fetchSummary() {
           return;
         }
 
-        // ดึง 3 ชุดตัวเลขอันล่างสุด (เพราะสลิปล่าสุดมี 3 แผน)
         const recentMatches = numberMatches.slice(-3);
         let updatedCount = 0;
 
         for (let i = 0; i < recentMatches.length; i++) {
           const match = recentMatches[i];
-          const newNav = parseFloat(match[1]);       // NAV ล่าสุด
-          const addedUnits = parseFloat(match[2]);   // จำนวนหน่วยงวดนี้
+          const newNav = parseFloat(match[1]);
+          const addedUnits = parseFloat(match[2]);
 
           if (isNaN(newNav) || isNaN(addedUnits)) continue;
 
-          // แมตช์ตามลำดับแผน
           const mapping = planMappings[i] || planMappings[0];
           const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
 
           if (!targetAsset) continue;
 
-          // 🔒 ระบบป้องกันสแกนซ้ำ
           if (targetAsset.last_transaction_date === slipDate) {
             showToast(`⚠️ สลิปวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
             return;
           }
 
-          // คำนวณหน่วยสะสมรวมใหม่ และ NAV ต้นทุนเฉลี่ย (Weighted Average)
           const oldUnits = parseFloat(targetAsset.units || 0);
           const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
           const totalNewUnits = oldUnits + addedUnits;
@@ -1456,7 +1418,6 @@ async function fetchSummary() {
             calculatedAvgNav = totalNewCost / totalNewUnits;
           }
 
-          // อัปเดตลง Supabase
           const { error: updateErr } = await supabaseClient
             .from('user_portfolios')
             .update({
@@ -1484,7 +1445,6 @@ async function fetchSummary() {
       }
     }
 
-    // ฟังก์ชันตั้งค่า Gemini API Key
     function configureGeminiApiKey() {
       const currentKey = localStorage.getItem('GEMINI_API_KEY') || '';
       const newKey = prompt('กรุณากรอก Gemini API Key ของคุณ:', currentKey);
@@ -1500,7 +1460,6 @@ async function fetchSummary() {
       }
     }
 
-    // ฟังก์ชันจัดการ OCR รูปภาพ DIME (USD Base) ผ่าน Gemini AI
     async function handleImageUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -1600,7 +1559,6 @@ async function fetchSummary() {
     async function updateDatabaseUnitsAndCost(items) {
       try {
         for (const item of items) {
-          // อัปเดตไปยังตาราง user_portfolios โดยตรง
           const { error } = await supabaseClient
             .from('user_portfolios')
             .update({
@@ -1645,138 +1603,113 @@ async function fetchSummary() {
       }
     }
 
-async function renderTrendChart() {
-  const canvas = document.getElementById('trendChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
+    async function renderTrendChart() {
+      const canvas = document.getElementById('trendChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
 
-  let labels = [];
-  let values = [];
+      let labels = [];
+      let values = [];
 
-  function getCleanAppKey(source) {
-    if (!source) return null;
-    const s = source.trim().toLowerCase();
-    if (s === 'gpf' || s === 'กบข' || s === 'กบข.') return 'gpf';
-    if (s === 'mfc') return 'mfc';
-    if (s === 'scb') return 'scb';
-    if (s === 'dime' || s === 'dime!') return 'dime';
-    return null;
-  }
-
-  if (typeof supabaseClient !== 'undefined') {
-    try {
-      const { data, error } = await supabaseClient
-        .from('portfolio_snapshots')
-        .select('snapshot_date, app_source, total_value_thb')
-        .order('snapshot_date', { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        const dates = [...new Set(data.map(d => d.snapshot_date))].sort();
-        const latestAppValues = { gpf: 0, mfc: 0, scb: 0, dime: 0 };
-
-        dates.forEach(date => {
-          const daySnapshots = data.filter(d => d.snapshot_date === date);
-          
-          // เก็บเฉพาะค่ายอดเงินล่าสุดของแต่ละแอปในวันนั้นๆ
-          daySnapshots.forEach(s => {
-            const cleanKey = getCleanAppKey(s.app_source);
-            if (cleanKey) {
-              latestAppValues[cleanKey] = Number(s.total_value_thb) || 0;
-            }
-          });
-
-          // รวมยอดเฉพาะ 4 แอปหลัก
-          const dayTotal = Object.values(latestAppValues).reduce((sum, val) => sum + val, 0);
-          labels.push(date);
-          values.push(dayTotal);
-
-          console.log(`[Snapshot Date: ${date}] Breakdown:`, { ...latestAppValues, Total: dayTotal });
-        });
+      function getCleanAppKey(source) {
+        if (!source) return null;
+        const s = source.trim().toLowerCase();
+        if (s === 'gpf' || s === 'กบข' || s === 'กบข.') return 'gpf';
+        if (s === 'mfc') return 'mfc';
+        if (s === 'scb') return 'scb';
+        if (s === 'dime' || s === 'dime!') return 'dime';
+        return null;
       }
-    } catch (err) {
-      console.warn('Snapshot fetch error:', err);
-    }
-  }
 
-  if (labels.length === 0) {
-    labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ปัจจุบัน'];
-    const currentTotal = (typeof overallTotalWealth !== 'undefined' && overallTotalWealth > 0) ? overallTotalWealth : 2797074.37;
-    values = [
-      currentTotal * 0.85, currentTotal * 0.88, currentTotal * 0.90,
-      currentTotal * 0.92, currentTotal * 0.94, currentTotal * 0.95,
-      currentTotal * 0.97, currentTotal * 0.99, currentTotal
-    ];
-  }
+      if (typeof supabaseClient !== 'undefined') {
+        try {
+          const { data, error } = await supabaseClient
+            .from('portfolio_snapshots')
+            .select('snapshot_date, app_source, total_value_thb')
+            .order('snapshot_date', { ascending: true });
 
-  if (window.trendChartInstance) {
-    window.trendChartInstance.destroy();
-  }
+          if (!error && data && data.length > 0) {
+            const dates = [...new Set(data.map(d => d.snapshot_date))].sort();
+            const latestAppValues = { gpf: 0, mfc: 0, scb: 0, dime: 0 };
 
-  window.trendChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'มูลค่าพอร์ตรวม (บาท)',
-        data: values,
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        fill: true,
-        tension: 0.3
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (context) => ` มูลค่าพอร์ตรวม: ฿${context.parsed.y.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+            dates.forEach(date => {
+              const daySnapshots = data.filter(d => d.snapshot_date === date);
+              
+              daySnapshots.forEach(s => {
+                const cleanKey = getCleanAppKey(s.app_source);
+                if (cleanKey) {
+                  latestAppValues[cleanKey] = Number(s.total_value_thb) || 0;
+                }
+              });
+
+              const dayTotal = Object.values(latestAppValues).reduce((sum, val) => sum + val, 0);
+              labels.push(date);
+              values.push(dayTotal);
+
+              console.log(`[Snapshot Date: ${date}] Breakdown:`, { ...latestAppValues, Total: dayTotal });
+            });
+          }
+        } catch (err) {
+          console.warn('Snapshot fetch error:', err);
+        }
+      }
+
+      if (labels.length === 0) {
+        labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ปัจจุบัน'];
+        const currentTotal = (typeof overallTotalWealth !== 'undefined' && overallTotalWealth > 0) ? overallTotalWealth : 2797074.37;
+        values = [
+          currentTotal * 0.85, currentTotal * 0.88, currentTotal * 0.90,
+          currentTotal * 0.92, currentTotal * 0.94, currentTotal * 0.95,
+          currentTotal * 0.97, currentTotal * 0.99, currentTotal
+        ];
+      }
+
+      if (window.trendChartInstance) {
+        window.trendChartInstance.destroy();
+      }
+
+      window.trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'มูลค่าพอร์ตรวม (บาท)',
+            data: values,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => ` มูลค่าพอร์ตรวม: ฿${context.parsed.y.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+            y: { 
+              ticks: { 
+                color: '#94a3b8',
+                callback: (val) => `฿${(val / 1000000).toFixed(2)}M`
+              }, 
+              grid: { color: 'rgba(51, 65, 85, 0.4)' } 
+            }
           }
         }
-      },
-      scales: {
-        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
-        y: { 
-          ticks: { 
-            color: '#94a3b8',
-            callback: (val) => `฿${(val / 1000000).toFixed(2)}M`
-          }, 
-          grid: { color: 'rgba(51, 65, 85, 0.4)' } 
-        }
-      }
+      });
     }
-  });
-}
-	// วางต่อท้าย renderTrendChart()
-async function checkAndSaveDailySnapshot(totalValue) {
-  return; // 👈 ใส่บรรทัดนี้เพื่อระงับการทำงาน และคงโครงสร้างฟังก์ชันไว้
 
-    const today = new Date().toISOString().split('T')[0];
-
-    try {
-        const { data, error } = await supabaseClient
-            .from('portfolio_snapshots')
-            .select('id')
-            .eq('snapshot_date', today);
-
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-            await supabaseClient
-                .from('portfolio_snapshots')
-                .insert([{ snapshot_date: today, total_value_thb: totalValue }]);
-        } else {
-            await supabaseClient
-                .from('portfolio_snapshots')
-                .update({ total_value_thb: totalValue })
-                .eq('snapshot_date', today);
-        }
-    } catch (err) {
-        console.error('Error saving snapshot:', err);
+    async function checkAndSaveDailySnapshot(totalValue) {
+      return;
     }
-}
+
     function showToast(message, type = 'info') {
       const container = document.getElementById('toast-container');
       if (!container) return;
@@ -1822,309 +1755,284 @@ async function checkAndSaveDailySnapshot(totalValue) {
       });
     }
 	
-async function scanScbCard(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+    async function scanScbCard(event) {
+      const file = event.target.files[0];
+      if (!file) return;
 
-  const label = event.target.closest('label');
-  const originalText = label ? label.innerHTML : '';
+      const label = event.target.closest('label');
 
-  // 📍 1. ตรวจสอบและดึง GEMINI_API_KEY จาก localStorage ภายในฟังก์ชันนี้เท่านั้น
-  let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || '';
+      let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || '';
 
-  if (!GEMINI_API_KEY) {
-    GEMINI_API_KEY = prompt('กรุณากรอก Gemini API Key ก่อนใช้งาน:');
-    if (GEMINI_API_KEY && GEMINI_API_KEY.trim()) {
-      GEMINI_API_KEY = GEMINI_API_KEY.trim();
-      localStorage.setItem('GEMINI_API_KEY', GEMINI_API_KEY);
-    } else {
-      showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
-      event.target.value = '';
-      return; // ปลอดภัยเพราะอยู่ในฟังก์ชันแล้ว
-    }
-  }
-
-  // 📍 2. ทำงานประมวลผลต่อตามปกติ...
-  try {
-    if (label) {
-      label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกน SCB...`;
-      label.style.pointerEvents = 'none';
-    }
-    const base64Image = await fileToBase64(file);
-    const base64Data = base64Image.split(',')[1];
-
-    // กำหนดชื่อโมเดลเป็นรุ่นที่ระบบ Google รองรับ
-    const MODEL_NAME = 'gemini-3.6-flash'; 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
-    
-    const prompt = `วิเคราะห์ภาพหน้าจอพอร์ตการลงทุนนี้ ค้นหาข้อมูลกองทุนทั้งหมดที่ปรากฏในภาพ 
-    และคืนค่ากลับมาเป็นรูปแบบ JSON Array เท่านั้น โครงสร้าง:
-    [{"asset_code": "SCBAXJ(E)", "avg_nav": 15.1046, "units": 1746.4907}] 
-    ห้ามมีข้อความอื่นหรือแท็ก json ติดมาเด็ดขาด`;
-
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: file.type, data: base64Data } }
-          ]
-        }]
-      })
-    });
-
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
-    }
-
-    let textOutput = result.candidates[0].content.parts[0].text.trim();
-    textOutput = textOutput.replace(/```json|```/g, '').trim();
-    const extractedFunds = JSON.parse(textOutput);
-
-    // เขียนทับค่า avg_nav และ units ใน Supabase
-    for (const fund of extractedFunds) {
-      const { error } = await supabaseClient
-        .from('user_portfolios')
-        .update({
-          avg_nav: fund.avg_nav,
-          units: fund.units
-        })
-        .eq('asset_code', fund.asset_code);
-
-      if (error) console.error("Update Error:", error);
-    }
-
-    alert("✅ สแกนและอัปเดตข้อมูลกองทุน SCB เรียบร้อยแล้ว!");
-    
-    if (typeof loadPortfolioData === 'function') {
-      loadPortfolioData();
-    } else {
-      location.reload();
-    }
-
-  } catch (err) {
-    console.error("Scan Error:", err);
-    alert("❌ เกิดข้อผิดพลาด: " + err.message);
-  } finally {
-    event.target.value = '';
-  }
-}
-async function scanDimePdfCard(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  // 🟢 ดึง API Key จาก localStorage หรือ Global variable
-  const apiKey = localStorage.getItem('GEMINI_API_KEY') || (typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : '');
-
-  if (!apiKey) {
-    alert("🔑 กรุณาตั้งค่า Gemini API Key ก่อนใช้งาน (กดปุ่ม 🔑 Key ที่มุมขวาของการ์ด Dime)");
-    event.target.value = '';
-    return;
-  }
-
-  alert("🔍 AI กำลังอ่านข้อมูลเอกสาร PDF DIME กรุณารอสักครู่...");
-
-  try {
-    const base64Pdf = await fileToBase64(file);
-    const base64Data = base64Pdf.split(',')[1];
-
-    const MODEL_NAME = 'gemini-3.6-flash';
-    // 🟢 ใช้ตัวแปร apiKey ที่ดึงมาสำเร็จ
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-
-    const prompt = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
-    ค้นหาและดึงรายการซื้อขายทั้งหมด (BUY หรือ SELL) ออกมาเป็น JSON Array เท่านั้น
-    โครงสร้าง JSON:
-    [
-      {
-        "order_id": "979038",
-        "asset_code": "AMZN",
-        "transaction_type": "BUY",
-        "units": 0.0595177,
-        "unit_price": 251.69
-      }
-    ]
-    เงื่อนไขสำคัญ:
-    1. order_id คือ เลขที่คำสั่ง เช่น 979038, 978689
-    2. asset_code คือ ชื่อย่อหุ้น เช่น AMZN, GOOGL
-    3. หากพบทศนิยมที่ใช้เครื่องหมายจุลภาค เช่น 0,0606622 ให้แปลงเป็นจุด 0.0606622
-    4. คืนค่าเฉพาะ JSON Array ห้ามมีข้อความอื่นเด็ดขาด`;
-
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: 'application/pdf', data: base64Data } }
-          ]
-        }]
-      })
-    });
-
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
-    }
-
-    let textOutput = result.candidates[0].content.parts[0].text.trim();
-    textOutput = textOutput.replace(/```json|```/g, '').trim();
-    const transactions = JSON.parse(textOutput);
-
-    let skippedCount = 0;
-    let successCount = 0;
-
-    for (const tx of transactions) {
-      const { order_id, asset_code, transaction_type, units, unit_price } = tx;
-      if (!asset_code || !units || !unit_price) continue;
-
-      // ตรวจสอบรายการซ้ำในตาราง dime_orders
-      if (order_id) {
-        const { data: existingOrder } = await supabaseClient
-          .from('dime_orders')
-          .select('order_id')
-          .eq('order_id', String(order_id))
-          .maybeSingle();
-
-        if (existingOrder) {
-          console.warn(`⚠️ ข้ามรายการซ้ำ Order ID: ${order_id} (${asset_code})`);
-          skippedCount++;
-          continue;
-        }
-      }
-
-      const numUnits = Number(units);
-      const numPrice = Number(unit_price);
-
-      const { data: portfolioItems } = await supabaseClient
-        .from('user_portfolios')
-        .select('*')
-        .eq('app_source', 'dime')
-        .eq('asset_code', asset_code);
-
-      if (!portfolioItems || portfolioItems.length === 0) {
-        if (transaction_type === 'BUY') {
-          const totalCost = Number((numUnits * numPrice).toFixed(4));
-          await supabaseClient.from('user_portfolios').insert({
-            app_source: 'dime',
-            asset_code: asset_code,
-            asset_name: asset_code,
-            units: Number(numUnits.toFixed(7)),
-            avg_nav: Number(numPrice.toFixed(4)),
-            total_cost: totalCost,
-            current_nav: Number(numPrice.toFixed(4)),
-            prev_nav: Number(numPrice.toFixed(4)),
-            current_value: totalCost
-          });
-        }
-      } else {
-        const item = portfolioItems[0];
-        const oldUnits = Number(item.units || 0);
-        const oldAvgNav = Number(item.avg_nav || 0);
-        const currentNav = Number(item.current_nav || numPrice);
-
-        let updatedUnits = 0;
-        let updatedAvgNav = 0;
-
-        if (transaction_type === 'BUY') {
-          updatedUnits = oldUnits + numUnits;
-          const updatedTotalCost = (oldUnits * oldAvgNav) + (numUnits * numPrice);
-          updatedAvgNav = updatedUnits > 0 ? (updatedTotalCost / updatedUnits) : 0;
+      if (!GEMINI_API_KEY) {
+        GEMINI_API_KEY = prompt('กรุณากรอก Gemini API Key ก่อนใช้งาน:');
+        if (GEMINI_API_KEY && GEMINI_API_KEY.trim()) {
+          GEMINI_API_KEY = GEMINI_API_KEY.trim();
+          localStorage.setItem('GEMINI_API_KEY', GEMINI_API_KEY);
         } else {
-          updatedUnits = Math.max(0, oldUnits - numUnits);
-          updatedAvgNav = oldAvgNav;
+          showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
+          event.target.value = '';
+          return;
+        }
+      }
+
+      try {
+        if (label) {
+          label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกน SCB...`;
+          label.style.pointerEvents = 'none';
+        }
+        const base64Image = await fileToBase64(file);
+        const base64Data = base64Image.split(',')[1];
+
+        const MODEL_NAME = 'gemini-2.5-flash'; 
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
+        
+        const prompt = `วิเคราะห์ภาพหน้าจอพอร์ตการลงทุนนี้ ค้นหาข้อมูลกองทุนทั้งหมดที่ปรากฏในภาพ 
+        และคืนค่ากลับมาเป็นรูปแบบ JSON Array เท่านั้น โครงสร้าง:
+        [{"asset_code": "SCBAXJ(E)", "avg_nav": 15.1046, "units": 1746.4907}] 
+        ห้ามมีข้อความอื่นหรือแท็ก json ติดมาเด็ดขาด`;
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: file.type, data: base64Data } }
+              ]
+            }]
+          })
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
         }
 
-        updatedUnits = Number(updatedUnits.toFixed(7));
-        updatedAvgNav = Number(updatedAvgNav.toFixed(4));
-        const updatedTotalCost = Number((updatedUnits * updatedAvgNav).toFixed(4));
-        const updatedCurrentValue = Number((updatedUnits * currentNav).toFixed(4));
+        let textOutput = result.candidates[0].content.parts[0].text.trim();
+        textOutput = textOutput.replace(/```json|```/g, '').trim();
+        const extractedFunds = JSON.parse(textOutput);
 
-        await supabaseClient.from('user_portfolios').update({
-          units: updatedUnits,
-          avg_nav: updatedAvgNav,
-          total_cost: updatedTotalCost,
-          current_value: updatedCurrentValue
-        }).eq('id', item.id);
+        for (const fund of extractedFunds) {
+          const { error } = await supabaseClient
+            .from('user_portfolios')
+            .update({
+              avg_nav: fund.avg_nav,
+              units: fund.units
+            })
+            .eq('asset_code', fund.asset_code);
+
+          if (error) console.error("Update Error:", error);
+        }
+
+        alert("✅ สแกนและอัปเดตข้อมูลกองทุน SCB เรียบร้อยแล้ว!");
+        
+        if (typeof loadPortfolioData === 'function') {
+          loadPortfolioData();
+        } else {
+          location.reload();
+        }
+
+      } catch (err) {
+        console.error("Scan Error:", err);
+        alert("❌ เกิดข้อผิดพลาด: " + err.message);
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    async function scanDimePdfCard(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const apiKey = localStorage.getItem('GEMINI_API_KEY') || (typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : '');
+
+      if (!apiKey) {
+        alert("🔑 กรุณาตั้งค่า Gemini API Key ก่อนใช้งาน (กดปุ่ม 🔑 Key ที่มุมขวาของการ์ด Dime)");
+        event.target.value = '';
+        return;
       }
 
-      // บันทึก Order ID ลงตารางป้องกันซ้ำ
-      if (order_id) {
-        await supabaseClient.from('dime_orders').insert({
-          order_id: String(order_id),
-          asset_code: asset_code,
-          units: numUnits
+      alert("🔍 AI กำลังอ่านข้อมูลเอกสาร PDF DIME กรุณารอสักครู่...");
+
+      try {
+        const base64Pdf = await fileToBase64(file);
+        const base64Data = base64Pdf.split(',')[1];
+
+        const MODEL_NAME = 'gemini-2.5-flash';
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+
+        const prompt = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
+        ค้นหาและดึงรายการซื้อขายทั้งหมด (BUY หรือ SELL) ออกมาเป็น JSON Array เท่านั้น
+        โครงสร้าง JSON:
+        [
+          {
+            "order_id": "979038",
+            "asset_code": "AMZN",
+            "transaction_type": "BUY",
+            "units": 0.0595177,
+            "unit_price": 251.69
+          }
+        ]
+        เงื่อนไขสำคัญ:
+        1. order_id คือ เลขที่คำสั่ง เช่น 979038, 978689
+        2. asset_code คือ ชื่อย่อหุ้น เช่น AMZN, GOOGL
+        3. หากพบทศนิยมที่ใช้เครื่องหมายจุลภาค เช่น 0,0606622 ให้แปลงเป็นจุด 0.0606622
+        4. คืนค่าเฉพาะ JSON Array ห้ามมีข้อความอื่นเด็ดขาด`;
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: 'application/pdf', data: base64Data } }
+              ]
+            }]
+          })
         });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
+        }
+
+        let textOutput = result.candidates[0].content.parts[0].text.trim();
+        textOutput = textOutput.replace(/```json|```/g, '').trim();
+        const transactions = JSON.parse(textOutput);
+
+        let skippedCount = 0;
+        let successCount = 0;
+
+        for (const tx of transactions) {
+          const { order_id, asset_code, transaction_type, units, unit_price } = tx;
+          if (!asset_code || !units || !unit_price) continue;
+
+          if (order_id) {
+            const { data: existingOrder } = await supabaseClient
+              .from('dime_orders')
+              .select('order_id')
+              .eq('order_id', String(order_id))
+              .maybeSingle();
+
+            if (existingOrder) {
+              console.warn(`⚠️ ข้ามรายการซ้ำ Order ID: ${order_id} (${asset_code})`);
+              skippedCount++;
+              continue;
+            }
+          }
+
+          const numUnits = Number(units);
+          const numPrice = Number(unit_price);
+
+          const { data: portfolioItems } = await supabaseClient
+            .from('user_portfolios')
+            .select('*')
+            .eq('app_source', 'dime')
+            .eq('asset_code', asset_code);
+
+          if (!portfolioItems || portfolioItems.length === 0) {
+            if (transaction_type === 'BUY') {
+              const totalCost = Number((numUnits * numPrice).toFixed(4));
+              await supabaseClient.from('user_portfolios').insert({
+                app_source: 'dime',
+                asset_code: asset_code,
+                asset_name: asset_code,
+                units: Number(numUnits.toFixed(7)),
+                avg_nav: Number(numPrice.toFixed(4)),
+                total_cost: totalCost,
+                current_nav: Number(numPrice.toFixed(4)),
+                prev_nav: Number(numPrice.toFixed(4)),
+                current_value: totalCost
+              });
+            }
+          } else {
+            const item = portfolioItems[0];
+            const oldUnits = Number(item.units || 0);
+            const oldAvgNav = Number(item.avg_nav || 0);
+            const currentNav = Number(item.current_nav || numPrice);
+
+            let updatedUnits = 0;
+            let updatedAvgNav = 0;
+
+            if (transaction_type === 'BUY') {
+              updatedUnits = oldUnits + numUnits;
+              const updatedTotalCost = (oldUnits * oldAvgNav) + (numUnits * numPrice);
+              updatedAvgNav = updatedUnits > 0 ? (updatedTotalCost / updatedUnits) : 0;
+            } else {
+              updatedUnits = Math.max(0, oldUnits - numUnits);
+              updatedAvgNav = oldAvgNav;
+            }
+
+            updatedUnits = Number(updatedUnits.toFixed(7));
+            updatedAvgNav = Number(updatedAvgNav.toFixed(4));
+            const updatedTotalCost = Number((updatedUnits * updatedAvgNav).toFixed(4));
+            const updatedCurrentValue = Number((updatedUnits * currentNav).toFixed(4));
+
+            await supabaseClient.from('user_portfolios').update({
+              units: updatedUnits,
+              avg_nav: updatedAvgNav,
+              total_cost: updatedTotalCost,
+              current_value: updatedCurrentValue
+            }).eq('id', item.id);
+          }
+
+          if (order_id) {
+            await supabaseClient.from('dime_orders').insert({
+              order_id: String(order_id),
+              asset_code: asset_code,
+              units: numUnits
+            });
+          }
+
+          successCount++;
+        }
+
+        if (skippedCount > 0 && successCount === 0) {
+          alert("⚠️ เอกสาร PDF นี้เคยสแกนเข้าระบบไปแล้ว (พบ Order ID ซ้ำทั้งหมด)");
+        } else {
+          alert(`✅ สแกนสำเร็จ ${successCount} รายการ ${skippedCount > 0 ? `(ข้ามรายการซ้ำ ${skippedCount} รายการ)` : ''}`);
+        }
+
+        if (typeof loadPortfolioData === 'function') {
+          loadPortfolioData();
+        } else {
+          location.reload();
+        }
+
+      } catch (err) {
+        console.error("Dime PDF Scan Error:", err);
+        alert("❌ เกิดข้อผิดพลาดในการอ่าน PDF: " + err.message);
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    function handleSnapshotScan(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+
+      console.log(`เลือกรูปภาพทั้งหมด ${files.length} รูป`);
+      const formData = new FormData();
+      
+      for (let i = 0; i < files.length; i++) {
+        console.log(`- ไฟล์ที่ ${i + 1}: ${files[i].name}`);
+        formData.append("files", files[i]);
       }
 
-      successCount++;
+      event.target.value = "";
     }
 
-    if (skippedCount > 0 && successCount === 0) {
-      alert("⚠️ เอกสาร PDF นี้เคยสแกนเข้าระบบไปแล้ว (พบ Order ID ซ้ำทั้งหมด)");
-    } else {
-      alert(`✅ สแกนสำเร็จ ${successCount} รายการ ${skippedCount > 0 ? `(ข้ามรายการซ้ำ ${skippedCount} รายการ)` : ''}`);
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+      });
     }
-
-    if (typeof loadPortfolioData === 'function') {
-      loadPortfolioData();
-    } else {
-      location.reload();
-    }
-
-  } catch (err) {
-    console.error("Dime PDF Scan Error:", err);
-    alert("❌ เกิดข้อผิดพลาดในการอ่าน PDF: " + err.message);
-  } finally {
-    event.target.value = '';
-  }
-}
-
-function handleSnapshotScan(event) {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
-
-  console.log(`เลือกรูปภาพทั้งหมด ${files.length} รูป`);
-
-  const formData = new FormData();
-  
-  // วนลูปเก็บรูปภาพทุกใบใส่ FormData เพื่อส่งไปให้ Backend/Python ประมวลผลพร้อมกัน
-  for (let i = 0; i < files.length; i++) {
-    console.log(`- ไฟล์ที่ ${i + 1}: ${files[i].name}`);
-    formData.append("files", files[i]); // ส่งเป็น Array ของไฟล์ไปที่ Backend
-  }
-
-  /* 
-  // ตัวอย่างการยิง API ไปที่ Server (Python Backend / Edge Function)
-  fetch("/api/scan-snapshot", {
-    method: "POST",
-    body: formData,
-  })
-  .then(res => res.json())
-  .then(data => {
-    alert(`สแกนสำเร็จ ${files.length} รูป! บันทึก Snapshot เรียบร้อย`);
-    location.reload();
-  })
-  .catch(err => console.error("Scan Error:", err));
-  */
-
-  // ล้างค่าเพื่อให้เลือกรูปชุดเดิมซ้ำได้ถ้าต้องการ
-  event.target.value = "";
-}
-// ฟังก์ชันช่วยแปลงรูปเป็น Base64
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-}
   </script>
   
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
