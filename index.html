@@ -124,7 +124,35 @@
       <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
       🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
     </div>
+<!-- ================= Snapshot History Section ================= -->
+<section id="snapshot-history-section" class="mt-8 p-6 bg-slate-800/80 border border-slate-700/60 rounded-2xl shadow-xl">
+  <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+    📊 ประวัติบันทึกพอร์ตการลงทุน (Snapshots History)
+  </h2>
+  
+  <!-- ส่วนแสดงกราฟ -->
+  <div class="max-w-2xl mx-auto my-6">
+    <canvas id="portfolioChart"></canvas>
+  </div>
 
+  <!-- ส่วนตารางข้อมูล -->
+  <!-- โค้ดใหม่ (ล็อกความสูง + หัวตารางค้างไว้) -->
+<div class="overflow-x-auto overflow-y-auto max-h-80 mt-4 rounded-lg border border-slate-700/50">
+  <table class="w-full text-left text-sm text-slate-300 border-collapse">
+    <thead class="bg-slate-900 text-slate-400 uppercase text-xs sticky top-0 z-10 shadow">
+      <tr>
+        <th class="p-3 border-b border-slate-700/80">วันที่</th>
+        <th class="p-3 border-b border-slate-700/80">แอปพลิเคชัน</th>
+        <th class="p-3 border-b border-slate-700/80">มูลค่ารวม (บาท)</th>
+        <th class="p-3 border-b border-slate-700/80">ผลตอบแทน (%)</th>
+      </tr>
+    </thead>
+    <tbody id="snapshot-table-body" class="divide-y divide-slate-700/50">
+      <tr><td colspan="4" class="text-center p-4 text-slate-400">กำลังโหลดข้อมูล...</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
   </div>
 
   <!-- Modal แก้ไขข้อมูลสินทรัพย์ -->
@@ -156,6 +184,7 @@
       </div>
     </div>
   </div>
+
 
   <script>
     const SUPABASE_URL = 'https://iproktvvetsbxxmpptuj.supabase.co';
@@ -198,6 +227,116 @@
       if (appList) appList.innerHTML = loadingTemplate;
       if (container) container.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">${loadingTemplate}${loadingTemplate}</div>`;
     }
+
+// ฟังก์ชันดึงข้อมูล Snapshots มาแสดง
+// 1. กำหนดธีมสีประจำแอปพลิเคชัน
+const SNAPSHOT_APP_THEMES = {
+  gpf:  { bg: '#2563eb', textClass: 'text-blue-400' },    // กบข. (น้ำเงิน)
+  mfc:  { bg: '#f43f5e', textClass: 'text-rose-400' },    // MFC (ชมพู/แดง)
+  scb:  { bg: '#8b5cf6', textClass: 'text-purple-400' },  // SCB (ม่วง)
+  dime: { bg: '#10b981', textClass: 'text-emerald-400' }, // DIME (เขียว)
+  default: { bg: '#64748b', textClass: 'text-slate-400' }
+};
+
+async function renderSnapshotDashboard() {
+  const { data, error } = await supabaseClient
+    .from('portfolio_snapshots')
+    .select('*')
+    .order('snapshot_date', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error("Error fetching snapshots:", error);
+    return;
+  }
+
+  const tableBody = document.getElementById('snapshot-table-body');
+  if (!data || data.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-slate-400">ยังไม่มีข้อมูลบันทึก</td></tr>';
+    return;
+  }
+
+  tableBody.innerHTML = data.map(row => {
+    let returnText = '-';
+    const appKey = (row.app_source || '').trim().toLowerCase();
+    const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default;
+
+    if (appKey === 'gpf') {
+      const parts = [];
+      if (row.reported_5y_pct !== null && row.reported_5y_pct !== undefined) {
+        const c5y = row.reported_5y_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        parts.push(`5 ปีย้อนหลัง: <span class="font-semibold ${c5y}">${row.reported_5y_pct}%</span>`);
+      }
+      if (row.reported_since_inception_pct !== null && row.reported_since_inception_pct !== undefined) {
+        const cIncep = row.reported_since_inception_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        parts.push(`ตั้งแต่เริ่มส่ง: <span class="font-semibold ${cIncep}">${row.reported_since_inception_pct}%</span>`);
+      }
+      returnText = parts.length > 0 ? parts.join(' <span class="text-slate-600 mx-1.5">|</span> ') : '-';
+    } else {
+      const returnPct = row.reported_ytd_pct ?? row.reported_5y_pct ?? row.reported_since_inception_pct;
+      if (returnPct !== null && returnPct !== undefined) {
+        const colorClass = returnPct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        const label = row.reported_ytd_pct !== null ? 'YTD: ' : '';
+        returnText = `${label}<span class="font-semibold ${colorClass}">${returnPct}%</span>`;
+      }
+    }
+
+    return `
+      <tr class="hover:bg-slate-700/30 transition">
+        <td class="p-3 font-mono">${row.snapshot_date}</td>
+        <td class="p-3 font-bold uppercase ${appTheme.textClass}">${row.app_source}</td>
+        <td class="p-3 font-mono">${Number(row.total_value_thb).toLocaleString('th-TH', {minimumFractionDigits: 2})} ฿</td>
+        <td class="p-3 font-mono text-xs md:text-sm">${returnText}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const latestByApp = {};
+  data.forEach(row => {
+    const appKey = (row.app_source || '').trim().toLowerCase();
+    if (!latestByApp[appKey]) {
+      latestByApp[appKey] = row.total_value_thb;
+    }
+  });
+
+  const labels = Object.keys(latestByApp).map(app => app.toUpperCase());
+  const values = Object.values(latestByApp);
+  const barColors = Object.keys(latestByApp).map(appKey => (SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default).bg);
+
+  const ctx = document.getElementById('portfolioChart')?.getContext('2d');
+  if (ctx && typeof Chart !== 'undefined') {
+    if (window.mySnapshotChart) {
+      window.mySnapshotChart.destroy();
+    }
+    window.mySnapshotChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'มูลค่าล่าสุด (บาท)',
+          data: values,
+          backgroundColor: barColors,
+          borderRadius: 6
+        }]
+      },
+options: {
+  indexAxis: 'y', // 👈 เปลี่ยนเป็นแนวนอน
+  responsive: true,
+  plugins: {
+    legend: { display: false },
+    title: { display: true, text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)', color: '#94a3b8' }
+  },
+  scales: {
+    x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51, 65, 85, 0.4)' } },
+    y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+  }
+}
+    });
+  }
+}
+// เรียกทำงานเมื่อโหลดหน้าเว็บเรียบร้อย
+document.addEventListener('DOMContentLoaded', renderSnapshotDashboard);
+
 
     async function loadDashboardData() {
       showSkeletonLoaders();
@@ -1479,120 +1618,113 @@ async function fetchSummary() {
       }
     }
 
-    async function renderTrendChart() {
-    const canvas = document.getElementById('trendChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+async function renderTrendChart() {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
 
-    let labels = [];
-    let values = [];
+  let labels = [];
+  let values = [];
 
-    // 1. ลองดึงข้อมูลประวัติจาก Supabase
-    if (typeof supabaseClient !== 'undefined') {
-        try {
-            const { data, error } = await supabaseClient
-                .from('portfolio_snapshots')
-                .select('snapshot_date, total_value_thb')
-                .order('snapshot_date', { ascending: true });
+  function getCleanAppKey(source) {
+    if (!source) return null;
+    const s = source.trim().toLowerCase();
+    if (s === 'gpf' || s === 'กบข' || s === 'กบข.') return 'gpf';
+    if (s === 'mfc') return 'mfc';
+    if (s === 'scb') return 'scb';
+    if (s === 'dime' || s === 'dime!') return 'dime';
+    return null;
+  }
 
-            if (!error && data && data.length > 0) {
-                const groupedData = {};
-                data.forEach(row => {
-                    const date = row.snapshot_date;
-                    groupedData[date] = (groupedData[date] || 0) + Number(row.total_value_thb);
-                });
-                labels = Object.keys(groupedData);
-                values = Object.values(groupedData);
+  if (typeof supabaseClient !== 'undefined') {
+    try {
+      const { data, error } = await supabaseClient
+        .from('portfolio_snapshots')
+        .select('snapshot_date, app_source, total_value_thb')
+        .order('snapshot_date', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const dates = [...new Set(data.map(d => d.snapshot_date))].sort();
+        const latestAppValues = { gpf: 0, mfc: 0, scb: 0, dime: 0 };
+
+        dates.forEach(date => {
+          const daySnapshots = data.filter(d => d.snapshot_date === date);
+          
+          // เก็บเฉพาะค่ายอดเงินล่าสุดของแต่ละแอปในวันนั้นๆ
+          daySnapshots.forEach(s => {
+            const cleanKey = getCleanAppKey(s.app_source);
+            if (cleanKey) {
+              latestAppValues[cleanKey] = Number(s.total_value_thb) || 0;
             }
-        } catch (err) {
-            console.warn('Snapshot fetch error:', err);
+          });
+
+          // รวมยอดเฉพาะ 4 แอปหลัก
+          const dayTotal = Object.values(latestAppValues).reduce((sum, val) => sum + val, 0);
+          labels.push(date);
+          values.push(dayTotal);
+
+          console.log(`[Snapshot Date: ${date}] Breakdown:`, { ...latestAppValues, Total: dayTotal });
+        });
+      }
+    } catch (err) {
+      console.warn('Snapshot fetch error:', err);
+    }
+  }
+
+  if (labels.length === 0) {
+    labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ปัจจุบัน'];
+    const currentTotal = (typeof overallTotalWealth !== 'undefined' && overallTotalWealth > 0) ? overallTotalWealth : 2797074.37;
+    values = [
+      currentTotal * 0.85, currentTotal * 0.88, currentTotal * 0.90,
+      currentTotal * 0.92, currentTotal * 0.94, currentTotal * 0.95,
+      currentTotal * 0.97, currentTotal * 0.99, currentTotal
+    ];
+  }
+
+  if (window.trendChartInstance) {
+    window.trendChartInstance.destroy();
+  }
+
+  window.trendChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'มูลค่าพอร์ตรวม (บาท)',
+        data: values,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => ` มูลค่าพอร์ตรวม: ฿${context.parsed.y.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+          }
         }
-    }
-
-    // 2. หากยังไม่มีข้อมูลประวัติย้อนหลัง ให้ใช้ข้อมูลสำรองสร้างกราฟชั่วคราว
-    if (labels.length === 0) {
-        labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ปัจจุบัน'];
-        const currentTotal = (typeof overallTotalWealth !== 'undefined' && overallTotalWealth > 0) ? overallTotalWealth : 2797074.37;
-        values = [
-            currentTotal * 0.85,
-            currentTotal * 0.88,
-            currentTotal * 0.90,
-            currentTotal * 0.92,
-            currentTotal * 0.94,
-            currentTotal * 0.95,
-            currentTotal * 0.97,
-            currentTotal * 0.99,
-            currentTotal
-        ];
-    }
-
-    // 3. เคลียร์ Instance กราฟเดิม
-    if (window.trendChartInstance) {
-        window.trendChartInstance.destroy();
-    }
-
-    // 4. สร้างสี Gradient ฟุ้งใต้เส้น
-    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.35)');
-    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
-
-    // 5. วาด Chart
-    window.trendChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'มูลค่าพอร์ตรวม (THB)',
-                data: values,
-                borderColor: '#38BDF8',
-                borderWidth: 3,
-                backgroundColor: gradient,
-                fill: true,
-                tension: 0.35,
-                pointBackgroundColor: '#00FF66',
-                pointBorderColor: '#1e293b',
-                pointBorderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#0f172a',
-                    titleColor: '#94a3b8',
-                    bodyColor: '#ffffff',
-                    borderColor: '#334155',
-                    borderWidth: 1,
-                    displayColors: false,
-                    callbacks: {
-                        label: (context) => ` ฿${context.parsed.y.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#94a3b8', font: { family: 'Prompt, sans-serif', size: 11 } }
-                },
-                y: {
-                    grid: { color: 'rgba(51, 65, 85, 0.4)' },
-                    ticks: {
-                        color: '#94a3b8',
-                        font: { family: 'Prompt, sans-serif', size: 10 },
-                        callback: (val) => `฿${(val / 1000000).toFixed(1)}M`
-                    }
-                }
-            }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+        y: { 
+          ticks: { 
+            color: '#94a3b8',
+            callback: (val) => `฿${(val / 1000000).toFixed(2)}M`
+          }, 
+          grid: { color: 'rgba(51, 65, 85, 0.4)' } 
         }
-    });
+      }
+    }
+  });
 }
 	// วางต่อท้าย renderTrendChart()
 async function checkAndSaveDailySnapshot(totalValue) {
-    if (typeof supabaseClient === 'undefined' || !totalValue || totalValue <= 0) return;
+  return; // 👈 ใส่บรรทัดนี้เพื่อระงับการทำงาน และคงโครงสร้างฟังก์ชันไว้
 
     const today = new Date().toISOString().split('T')[0];
 
