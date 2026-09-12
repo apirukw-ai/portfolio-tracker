@@ -384,13 +384,22 @@ async function renderSnapshotDashboard() {
             },
             grid: { color: 'rgba(51, 65, 85, 0.3)' }
           },
-          y: {
-            ticks: { 
-              color: '#ffffff',
-              font: { family: 'Prompt', weight: 'bold' }
-            },
-            grid: { display: false }
-          }
+            y: {
+                ticks: {
+                    color: function(context) {
+                        const label = context.chart.data.labels[context.index];
+                        const colorMap = {
+                            'GPF': '#38BDF8',
+                            'DIME': '#00FF66',
+                            'MFC': '#FF9800',
+                            'SCB': '#C084FC'
+                        };
+                        return colorMap[label] || '#FFFFFF';
+                    },
+                    font: { size: 13, family: 'Prompt', weight: 'bold' }
+                },
+                grid: { display: false }
+            }
         }
       }
     });
