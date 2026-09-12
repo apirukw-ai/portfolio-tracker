@@ -125,7 +125,7 @@ def fetch_and_update():
 
         print(f"📦 พบรายการสินทรัพย์ทั้งหมดใน DB {len(portfolio_items)} รายการ")
 
-        # --- อัปเดต current_nav และ prev_nav รายตัว ---
+        # --- อัปเดต current_nav และ prev_nav เฉพาะ GPF และ Dime ---
         for item in portfolio_items:
             item_id = item["id"]
             app = item.get("app_source", "").lower()
@@ -166,23 +166,29 @@ def fetch_and_update():
             p_nav = update_payload.get("prev_nav", "-")
             print(f" ✅ อัปเดตสำเร็จ {code}: NAV={c_nav}, PrevNAV={p_nav}")
 
-        # --- ดึงข้อมูลล่าสุดหลังอัปเดตเพื่อบันทึก Snapshot รายวัน ---
+        # --- ดึงข้อมูลล่าสุดหลังอัปเดตเพื่อบันทึก Snapshot รายวัน (รวมทุกแอป) ---
         updated_db = supabase.table("user_portfolios").select("*").execute()
         latest_items = updated_db.data or []
 
-        for app in ["gpf", "dime"]:
-            app_items = [i for i in latest_items if i.get("app_source", "").lower() == app]
+        # ครอบคลุมทั้ง GPF, DIME, SCB, MFC และแปลงชื่อเป็นตัวพิมพ์ใหญ่เพื่อความสอดคล้อง
+        all_apps = ["GPF", "DIME", "SCB", "MFC"]
+
+        for app in all_apps:
+            app_items = [i for i in latest_items if i.get("app_source", "").upper() == app]
             
-            if app == "gpf":
+            if app == "GPF":
                 total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
-            elif app == "dime":
+            elif app == "DIME":
                 total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
                 total_thb = total_usd * usd_rate  # แปลง USD เป็น THB
+            else:
+                # สำหรับ SCB และ MFC ใช้ค่าน้ำหนัก THB ล่าสุดที่มีอยู่ในฐานข้อมูล
+                total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
 
             if total_thb > 0:
                 save_daily_snapshot(supabase, app, total_thb)
 
-        print(f"✅ อัปเดต NAV และ Snapshot (GPF & Dime) เสร็จสิ้นเมื่อ: {now_thai}")
+        print(f"✅ อัปเดต NAV และ Snapshot ทั้งหมดเสร็จสิ้นเมื่อ: {now_thai}")
 
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -199,14 +205,14 @@ def save_daily_snapshot(supabase_client, app_source, total_thb):
 
         data = {
             "snapshot_date": today_str,
-            "app_source": app_source,
+            "app_source": app_source.upper(),  # บันทึกเป็นตัวพิมพ์ใหญ่เสมอ (GPF, DIME, SCB, MFC)
             "total_value_thb": float(total_thb),
         }
 
         supabase_client.table("portfolio_snapshots").upsert(
             data, on_conflict="snapshot_date,app_source"
         ).execute()
-        print(f"✅ Saved snapshot for {app_source}: ฿{total_thb:,.2f}")
+        print(f"✅ Saved snapshot for {app_source.upper()}: ฿{total_thb:,.2f}")
     except Exception as e:
         print(f"⚠️ Failed to save snapshot for {app_source}: {e}")
 
