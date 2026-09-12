@@ -126,14 +126,41 @@
     </div>
 <!-- ================= Snapshot History Section ================= -->
 <section id="snapshot-history-section" class="mt-8 p-6 bg-slate-800/90 border border-sky-500/20 rounded-2xl shadow-[0_0_25px_rgba(56,189,248,0.04)]">
-  <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+  <!-- แทนที่เฉพาะส่วนหัวข้อด้วย <div> นี้ -->
+<div class="flex items-center justify-between mb-4">
+  <h2 class="text-lg font-bold text-white flex items-center gap-2">
     📊 ประวัติบันทึกพอร์ตการลงทุน (Snapshots History)
   </h2>
-  
-  <!-- ส่วนแสดงกราฟ -->
-  <div class="max-w-4xl mx-auto my-6">
-    <canvas id="portfolioChart"></canvas>
-  </div>
+
+  <!-- ปุ่มสแกนรูปภาพ -->
+  <button 
+    type="button"
+    onclick="document.getElementById('file-input-snapshot').click()"
+    class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+  >
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+    <span>สแกนรูปภาพ</span>
+  </button>
+
+  <!-- Hidden File Input -->
+<!-- เพิ่ม attribute "multiple" ตรงนี้ -->
+<input 
+  type="file" 
+  id="file-input-snapshot" 
+  accept="image/*" 
+  multiple 
+  class="hidden" 
+  onchange="handleSnapshotScan(event)"
+/>
+</div>
+
+<!-- ส่วนแสดงกราฟ (คงไว้เหมือนเดิม ห้ามลบ) -->
+<div class="max-w-4xl mx-auto my-6">
+  <canvas id="portfolioChart"></canvas>
+</div>
 
   <!-- ส่วนตารางข้อมูล -->
   <!-- โค้ดใหม่ (ล็อกความสูง + หัวตารางค้างไว้) -->
@@ -2056,6 +2083,38 @@ async function scanDimePdfCard(event) {
   } finally {
     event.target.value = '';
   }
+}
+
+function handleSnapshotScan(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  console.log(`เลือกรูปภาพทั้งหมด ${files.length} รูป`);
+
+  const formData = new FormData();
+  
+  // วนลูปเก็บรูปภาพทุกใบใส่ FormData เพื่อส่งไปให้ Backend/Python ประมวลผลพร้อมกัน
+  for (let i = 0; i < files.length; i++) {
+    console.log(`- ไฟล์ที่ ${i + 1}: ${files[i].name}`);
+    formData.append("files", files[i]); // ส่งเป็น Array ของไฟล์ไปที่ Backend
+  }
+
+  /* 
+  // ตัวอย่างการยิง API ไปที่ Server (Python Backend / Edge Function)
+  fetch("/api/scan-snapshot", {
+    method: "POST",
+    body: formData,
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(`สแกนสำเร็จ ${files.length} รูป! บันทึก Snapshot เรียบร้อย`);
+    location.reload();
+  })
+  .catch(err => console.error("Scan Error:", err));
+  */
+
+  // ล้างค่าเพื่อให้เลือกรูปชุดเดิมซ้ำได้ถ้าต้องการ
+  event.target.value = "";
 }
 // ฟังก์ชันช่วยแปลงรูปเป็น Base64
 function fileToBase64(file) {
