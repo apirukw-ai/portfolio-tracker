@@ -166,27 +166,28 @@ def fetch_and_update():
             p_nav = update_payload.get("prev_nav", "-")
             print(f" ✅ อัปเดตสำเร็จ {code}: NAV={c_nav}, PrevNAV={p_nav}")
 
-        # --- ดึงข้อมูลล่าสุดหลังอัปเดตเพื่อบันทึก Snapshot รายวัน (รวมทุกแอป) ---
-        updated_db = supabase.table("user_portfolios").select("*").execute()
-        latest_items = updated_db.data or []
+# 1. ดึงข้อมูลสินทรัพย์ทั้งหมดจากตาราง user_portfolios
+updated_db = supabase.table("user_portfolios").select("*").execute()
+latest_items = updated_db.data or []
 
-        # ครอบคลุมทั้ง GPF, DIME, SCB, MFC และแปลงชื่อเป็นตัวพิมพ์ใหญ่เพื่อความสอดคล้อง
-        all_apps = ["GPF", "DIME", "SCB", "MFC"]
+all_apps = ["GPF", "DIME", "SCB", "MFC"]
 
-        for app in all_apps:
-            app_items = [i for i in latest_items if i.get("app_source", "").upper() == app]
-            
-            if app == "GPF":
-                total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
-            elif app == "DIME":
-                total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
-                total_thb = total_usd * usd_rate  # แปลง USD เป็น THB
-            else:
-                # สำหรับ SCB และ MFC ใช้ค่าน้ำหนัก THB ล่าสุดที่มีอยู่ในฐานข้อมูล
-                total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
-
-            if total_thb > 0:
-                save_daily_snapshot(supabase, app, total_thb)
+for app in all_apps:
+    # 2. กรองเฉพาะรายการที่เป็นของแอปนั้นๆ
+    app_items = [
+        i for i in latest_items 
+        if str(i.get("app_source", "")).strip().upper() == app
+    ]
+    
+    # 3. คำนวณผลรวมมูลค่า (THB) เฉพาะของแอปนี้เท่านั้น
+    total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+    
+    # หมายเหตุ: กรณี DIME หากมูลค่าใน user_portfolios เก็บเป็น USD ให้คูณ usd_rate 
+    # แต่ถ้าเก็บเป็น THB อยู่แล้ว ให้ใช้ total_thb ได้เลยโดยไม่ต้องคูณ usd_rate ซ้ำ
+    
+    # 4. บันทึก Snapshot แยกเฉพาะยอดของแอปนั้น
+    if total_thb > 0:
+        save_daily_snapshot(supabase, app, total_thb)
 
         print(f"✅ อัปเดต NAV และ Snapshot ทั้งหมดเสร็จสิ้นเมื่อ: {now_thai}")
 
