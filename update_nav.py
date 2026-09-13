@@ -69,7 +69,9 @@ def get_gpf_nav_direct():
             for col_text in cols:
                 match = re.search(r"^\d{1,3}(?:,\d{3})*\.\d{4}$", col_text)
                 if match:
-                    nav_candidates.append(float(match.group(0).replace(",", "")))
+                    nav_candidates.append(
+                        float(match.group(0).replace(",", ""))
+                    )
 
             if not nav_candidates:
                 continue
@@ -139,21 +141,28 @@ def fetch_and_update():
 
             print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
 
-            update_payload = {"nav_date": today_date_str, "updated_at": now_thai}
+            update_payload = {
+                "nav_date": today_date_str,
+                "updated_at": now_thai,
+            }
 
             if app == "gpf":
                 latest_nav = gpf_nav_data.get(code)
                 if latest_nav and latest_nav > 0:
                     update_payload["current_nav"] = round(latest_nav, 4)
-                    update_payload["current_value"] = round(units * latest_nav, 4)
+                    update_payload["current_value"] = round(
+                        units * latest_nav, 4
+                    )
 
             elif app == "dime":
                 latest_nav, latest_prev_nav = get_us_stock_price(code)
-                
+
                 if latest_nav and latest_nav > 0:
                     update_payload["current_nav"] = round(latest_nav, 4)
-                    update_payload["current_value"] = round(units * latest_nav, 4)
-                
+                    update_payload["current_value"] = round(
+                        units * latest_nav, 4
+                    )
+
                 if latest_prev_nav and latest_prev_nav > 0:
                     update_payload["prev_nav"] = round(latest_prev_nav, 4)
 
@@ -166,34 +175,38 @@ def fetch_and_update():
             p_nav = update_payload.get("prev_nav", "-")
             print(f" ✅ อัปเดตสำเร็จ {code}: NAV={c_nav}, PrevNAV={p_nav}")
 
-# 1. ดึงข้อมูลสินทรัพย์ทั้งหมดจากตาราง user_portfolios
-        try:
-            updated_db = supabase.table("user_portfolios").select("*").execute()
-            latest_items = updated_db.data or []
+        # 1. ดึงข้อมูลสินทรัพย์ทั้งหมดจากตาราง user_portfolios
+        updated_db = supabase.table("user_portfolios").select("*").execute()
+        latest_items = updated_db.data or []
 
-            all_apps = ["GPF", "DIME", "SCB", "MFC"]
+        all_apps = ["GPF", "DIME", "SCB", "MFC"]
 
-            for app in all_apps:
-                # กรองเฉพาะรายการของแอปนั้นๆ
-                app_items = [
-                    i for i in latest_items 
-                    if str(i.get("app_source", "")).strip().upper() == app
-                ]
-                
-                # คำนวณมูลค่ารวมเฉพาะของแอปนั้น
-                if app == "DIME":
-                    total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
-                    total_thb = total_usd * usd_rate
-                else:
-                    total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+        for app in all_apps:
+            # กรองเฉพาะรายการของแอปนั้นๆ
+            app_items = [
+                i
+                for i in latest_items
+                if str(i.get("app_source", "")).strip().upper() == app
+            ]
 
-                # บันทึก Snapshot รายแอป
-                if total_thb > 0:
-                    save_daily_snapshot(supabase, app, total_thb)
+            # คำนวณมูลค่ารวมเฉพาะของแอปนั้น
+            if app == "DIME":
+                total_usd = sum(
+                    float(i.get("current_value") or 0) for i in app_items
+                )
+                total_thb = total_usd * usd_rate
+            else:
+                total_thb = sum(
+                    float(i.get("current_value") or 0) for i in app_items
+                )
 
-            print("✅ อัปเดต Snapshot รายวันสำเร็จ")
-        except Exception as e:
-            print(f"❌ Error during snapshot save: {e}")
+            # บันทึก Snapshot รายแอป
+            if total_thb > 0:
+                save_daily_snapshot(supabase, app, total_thb)
+
+        print("✅ อัปเดต Snapshot รายวันสำเร็จ")
+    except Exception as e:
+        print(f"❌ Error during update process: {e}")
 
 
 # ----------------------------------------------------
@@ -209,7 +222,9 @@ def save_daily_snapshot(supabase_client, app_source, total_thb):
         # 1. ค้นหาค่า % ผลตอบแทนล่าสุดของแอปนี้จากประวัติเดิมก่อน
         prev_res = (
             supabase_client.table("portfolio_snapshots")
-            .select("reported_ytd_pct, reported_5y_pct, reported_since_inception_pct")
+            .select(
+                "reported_ytd_pct, reported_5y_pct, reported_since_inception_pct"
+            )
             .ilike("app_source", app_upper)
             .order("snapshot_date", desc=True)
             .limit(1)
@@ -230,14 +245,18 @@ def save_daily_snapshot(supabase_client, app_source, total_thb):
             if last_record.get("reported_5y_pct") is not None:
                 data["reported_5y_pct"] = last_record["reported_5y_pct"]
             if last_record.get("reported_since_inception_pct") is not None:
-                data["reported_since_inception_pct"] = last_record["reported_since_inception_pct"]
+                data["reported_since_inception_pct"] = last_record[
+                    "reported_since_inception_pct"
+                ]
 
         # 3. สั่ง Upsert ข้อมูลรายวัน
         supabase_client.table("portfolio_snapshots").upsert(
             data, on_conflict="snapshot_date,app_source"
         ).execute()
-        
-        print(f"✅ Saved snapshot for {app_upper}: ฿{total_thb:,.2f} (Preserved % metrics)")
+
+        print(
+            f"✅ Saved snapshot for {app_upper}: ฿{total_thb:,.2f} (Preserved % metrics)"
+        )
     except Exception as e:
         print(f"⚠️ Failed to save snapshot for {app_source}: {e}")
 
