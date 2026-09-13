@@ -167,32 +167,33 @@ def fetch_and_update():
             print(f" ✅ อัปเดตสำเร็จ {code}: NAV={c_nav}, PrevNAV={p_nav}")
 
 # 1. ดึงข้อมูลสินทรัพย์ทั้งหมดจากตาราง user_portfolios
-updated_db = supabase.table("user_portfolios").select("*").execute()
-latest_items = updated_db.data or []
+        try:
+            updated_db = supabase.table("user_portfolios").select("*").execute()
+            latest_items = updated_db.data or []
 
-all_apps = ["GPF", "DIME", "SCB", "MFC"]
+            all_apps = ["GPF", "DIME", "SCB", "MFC"]
 
-for app in all_apps:
-    # 2. กรองเฉพาะรายการที่เป็นของแอปนั้นๆ
-    app_items = [
-        i for i in latest_items 
-        if str(i.get("app_source", "")).strip().upper() == app
-    ]
-    
-    # 3. คำนวณผลรวมมูลค่า (THB) เฉพาะของแอปนี้เท่านั้น
-    total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
-    
-    # หมายเหตุ: กรณี DIME หากมูลค่าใน user_portfolios เก็บเป็น USD ให้คูณ usd_rate 
-    # แต่ถ้าเก็บเป็น THB อยู่แล้ว ให้ใช้ total_thb ได้เลยโดยไม่ต้องคูณ usd_rate ซ้ำ
-    
-    # 4. บันทึก Snapshot แยกเฉพาะยอดของแอปนั้น
-    if total_thb > 0:
-        save_daily_snapshot(supabase, app, total_thb)
+            for app in all_apps:
+                # กรองเฉพาะรายการของแอปนั้นๆ
+                app_items = [
+                    i for i in latest_items 
+                    if str(i.get("app_source", "")).strip().upper() == app
+                ]
+                
+                # คำนวณมูลค่ารวมเฉพาะของแอปนั้น
+                if app == "DIME":
+                    total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
+                    total_thb = total_usd * usd_rate
+                else:
+                    total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
 
-        print(f"✅ อัปเดต NAV และ Snapshot ทั้งหมดเสร็จสิ้นเมื่อ: {now_thai}")
+                # บันทึก Snapshot รายแอป
+                if total_thb > 0:
+                    save_daily_snapshot(supabase, app, total_thb)
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
+            print("✅ อัปเดต Snapshot รายวันสำเร็จ")
+        except Exception as e:
+            print(f"❌ Error during snapshot save: {e}")
 
 
 # ----------------------------------------------------
