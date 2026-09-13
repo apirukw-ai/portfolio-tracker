@@ -1792,7 +1792,7 @@ async function renderSnapshotDashboard() {
         const base64Image = await fileToBase64(file);
         const base64Data = base64Image.split(',')[1];
 
-        const MODEL_NAME = 'gemini-2.5-flash'; 
+        const MODEL_NAME = 'gemini-3.6-flash'; 
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
         
         const prompt = `วิเคราะห์ภาพหน้าจอพอร์ตการลงทุนนี้ ค้นหาข้อมูลกองทุนทั้งหมดที่ปรากฏในภาพ 
@@ -1869,7 +1869,7 @@ async function renderSnapshotDashboard() {
         const base64Pdf = await fileToBase64(file);
         const base64Data = base64Pdf.split(',')[1];
 
-        const MODEL_NAME = 'gemini-2.5-flash';
+        const MODEL_NAME = 'gemini-3.6-flash';
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
 
         const prompt = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
