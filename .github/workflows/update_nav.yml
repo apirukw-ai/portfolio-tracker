@@ -1,4 +1,4 @@
-name: Auto Update NAV
+name: Auto Update Portfolio NAV
 
 on:
   schedule:
@@ -7,6 +7,12 @@ on:
     
     # 2. GPF: 10:00 น. เวลาไทย (จ.-ศ.) -> UTC คือ 03:00 น. (จ.-ศ.)
     - cron: '0 3 * * 1-5'
+
+    # 3. MFC: 19:30 น. เวลาไทย (จ.-ศ.) -> UTC คือ 12:30 น. (จ.-ศ.)
+    - cron: '30 12 * * 1-5'
+
+    # 4. SCB + Snapshot ยอดรวม: 20:30 น. เวลาไทย (จ.-ศ.) -> UTC คือ 13:30 น. (จ.-ศ.)
+    - cron: '30 13 * * 1-5'
         
   workflow_dispatch:
 
@@ -27,8 +33,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install supabase requests beautifulsoup4 yfinance
 
-      - name: Run NAV Update Script
+      - name: Run GPF NAV Fetch
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python update_nav.py
+        run: python fetch_gpf_nav.py
+
+      - name: Run Dime US Stock Price Fetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python fetch_dime_nav.py
+
+      - name: Run MFC NAV Fetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python fetch_nav.py
+
+      - name: Run SCB NAV Fetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python fetch_scb_nav.py
+
+      - name: Save Daily Snapshot
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python daily_snapshot.py
