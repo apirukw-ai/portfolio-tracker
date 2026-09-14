@@ -49,7 +49,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python fetch_nav.py
+        run: python fetch_mfc_nav.py
 
       - name: Run SCB NAV Fetch
         env:
