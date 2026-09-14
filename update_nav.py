@@ -136,40 +136,30 @@ def fetch_and_update():
             current_nav = float(item.get("current_nav") or 0)
             units = float(item.get("units") or 0)
 
-            if app not in ["gpf", "dime"]:
-                continue
-
-            print(f"🔄 กำลังประมวลผล [{app.upper()}] {code} - {name}...")
-
+            # 1. กำหนดเวลาอัปเดตปัจจุบันให้ทุกแอป (รวม SCB และ MFC)
             update_payload = {
-                "nav_date": today_date_str,
-                "updated_at": now_thai,
+                "updated_at": now_thai
             }
 
+            # 2. คำนวณ NAV ใหม่เฉพาะแอปที่มีระบบดึงราคาอัตโนมัติ
             if app == "gpf":
                 latest_nav = gpf_nav_data.get(code)
                 if latest_nav and latest_nav > 0:
                     update_payload["current_nav"] = round(latest_nav, 4)
-                    update_payload["current_value"] = round(
-                        units * latest_nav, 4
-                    )
+                    update_payload["current_value"] = round(units * latest_nav, 4)
+                    update_payload["nav_date"] = today_date_str
 
             elif app == "dime":
                 latest_nav, latest_prev_nav = get_us_stock_price(code)
-
                 if latest_nav and latest_nav > 0:
                     update_payload["current_nav"] = round(latest_nav, 4)
-                    update_payload["current_value"] = round(
-                        units * latest_nav, 4
-                    )
-
+                    update_payload["current_value"] = round(units * latest_nav * usd_rate, 4)
+                    update_payload["nav_date"] = today_date_str
                 if latest_prev_nav and latest_prev_nav > 0:
                     update_payload["prev_nav"] = round(latest_prev_nav, 4)
 
-            # อัปเดตลง Supabase
-            supabase.table("user_portfolios").update(update_payload).eq(
-                "id", item_id
-            ).execute()
+            # 3. อัปเดตข้อมูลลง Supabase (อัปเดตเวลาให้ทุกรายการแน่นอน)
+            supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
 
             c_nav = update_payload.get("current_nav", current_nav)
             p_nav = update_payload.get("prev_nav", "-")
