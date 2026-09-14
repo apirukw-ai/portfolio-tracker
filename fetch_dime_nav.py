@@ -25,20 +25,19 @@ def get_usd_thb_rate():
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        
-        # 1. ใช้ fast_info (ดึงข้อมูลได้เร็วและแม่นยำที่สุด ไม่ต้องโหลดตารางประวัติ)
-        current_price = ticker.fast_info.last_price
-        prev_close = ticker.fast_info.previous_close
-        
-        # ตรวจสอบว่าได้ข้อมูลครบ
-        if current_price is not None and prev_close is not None:
-            return round(float(current_price), 4), round(float(prev_close), 4)
-            
-        # 2. Fallback (สำรอง) กรณี API ของ fast_info โหลดไม่ขึ้น ให้ดึงจาก info แทน
         info = ticker.info
-        current_price = info.get('currentPrice', info.get('regularMarketPrice'))
-        prev_close = info.get('previousClose', info.get('regularMarketPreviousClose'))
         
+        # ล็อกเป้าดึงเฉพาะราคาในเวลาทำการปกติ (Regular Market) 
+        # เพื่อหลีกเลี่ยงราคาช่วง After-hours ที่ทำให้ทศนิยมเพี้ยน
+        current_price = info.get('regularMarketPrice')
+        prev_close = info.get('regularMarketPreviousClose')
+        
+        # Fallback สำรองเผื่อหา key ด้านบนไม่เจอ
+        if current_price is None:
+            current_price = info.get('currentPrice')
+        if prev_close is None:
+            prev_close = info.get('previousClose')
+            
         if current_price is not None and prev_close is not None:
             return round(float(current_price), 4), round(float(prev_close), 4)
             
