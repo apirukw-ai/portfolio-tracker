@@ -559,16 +559,16 @@ async function renderSnapshotDashboard() {
         allDivs.forEach(div => {
           const t = div.innerText || '';
           
-          if (t.includes('ภาพรวมของแต่ละพอร์ต') || t.includes('สแกนสลิป') || t.includes('รวมพอร์ต')) return;
+          if (t.includes('ภาพรวมของแต่ละพอร์ต') || t.includes('สแกนสลิป') || t.includes('รวมพอร์ต') || t.includes('สัดส่วนพอร์ต') || t.includes('มูลค่าปัจจุบัน')) return;
 
           if (div.children.length >= 1 && div.children.length <= 8) {
             if (t.includes('มูลค่าพอร์ตรวมทั้งหมด')) {
-              const valEl = div.querySelector('h1, h2, h3, .text-2xl, .text-3xl, .font-bold');
+              const valEl = document.getElementById('total-wealth');
               if (valEl) {
                 valEl.innerText = `฿${totalWealthTHB.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                 valEl.style.color = GREEN;
               }
-              const subEl = Array.from(div.querySelectorAll('p, span, div')).find(e => e.children.length === 0 && (e.innerText.includes('กำลังคำนวณ') || e.innerText.includes('จากทั้งหมด')));
+              const subEl = document.getElementById('total-wealth-subtext');
               if (subEl) {
                 const pctSign = totalProfitPct >= 0 ? '▲' : '▼';
                 const pctColor = totalProfitPct >= 0 ? GREEN : RED;
