@@ -1,0 +1,72 @@
+import os
+from datetime import datetime, timedelta, timezone
+from supabase import Client, create_client
+import yfinance as yf
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("❌ Missing Supabase Credentials")
+    exit(1)
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def get_usd_thb_rate():
+    try:
+        ticker = yf.Ticker("THB=X")
+        hist = ticker.history(period="1d")
+        if not hist.empty:
+            return float(hist["Close"].iloc[-1])
+    except Exception as e:
+        print(f"⚠️ Exchange Rate Fetch Error: {e}")
+    return 33.00
+
+def get_us_stock_price(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="5d")
+        if len(hist) >= 2:
+            current_price = round(float(hist["Close"].iloc[-1]), 4)
+            prev_close = round(float(hist["Close"].iloc[-2]), 4)
+            return current_price, prev_close
+    except Exception as e:
+        print(f"⚠️ yfinance Error [{symbol}]: {e}")
+    return None, None
+
+def run_dime_update():
+    thai_tz = timezone(timedelta(hours=7))
+    now_thai_dt = datetime.now(thai_tz)
+    now_thai = now_thai_dt.strftime("%Y-%m-%dT%H:%M:%S+07:00")
+    today_date_str = now_thai_dt.strftime("%d/%m/%Y")
+
+    usd_rate = get_usd_thb_rate()
+    print(f"💵 อัตราแลกเปลี่ยน USD/THB ปัจจุบัน: {usd_rate:.4f}")
+
+    db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "DIME").execute()
+    dime_items = db_res.data or []
+
+    print(f"📦 พบรายการ DIME ในระบบ {len(dime_items)} รายการ")
+
+    for item in dime_items:
+        item_id = item["id"]
+        code = item.get("asset_code", "").strip()
+        units = float(item.get("units") or 0)
+
+        latest_nav, latest_prev_nav = get_us_stock_price(code)
+
+        if latest_nav and latest_nav > 0:
+            update_payload = {
+                "current_nav": round(latest_nav, 4),
+                "current_value": round(units * latest_nav * usd_rate, 4),
+                "nav_date": today_date_str,
+                "updated_at": now_thai
+            }
+            if latest_prev_nav and latest_prev_nav > 0:
+                update_payload["prev_nav"] = round(latest_prev_nav, 4)
+
+            supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
+            print(f" ✅ [DIME] {code}: Price=${latest_nav} | Value=฿{units * latest_nav * usd_rate:,.2f}")
+
+if __name__ == "__main__":
+    run_dime_update()
