@@ -21,44 +21,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # อัปเดตเป็น v4 ให้ทันสมัยขึ้น
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # อัปเดตเป็น v5
         with:
           python-version: '3.10'
 
       - name: Install dependencies
         run: |
-            python -m pip install --upgrade pip
-            pip install supabase requests beautifulsoup4 yfinance playwright
-            playwright install chromium
-
-      - name: Run GPF NAV Fetch
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python fetch_gpf_nav.py
+          python -m pip install --upgrade pip
+          pip install supabase requests beautifulsoup4 yfinance playwright
+          playwright install chromium
 
       - name: Run Dime US Stock Price Fetch
+        if: github.event.schedule == '0 22 * * 1-5' || github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python fetch_dime_nav.py
 
+      - name: Run GPF NAV Fetch
+        if: github.event.schedule == '0 3 * * 1-5' || github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python fetch_gpf_nav.py
+
       - name: Run MFC NAV Fetch
+        if: github.event.schedule == '30 12 * * 1-5' || github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python fetch_mfc_nav.py
 
       - name: Run SCB NAV Fetch
+        if: github.event.schedule == '30 13 * * 1-5' || github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python fetch_scb_nav.py
 
       - name: Save Daily Snapshot
+        if: github.event.schedule == '30 13 * * 1-5' || github.event_name == 'workflow_dispatch'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
