@@ -25,13 +25,26 @@ def get_usd_thb_rate():
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="5d")
-        if len(hist) >= 2:
-            current_price = round(float(hist["Close"].iloc[-1]), 4)
-            prev_close = round(float(hist["Close"].iloc[-2]), 4)
-            return current_price, prev_close
+        
+        # 1. ใช้ fast_info (ดึงข้อมูลได้เร็วและแม่นยำที่สุด ไม่ต้องโหลดตารางประวัติ)
+        current_price = ticker.fast_info.last_price
+        prev_close = ticker.fast_info.previous_close
+        
+        # ตรวจสอบว่าได้ข้อมูลครบ
+        if current_price is not None and prev_close is not None:
+            return round(float(current_price), 4), round(float(prev_close), 4)
+            
+        # 2. Fallback (สำรอง) กรณี API ของ fast_info โหลดไม่ขึ้น ให้ดึงจาก info แทน
+        info = ticker.info
+        current_price = info.get('currentPrice', info.get('regularMarketPrice'))
+        prev_close = info.get('previousClose', info.get('regularMarketPreviousClose'))
+        
+        if current_price is not None and prev_close is not None:
+            return round(float(current_price), 4), round(float(prev_close), 4)
+            
     except Exception as e:
         print(f"⚠️ yfinance Error [{symbol}]: {e}")
+        
     return None, None
 
 def run_dime_update():
