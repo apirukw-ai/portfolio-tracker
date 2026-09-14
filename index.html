@@ -1703,13 +1703,14 @@ async function renderSnapshotDashboard() {
           },
           scales: {
             x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
-            y: { 
-              ticks: { 
-                color: '#94a3b8',
-                callback: (val) => `฿${(val / 1000000).toFixed(2)}M`
-              }, 
-              grid: { color: 'rgba(51, 65, 85, 0.4)' } 
-            }
+y: {
+  ticks: {
+    color: '#94a3b8',
+    maxTicksLimit: 5, // จำกัดจำนวนขีดแกน Y ให้มีไม่เกิน 5 เส้น (ไม่แน่นเกินไป)
+    callback: (val) => '฿' + (val / 1000000).toFixed(3) + 'M' // ใช้ทศนิยม 3 ตำแหน่ง เพื่อให้เห็นความต่างหลักพัน (เช่น 2.795M, 2.800M)
+  },
+  grid: { color: 'rgba(51, 65, 85, 0.4)' }
+}
           }
         }
       });
