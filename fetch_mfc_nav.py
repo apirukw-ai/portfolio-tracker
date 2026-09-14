@@ -1,6 +1,6 @@
 import os
 import re
-import datetime
+from datetime import datetime, timedelta, timezone
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
@@ -12,7 +12,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ Error: กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_SERVICE_ROLE_KEY ใน GitHub Secrets")
+    print("❌ Error: กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_KEY ใน GitHub Secrets")
     exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -84,16 +84,34 @@ def update_supabase(nav_data):
         print("⚠️ ไม่มีข้อมูล NAV ที่จะอัปเดต")
         return
 
-    for asset_name, nav in nav_data.items():
-        try:
-            response = supabase.table("user_portfolios") \
-                .update({"current_nav": nav}) \
-                .eq("asset_name", asset_name) \
-                .execute()
-                
-            print(f"💾 อัปเดต Supabase สำเร็จ: {asset_name} = {nav}")
-        except Exception as e:
-            print(f"❌ อัปเดต Supabase ไม่สำเร็จ ({asset_name}): {e}")
+    thai_tz = timezone(timedelta(hours=7))
+    now_thai_dt = datetime.now(thai_tz)
+    now_thai = now_thai_dt.strftime("%Y-%m-%dT%H:%M:%S+07:00")
+    today_date_str = now_thai_dt.strftime("%d/%m/%Y")
+
+    # ดึงข้อมูล MFC ทั้งหมดเพื่อเอา units มาคำนวณมูลค่ารวม
+    db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "MFC").execute()
+    mfc_items = db_res.data or []
+
+    for item in mfc_items:
+        item_id = item["id"]
+        asset_name = item.get("asset_name", "").strip()
+        units = float(item.get("units") or 0)
+        
+        latest_nav = nav_data.get(asset_name)
+
+        if latest_nav:
+            try:
+                update_payload = {
+                    "current_nav": round(latest_nav, 4),
+                    "current_value": round(units * latest_nav, 4),
+                    "nav_date": today_date_str,
+                    "updated_at": now_thai
+                }
+                supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
+                print(f"💾 อัปเดต Supabase สำเร็จ: {asset_name} = NAV: {latest_nav}, Value: ฿{units * latest_nav:,.2f}")
+            except Exception as e:
+                print(f"❌ อัปเดต Supabase ไม่สำเร็จ ({asset_name}): {e}")
 
 if __name__ == "__main__":
     print("🚀 เริ่มต้นกระบวนการ Auto Update NAV...")

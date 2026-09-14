@@ -22,7 +22,9 @@ def get_usd_thb_rate():
             return rate
     except Exception as e:
         print(f"⚠️ Exchange Rate Fetch Error: {e}")
-    return 33.00
+    
+    # Fallback rate if yfinance is down
+    return 33.00 
 
 def save_daily_snapshot(app_source, total_thb):
     try:
@@ -44,14 +46,12 @@ def save_daily_snapshot(app_source, total_thb):
             "total_value_thb": float(total_thb),
         }
 
+        # Persist historical percentages if they exist
         if prev_res.data and len(prev_res.data) > 0:
             last_record = prev_res.data[0]
-            if last_record.get("reported_ytd_pct") is not None:
-                data["reported_ytd_pct"] = last_record["reported_ytd_pct"]
-            if last_record.get("reported_5y_pct") is not None:
-                data["reported_5y_pct"] = last_record["reported_5y_pct"]
-            if last_record.get("reported_since_inception_pct") is not None:
-                data["reported_since_inception_pct"] = last_record["reported_since_inception_pct"]
+            for key in ["reported_ytd_pct", "reported_5y_pct", "reported_since_inception_pct"]:
+                if last_record.get(key) is not None:
+                    data[key] = last_record[key]
 
         supabase.table("portfolio_snapshots").upsert(
             data, on_conflict="snapshot_date,app_source"
@@ -66,16 +66,18 @@ def run_snapshot_process():
     db_res = supabase.table("user_portfolios").select("*").execute()
     latest_items = db_res.data or []
 
-    all_apps = ["GPF", "DIME", "SCB", "MFC"]
+    # Dynamically extract all unique apps present in the portfolio table
+    all_apps = {str(i.get("app_source", "")).strip().upper() for i in latest_items if i.get("app_source")}
 
     for app in all_apps:
         app_items = [
-            i for i in latest_items
+            i for i in latest_items 
             if str(i.get("app_source", "")).strip().upper() == app
         ]
 
+        # Calculate totals
         if app == "DIME":
-            # รวมยอด USD ของ DIME แล้วคูณแปลงเป็น THB (บาท)
+            # DIME is stored in USD, so we convert to THB
             total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
             total_thb = total_usd * usd_rate
         else:
