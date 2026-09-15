@@ -1,9 +1,9 @@
 import os
 import re
 from datetime import datetime, timedelta, timezone
-from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
-from supabase import create_client, Client
+from playwright.sync_api import sync_playwright
+from supabase import Client, create_client
 
 # ==========================================
 # 1. ตั้งค่าการเชื่อมต่อ Supabase
@@ -21,13 +21,14 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # 2. จับคู่ asset_name ใน Supabase -> ชื่อสัญลักษณ์บนเว็บ MFC
 # ==========================================
 FUND_MAP = {
-    'IGOLD-G': ['IGOLD-G', 'IGOLD'],       # MPF07
-    'MGTECH':  ['MGTECH', 'MTECH', 'M-TECH'], # MPF15
-    'M-EM':    ['M-EM', 'MEM'],            # MPF18
-    'MEURO-G': ['MEURO-G', 'MEURO'],       # MPF19
-    'MGFPVD':  ['MGFPVD', 'MGF'],          # MPF23
-    'M-ASIA':  ['M-ASIA', 'MASIA']         # MPF27
+    'IGOLD-G': ['IGOLD-G', 'IGOLD'],        # MPF07
+    'MGTECH':  ['MGTECH', 'MTECH', 'M-TECH'],  # MPF15
+    'M-EM':    ['M-EM', 'MEM'],              # MPF18
+    'MEURO-G': ['MEURO-G', 'MEURO'],        # MPF19
+    'MGFPVD':  ['MGFPVD', 'MGF'],           # MPF23
+    'M-ASIA':  ['M-ASIA', 'MASIA']          # MPF27
 }
+
 
 def fetch_mfc_nav():
     url = "https://mfcfund.com/unit-value/"
@@ -38,10 +39,24 @@ def fetch_mfc_nav():
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            
-            page.goto(url, wait_until="networkidle", timeout=60000)
-            page.wait_for_timeout(3000)
+            # ตั้งค่า User-Agent ป้องกันการโดนบล็อก
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
+                )
+            )
+            page = context.new_page()
+
+            # เปลี่ยนจาก networkidle เป็น domcontentloaded เพื่อแก้ปัญหา Timeout
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+            # รอให้ตารางข้อมูลโหลดสำเร็จ
+            try:
+                page.wait_for_selector("table", timeout=15000)
+            except Exception:
+                page.wait_for_timeout(5000)
 
             html_content = page.content()
             browser.close()
@@ -60,7 +75,7 @@ def fetch_mfc_nav():
 
                 for alias in aliases:
                     clean_alias = re.sub(r'[\s\-]+', '', alias).upper()
-                    
+
                     if clean_alias in clean_text:
                         matches = re.findall(r'\d[\d\,]*\.\d{4}', raw_text)
                         if matches:
@@ -79,6 +94,7 @@ def fetch_mfc_nav():
         print(f"❌ เกิดข้อผิดพลาดขณะดึง NAV: {e}")
         return nav_results
 
+
 def update_supabase(nav_data):
     if not nav_data:
         print("⚠️ ไม่มีข้อมูล NAV ที่จะอัปเดต")
@@ -89,7 +105,6 @@ def update_supabase(nav_data):
     now_thai = now_thai_dt.strftime("%Y-%m-%dT%H:%M:%S+07:00")
     today_date_str = now_thai_dt.strftime("%d/%m/%Y")
 
-    # ดึงข้อมูล MFC ทั้งหมดเพื่อเอา units มาคำนวณมูลค่ารวม
     db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "MFC").execute()
     mfc_items = db_res.data or []
 
@@ -97,7 +112,7 @@ def update_supabase(nav_data):
         item_id = item["id"]
         asset_name = item.get("asset_name", "").strip()
         units = float(item.get("units") or 0)
-        
+
         latest_nav = nav_data.get(asset_name)
 
         if latest_nav:
@@ -112,6 +127,7 @@ def update_supabase(nav_data):
                 print(f"💾 อัปเดต Supabase สำเร็จ: {asset_name} = NAV: {latest_nav}, Value: ฿{units * latest_nav:,.2f}")
             except Exception as e:
                 print(f"❌ อัปเดต Supabase ไม่สำเร็จ ({asset_name}): {e}")
+
 
 if __name__ == "__main__":
     print("🚀 เริ่มต้นกระบวนการ Auto Update NAV...")
