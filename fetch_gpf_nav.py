@@ -26,7 +26,7 @@ def get_gpf_nav_direct():
     print("📡 กำลังดึงข้อมูล NAV จากเว็บ กบข. (GPF)...")
     try:
         gpf_url = "https://www.gpf.or.th/thai2019/About/main.php?page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
-        res = requests.get(gpf_url, headers=HEADERS, timeout=15)
+        res = requests.get(gpf_url, headers=HEADERS, timeout=20)
         res.encoding = "utf-8" if "utf-8" in res.text.lower() else "tis-620"
 
         soup = BeautifulSoup(res.text, "html.parser")
@@ -38,6 +38,7 @@ def get_gpf_nav_direct():
 
             nav_candidates = []
             for col_text in cols:
+                # แมตช์ตัวเลขทศนิยม 4 ตำแหน่ง (รูปแบบ NAV ของ กบข.)
                 match = re.search(r"^\d{1,3}(?:,\d{3})*\.\d{4}$", col_text)
                 if match:
                     nav_candidates.append(float(match.group(0).replace(",", "")))
@@ -46,6 +47,8 @@ def get_gpf_nav_direct():
                 continue
 
             nav_val = nav_candidates[0]
+            
+            # จับคู่ตามคีย์เวิร์ด และ ID แผนลงทุน
             if "หุ้นต่างประเทศ" in text or "1788632129596" in text:
                 nav_map["1788632129596"] = nav_val
                 nav_map["แผนหุ้นต่างประเทศ"] = nav_val
@@ -55,6 +58,10 @@ def get_gpf_nav_direct():
             elif "อสังหาริมทรัพย์" in text or "1788632247228" in text:
                 nav_map["1788632247228"] = nav_val
                 nav_map["แผนอสังหาริมทรัพย์ไทย"] = nav_val
+            elif "ตราสารหนี้" in text:
+                nav_map["แผนตราสารหนี้"] = nav_val
+            elif "หลักประกันประเดิม" in text or "แผนประเดิม" in text:
+                nav_map["แผนประเดิม"] = nav_val
 
     except Exception as e:
         print(f"⚠️ GPF Fetch Error: {e}")
@@ -69,7 +76,7 @@ def run_gpf_update():
 
     gpf_nav_data = get_gpf_nav_direct()
     if not gpf_nav_data:
-        print("⚠️ ไม่สามารถดึงข้อมูล NAV จาก GPF ได้")
+        print("⚠️ ไม่สามารถดึงข้อมูล NAV จาก GPF ได้ในรอบนี้ (ข้ามการอัปเดตเพื่อรักษาข้อมูลเดิม)")
         return
 
     try:
@@ -100,6 +107,8 @@ def run_gpf_update():
             })
             batch_payload.append(updated_item)
             print(f" ✅ [GPF] {code or name}: NAV={latest_nav} | Value=฿{units * latest_nav:,.2f}")
+        else:
+            print(f"⚠️ ไม่พบ NAV ของ [{code or name}] ในข้อมูลที่ดึงได้จากเว็บ กบข.")
 
     if batch_payload:
         try:
