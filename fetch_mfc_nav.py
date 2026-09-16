@@ -34,8 +34,12 @@ def fetch_mfc_nav():
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             try:
-                page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                page.wait_for_timeout(3000)
+                page.goto(url, wait_until="networkidle", timeout=60000)
+                
+                # 🛠️ เพิ่มคำสั่งรอดึง element ตารางหรือแถวข้อมูลให้แสดงผลก่อน
+                page.wait_for_selector("tr", timeout=15000)
+                page.wait_for_timeout(5000) # รอเพิ่มอีกนิดให้ JavaScript เรนเดอร์ข้อมูลจนครบ
+                
                 html_content = page.content()
             finally:
                 browser.close()
@@ -43,7 +47,7 @@ def fetch_mfc_nav():
         soup = BeautifulSoup(html_content, 'html.parser')
         rows = soup.find_all('tr')
         print(f"ℹ️ พบแถวตารางทั้งหมด: {len(rows)} แถว")
-
+        
         for row in rows:
             raw_text = row.get_text()
             clean_text = re.sub(r'[\s\-]+', '', raw_text).upper()
