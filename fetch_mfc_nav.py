@@ -17,35 +17,39 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==========================================
-# 2. จับคู่ asset_name -> ชื่อสัญลักษณ์สำหรับค้นหาใน pythainav
+# 2. รายชื่อกองทุน MFC ที่ทดสอบแล้วว่าดึงได้จริง
 # ==========================================
-FUND_MAP = {
-    'IGOLD-G': ['IGOLD-G', 'IGOLD'],
-    'MGTECH':  ['MGTECH', 'MTECH', 'M-TECH'],
-    'M-EM':    ['M-EM', 'MEM'],
-    'MEURO-G': ['MEURO-G', 'MEURO'],
-    'MGFPVD':  ['MGFPVD', 'MGF'],
-    'M-ASIA':  ['M-ASIA', 'MASIA']
-}
+TARGET_FUNDS = [
+    'IGOLD-G',
+    'MGTECH',
+    'M-EM',
+    'MEURO-G',
+    'MGFPVD',
+    'M-ASIA'
+]
 
 def fetch_mfc_nav() -> Dict[str, float]:
-    """ดึงข้อมูล NAV ผ่าน pythainav"""
+    """ดึงข้อมูล NAV ผ่าน pythainav โดยใช้ชื่อกองทุนที่ถูกต้อง"""
     nav_results: Dict[str, float] = {}
     print("📡 กำลังดึงข้อมูล NAV ผ่าน pythainav...")
 
-    for asset_name, aliases in FUND_MAP.items():
-        for alias in aliases:
-            try:
-                # ดึงค่า NAV ผ่าน pythainav
-                result = nav.get(alias)
-                if result and hasattr(result, 'value') and result.value is not None:
-                    nav_val = float(result.value)
-                    if 1.0 <= nav_val <= 1000.0:
-                        nav_results[asset_name] = nav_val
-                        print(f"✅ เจอ {asset_name} (ค้นหาด้วย '{alias}') -> NAV: {nav_val}")
-                        break
-            except Exception:
-                continue
+    for symbol in TARGET_FUNDS:
+        try:
+            result = nav.get(symbol)
+            nav_val = None
+            
+            if hasattr(result, 'value') and result.value is not None:
+                nav_val = float(result.value)
+            elif isinstance(result, (int, float)):
+                nav_val = float(result)
+
+            if nav_val and 1.0 <= nav_val <= 1000.0:
+                nav_results[symbol] = nav_val
+                print(f"✅ {symbol:<10} -> NAV: {nav_val}")
+            else:
+                print(f"⚠️ {symbol:<10} -> ไม่พบค่า NAV")
+        except Exception as e:
+            print(f"❌ {symbol:<10} -> Error: {e}")
 
     return nav_results
 
@@ -67,7 +71,6 @@ def update_supabase_batch(nav_data: Dict[str, float]) -> None:
         print(f"❌ ไม่สามารถดึงข้อมูลจาก Supabase ได้: {e}")
         return
 
-    # สร้างข้อมูลแบบ List เพื่อเตรียมทำ Batch Update
     batch_payload: List[Dict[str, Any]] = []
 
     for item in mfc_items:
@@ -89,13 +92,12 @@ def update_supabase_batch(nav_data: Dict[str, float]) -> None:
 
     if batch_payload:
         try:
-            # ส่งข้อมูลอัปเดตทีเดียวทั้งหมดด้วย upsert
             supabase.table("user_portfolios").upsert(batch_payload).execute()
             print(f"💾 อัปเดต Supabase แบบ Batch สำเร็จทั้งหมด {len(batch_payload)} รายการ")
         except Exception as e:
             print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
     else:
-        print("⚠️ ไม่มีรายการกองทุนตรงกับข้อมูล NAV ที่ดึงมาได้")
+        print("⚠️ ไม่พบ asset_name ใน Supabase ที่ตรงกับกองทุนที่ดึงมาได้")
 
 if __name__ == "__main__":
     print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (pythainav)...")
