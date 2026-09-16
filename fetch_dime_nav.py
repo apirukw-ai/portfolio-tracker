@@ -23,24 +23,29 @@ def get_usd_thb_rate():
             return float(hist["Close"].iloc[-1])
     except Exception as e:
         print(f"⚠️ Exchange Rate Fetch Error: {e}")
-    return 33.00
+    
+    # Fallback rate สมเหตุสมผลหาก yfinance มีปัญหา
+    return 34.50
 
 def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
+        
+        # 1. ลองดึงจาก info ก่อน
         info = ticker.info
+        current_price = info.get('regularMarketPrice') or info.get('currentPrice')
+        prev_close = info.get('regularMarketPreviousClose') or info.get('previousClose')
         
-        # ล็อกเป้าดึงเฉพาะราคาในเวลาทำการปกติ (Regular Market) 
-        # เพื่อหลีกเลี่ยงราคาช่วง After-hours ที่ทำให้ทศนิยมเพี้ยน
-        current_price = info.get('regularMarketPrice')
-        prev_close = info.get('regularMarketPreviousClose')
-        
-        # Fallback สำรองเผื่อหา key ด้านบนไม่เจอ
-        if current_price is None:
-            current_price = info.get('currentPrice')
-        if prev_close is None:
-            prev_close = info.get('previousClose')
-            
+        # 2. ถ้า info คืนค่า None ให้ Fallback ไปดึงจาก history (2 วันล่าสุด)
+        if current_price is None or prev_close is None:
+            hist = ticker.history(period="5d")
+            if len(hist) >= 2:
+                current_price = float(hist["Close"].iloc[-1])
+                prev_close = float(hist["Close"].iloc[-2])
+            elif len(hist) == 1:
+                current_price = float(hist["Close"].iloc[-1])
+                prev_close = current_price
+
         if current_price is not None and prev_close is not None:
             return round(float(current_price), 4), round(float(prev_close), 4)
             
@@ -91,6 +96,8 @@ def run_dime_update():
 
             batch_payload.append(updated_item)
             print(f" ✅ [DIME] {code}: Price=${latest_nav:.2f} | Value=${current_value_usd:.2f} (฿{current_value_usd * usd_rate:,.2f})")
+        else:
+            print(f"⚠️ ไม่สามารถดึงราคาของ {code} ได้ในรอบนี้ (ข้ามการอัปเดตเพื่อรักษาข้อมูลเดิม)")
 
     if batch_payload:
         try:
