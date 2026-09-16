@@ -1,16 +1,18 @@
 import os
 import re
 from datetime import datetime, timedelta, timezone
-
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 from supabase import Client, create_client
 
+# ==========================================
+# 1. ตั้งค่าการเชื่อมต่อ Supabase
+# ==========================================
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ Missing Supabase Credentials")
+    print("❌ Error: กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_KEY ใน Environment Variables")
     exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -21,6 +23,7 @@ HEADERS = {
 
 def get_gpf_nav_direct():
     nav_map = {}
+    print("📡 กำลังดึงข้อมูล NAV จากเว็บ กบข. (GPF)...")
     try:
         gpf_url = "https://www.gpf.or.th/thai2019/About/main.php?page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
         res = requests.get(gpf_url, headers=HEADERS, timeout=15)
@@ -61,34 +64,53 @@ def get_gpf_nav_direct():
 def run_gpf_update():
     thai_tz = timezone(timedelta(hours=7))
     now_thai_dt = datetime.now(thai_tz)
-    now_thai = now_thai_dt.strftime("%Y-%m-%dT%H:%M:%S+07:00")
-    today_date_str = now_thai_dt.strftime("%d/%m/%Y")
+    now_thai_iso = now_thai_dt.isoformat()
+    today_date_str = now_thai_dt.strftime("%Y-%m-%d")
 
     gpf_nav_data = get_gpf_nav_direct()
     if not gpf_nav_data:
         print("⚠️ ไม่สามารถดึงข้อมูล NAV จาก GPF ได้")
         return
 
-    db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "GPF").execute()
-    gpf_items = db_res.data or []
+    try:
+        db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "GPF").execute()
+        gpf_items = db_res.data or []
+    except Exception as e:
+        print(f"❌ ไม่สามารถดึงข้อมูลจาก Supabase ได้: {e}")
+        return
 
     print(f"📦 พบรายการ GPF ในระบบ {len(gpf_items)} รายการ")
 
+    batch_payload = []
     for item in gpf_items:
-        item_id = item["id"]
-        code = item.get("asset_code", "").strip()
+        code = item.get("asset_code", "").strip() if item.get("asset_code") else ""
+        name = item.get("asset_name", "").strip() if item.get("asset_name") else ""
         units = float(item.get("units") or 0)
-        latest_nav = gpf_nav_data.get(code)
+        
+        # ตรวจสอบจาก asset_code ก่อน หากไม่เจอให้ลองเช็คจาก asset_name
+        latest_nav = gpf_nav_data.get(code) or gpf_nav_data.get(name)
 
         if latest_nav and latest_nav > 0:
-            update_payload = {
+            updated_item = item.copy()
+            updated_item.update({
                 "current_nav": round(latest_nav, 4),
                 "current_value": round(units * latest_nav, 4),
                 "nav_date": today_date_str,
-                "updated_at": now_thai
-            }
-            supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
-            print(f" ✅ [GPF] {code}: NAV={latest_nav} | Value=฿{units * latest_nav:,.2f}")
+                "updated_at": now_thai_iso
+            })
+            batch_payload.append(updated_item)
+            print(f" ✅ [GPF] {code or name}: NAV={latest_nav} | Value=฿{units * latest_nav:,.2f}")
+
+    if batch_payload:
+        try:
+            supabase.table("user_portfolios").upsert(batch_payload).execute()
+            print(f"💾 อัปเดต Supabase แบบ Batch สำเร็จทั้งหมด {len(batch_payload)} รายการ")
+        except Exception as e:
+            print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
+    else:
+        print("⚠️ ไม่พบข้อมูลแผนลงทุน GPF ใน Supabase ที่จับคู่ตรงกัน")
 
 if __name__ == "__main__":
+    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (GPF + Batch Upsert)...")
     run_gpf_update()
+    print("✨ ทำงานเสร็จสิ้น!")
