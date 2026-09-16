@@ -21,12 +21,19 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # 2. จับคู่ asset_name -> คำค้นหาสัญลักษณ์กองทุน
 # ==========================================
 FUND_MAP = {
-    'SCBAXJ(E)':    ['SCBAXJ(E)', 'SCBAXJ-E', ' SCBAXJ(E) '],
-    'SCBNDQ(E)':    ['SCBNDQ(E)', 'SCBNDQ-E', ' SCBNDQ(E) '],
-    'SCBS&P500E':   ['SCBS&P500E', 'SCBS&P500(E)', 'SCBS&P500-E', ' SCBS&P500E '],
-    'SCBSEMI(E)':   ['SCBSEMI(E)', 'SCBSEMI-E', ' SCBSEMI(E) '],
-    'SCBWORLD(E)':  ['SCBWORLD(E)', 'SCBWORLD-E', ' SCBWORLD(E) ']
+    'SCBAXJ(E)':    ['SCBAXJ(E)', 'SCBAXJ-E', 'SCBAXJ'],
+    'SCBNDQ(E)':    ['SCBNDQ(E)', 'SCBNDQ-E', 'SCBNDQ'],
+    'SCBS&P500E':   ['SCBS&P500E', 'SCBS&P500(E)', 'SCBS&P500-E', 'SCBS&P500'],
+    'SCBSEMI(E)':   ['SCBSEMI(E)', 'SCBSEMI-E', 'SCBSEMI'],
+    'SCBWORLD(E)':  ['SCBWORLD(E)', 'SCBWORLD-E', 'SCBWORLD']
 }
+
+def clean_symbol(text):
+    """ฟังก์ชันทำความสะอาดข้อความ ลบช่องว่าง และจัดการ HTML entities เช่น &amp;"""
+    if not text:
+        return ""
+    text = text.replace('&amp;', '&')
+    return re.sub(r'[\s\-_()]+', '', text).upper()
 
 def fetch_scb_nav():
     url = "https://www.scbam.com/medias/inc/navmail.html"
@@ -47,18 +54,18 @@ def fetch_scb_nav():
             return nav_results
 
         soup = BeautifulSoup(response.text, 'html.parser')
-        rows = soup.find_all(['tr', 'p', 'div'])
+        rows = soup.find_all('tr')
 
         for row in rows:
             raw_text = row.get_text()
-            clean_text = re.sub(r'\s+', '', raw_text).upper()
+            clean_text = clean_symbol(raw_text)
 
             for asset_name, aliases in FUND_MAP.items():
                 if asset_name in nav_results:
                     continue
 
                 for alias in aliases:
-                    clean_alias = re.sub(r'\s+', '', alias).upper()
+                    clean_alias = clean_symbol(alias)
 
                     if clean_alias in clean_text:
                         matches = re.findall(r'\d[\d\,]*\.\d{4}', raw_text)
@@ -99,12 +106,13 @@ def update_supabase_batch(nav_data):
 
     for item in scb_items:
         asset_name = item.get("asset_name", "").strip()
+        asset_code = item.get("asset_code", "").strip()
         units = float(item.get("units") or 0)
         
-        latest_nav = nav_data.get(asset_name)
+        # เช็คแมตช์ทั้งจาก asset_name และ asset_code
+        latest_nav = nav_data.get(asset_name) or nav_data.get(asset_code)
 
         if latest_nav:
-            # คัดลอกข้อมูลแถวเดิมเพื่อรักษา Not-Null Constraint ของคอลัมน์อื่นๆ
             updated_item = item.copy()
             updated_item.update({
                 "current_nav": round(latest_nav, 4),
@@ -121,13 +129,13 @@ def update_supabase_batch(nav_data):
         except Exception as e:
             print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
     else:
-        print("⚠️ ไม่พบข้อมูล asset_name ใน Supabase ที่จับคู่ตรงกัน")
+        print("⚠️ ไม่พบข้อมูล asset_name / asset_code ใน Supabase ที่จับคู่ตรงกัน")
 
 if __name__ == "__main__":
     print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (SCB HTML + Batch Upsert)...")
     nav_data = fetch_scb_nav()
     print("-" * 40)
-    print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)} กองทุน): {nav_data}")
+    print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)}/{len(FUND_MAP)} กองทุน): {nav_data}")
     print("-" * 40)
     update_supabase_batch(nav_data)
     print("✨ ทำงานเสร็จสิ้น!")
