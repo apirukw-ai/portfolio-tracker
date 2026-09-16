@@ -9,10 +9,10 @@ from supabase import create_client, Client
 # 1. ตั้งค่าการเชื่อมต่อ Supabase
 # ==========================================
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ Error: กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_KEY ใน GitHub Secrets")
+    print("❌ Error: กรุณาตั้งค่า SUPABASE_URL และ SUPABASE_KEY ใน Environment Variables")
     exit(1)
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -46,12 +46,10 @@ def fetch_scb_nav():
             print(f"❌ ดึงข้อมูลไม่สำเร็จ HTTP Status: {response.status_code}")
             return nav_results
 
-        # แปลงโครงสร้าง HTML เป็น BeautifulSoup Object
         soup = BeautifulSoup(response.text, 'html.parser')
         rows = soup.find_all(['tr', 'p', 'div'])
 
         for row in rows:
-            # ลบแท็ก HTML ออก เหลือเฉพาะข้อความบริสุทธิ์ของแถวนั้นๆ
             raw_text = row.get_text()
             clean_text = re.sub(r'\s+', '', raw_text).upper()
 
@@ -63,7 +61,6 @@ def fetch_scb_nav():
                     clean_alias = re.sub(r'\s+', '', alias).upper()
 
                     if clean_alias in clean_text:
-                        # ดึงตัวเลขทศนิยม 4 ตำแหน่งจากข้อความในแถว
                         matches = re.findall(r'\d[\d\,]*\.\d{4}', raw_text)
                         if matches:
                             try:
@@ -81,43 +78,56 @@ def fetch_scb_nav():
         print(f"❌ เกิดข้อผิดพลาดขณะดึง NAV: {e}")
         return nav_results
 
-def update_supabase(nav_data):
+def update_supabase_batch(nav_data):
     if not nav_data:
         print("⚠️ ไม่มีข้อมูล NAV ที่จะอัปเดต")
         return
 
     thai_tz = timezone(timedelta(hours=7))
     now_thai_dt = datetime.now(thai_tz)
-    now_thai = now_thai_dt.strftime("%Y-%m-%dT%H:%M:%S+07:00")
-    today_date_str = now_thai_dt.strftime("%d/%m/%Y")
+    now_thai_iso = now_thai_dt.isoformat()
+    today_date_str = now_thai_dt.strftime("%Y-%m-%d")
 
-    # ดึงข้อมูล SCB ทั้งหมดเพื่อเอา units มาคำนวณมูลค่ารวม
-    db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "SCB").execute()
-    scb_items = db_res.data or []
+    try:
+        db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "SCB").execute()
+        scb_items = db_res.data or []
+    except Exception as e:
+        print(f"❌ ไม่สามารถดึงข้อมูลจาก Supabase ได้: {e}")
+        return
+
+    batch_payload = []
 
     for item in scb_items:
-        item_id = item["id"]
         asset_name = item.get("asset_name", "").strip()
         units = float(item.get("units") or 0)
         
         latest_nav = nav_data.get(asset_name)
 
         if latest_nav:
-            try:
-                update_payload = {
-                    "current_nav": round(latest_nav, 4),
-                    "current_value": round(units * latest_nav, 4),
-                    "nav_date": today_date_str,
-                    "updated_at": now_thai
-                }
-                supabase.table("user_portfolios").update(update_payload).eq("id", item_id).execute()
-                print(f"💾 อัปเดต Supabase สำเร็จ: {asset_name} = NAV: {latest_nav}, Value: ฿{units * latest_nav:,.2f}")
-            except Exception as e:
-                print(f"❌ อัปเดต Supabase ไม่สำเร็จ ({asset_name}): {e}")
+            # คัดลอกข้อมูลแถวเดิมเพื่อรักษา Not-Null Constraint ของคอลัมน์อื่นๆ
+            updated_item = item.copy()
+            updated_item.update({
+                "current_nav": round(latest_nav, 4),
+                "current_value": round(units * latest_nav, 4),
+                "nav_date": today_date_str,
+                "updated_at": now_thai_iso
+            })
+            batch_payload.append(updated_item)
+
+    if batch_payload:
+        try:
+            supabase.table("user_portfolios").upsert(batch_payload).execute()
+            print(f"💾 อัปเดต Supabase แบบ Batch สำเร็จทั้งหมด {len(batch_payload)} รายการ")
+        except Exception as e:
+            print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
+    else:
+        print("⚠️ ไม่พบข้อมูล asset_name ใน Supabase ที่จับคู่ตรงกัน")
 
 if __name__ == "__main__":
-    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (SCB HTML + BeautifulSoup)...")
+    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (SCB HTML + Batch Upsert)...")
     nav_data = fetch_scb_nav()
+    print("-" * 40)
     print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)} กองทุน): {nav_data}")
-    update_supabase(nav_data)
+    print("-" * 40)
+    update_supabase_batch(nav_data)
     print("✨ ทำงานเสร็จสิ้น!")
