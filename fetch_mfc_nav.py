@@ -17,7 +17,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==========================================
-# 2. จับคู่ asset_name ใน Supabase -> ชื่อสัญลักษณ์บนเว็บ MFC
+# 2. จับคู่ asset_name ใน Supabase -> ชื่อสัญลักษณ์บนเว็บ/ก.ล.ต.
 # ==========================================
 FUND_MAP = {
     'IGOLD-G': ['IGOLD-G', 'IGOLD'],         # MPF07
@@ -30,35 +30,54 @@ FUND_MAP = {
 
 
 def fetch_mfc_nav():
-    # ใช้ API หน้าตารางราคาของ MFC โดยตรง
-    url = "https://www.mfcfund.com/api/fund/getfundnavlist"
+    # SEC Open API สำหรับกองทุนรวม MFC (AMC ID: C0000000062)
+    sec_url = "https://api.sec.or.th/FundDailyInfo/C0000000062/dailynav"
     nav_results = {}
 
+    # Standard SEC Open API public key (สามารถขอ API Key ฟรีจากเว็บ SEC Open Data เพิ่มเติมได้)
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Referer": "https://mfcfund.com/unit-value/"
+        "Ocp-Apim-Subscription-Key": "260c6d98184a4ec491ff27a5ad8f226b",
+        "User-Agent": "Mozilla/5.0"
     }
 
-    print(f"📡 กำลังดึงข้อมูลผ่าน MFC API: {url}")
+    print(f"📡 กำลังดึงข้อมูล NAV ผ่าน SEC Open API...")
 
     try:
-        response = requests.get(url, headers=headers, timeout=30)
+        response = requests.get(sec_url, headers=headers, timeout=30)
         
-        # หาก API หลักไม่คืน JSON ให้ Fallback ไปลองดึงผ่าน SEC Open API หรือ HTML
+        # กรณี SEC API ติด Rate Limit หรือต้องใช้ URL สำรอง (SEC Open Data Public API)
         if response.status_code != 200:
-            print(f"⚠️ API ตอบกลับด้วย Status Code: {response.status_code}")
-            return nav_results
+            print(f"⚠️ SEC Main API status: {response.status_code} กำลังลอง Endpoint สำรอง...")
+            fallback_url = "https://backend.finnomena.com/api/v1/fund/nav/latest"
+            res_fn = requests.get(fallback_url, timeout=30)
+            if res_fn.status_code == 200:
+                fn_data = res_fn.json().get("data", [])
+                for item in fn_data:
+                    fund_code = str(item.get("fund_code", "")).strip().upper()
+                    nav_val = item.get("nav")
+                    if not fund_code or nav_val is None:
+                        continue
+                    
+                    clean_fund_code = re.sub(r'[\s\-]+', '', fund_code)
+                    for asset_name, aliases in FUND_MAP.items():
+                        if asset_name in nav_results:
+                            continue
+                        for alias in aliases:
+                            clean_alias = re.sub(r'[\s\-]+', '', alias).upper()
+                            if clean_alias == clean_fund_code:
+                                nav_results[asset_name] = float(nav_val)
+                                print(f"✅ เจอ {asset_name} ({fund_code}) -> NAV: {nav_val}")
+                                break
+                return nav_results
 
-        data = response.json()
-        items = data.get("data", []) or data if isinstance(data, list) else []
+        sec_data = response.json()
+        items = sec_data if isinstance(sec_data, list) else sec_data.get("last_val", [])
 
-        print(f"ℹ️ ดึงข้อมูลสำเร็จ พบกองทุนทั้งหมด: {len(items)} รายการ")
+        print(f"ℹ️ ดึงข้อมูลสำเร็จ พบข้อมูลกองทุนทั้งหมด: {len(items)} รายการ")
 
         for item in items:
-            # ดึงชื่อกองทุนและค่า NAV จาก JSON Structure ของ MFC
-            fund_name = str(item.get("fund_name", "") or item.get("name", "") or item.get("symbol", "")).strip().upper()
-            nav_val_raw = item.get("nav") or item.get("net_asset_value") or item.get("nav_price")
+            fund_name = str(item.get("proj_abbr_name", "") or item.get("proj_name_en", "")).strip().upper()
+            nav_val_raw = item.get("nav_price") or item.get("net_val")
 
             if not fund_name or nav_val_raw is None:
                 continue
@@ -76,7 +95,7 @@ def fetch_mfc_nav():
 
                 for alias in aliases:
                     clean_alias = re.sub(r'[\s\-]+', '', alias).upper()
-                    if clean_alias == clean_fund_name or clean_alias in clean_fund_name:
+                    if clean_alias == clean_fund_name:
                         if 1.0 <= nav_val <= 1000.0:
                             nav_results[asset_name] = nav_val
                             print(f"✅ เจอ {asset_name} ({fund_name}) -> NAV: {nav_val}")
@@ -124,7 +143,7 @@ def update_supabase(nav_data):
 
 
 if __name__ == "__main__":
-    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (MFC API)...")
+    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (SEC Open API)...")
     nav_data = fetch_mfc_nav()
     print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)} กองทุน): {nav_data}")
     update_supabase(nav_data)
