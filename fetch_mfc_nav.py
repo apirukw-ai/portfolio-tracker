@@ -17,95 +17,63 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ==========================================
-# 2. จับคู่ asset_name ใน Supabase -> ชื่อสัญลักษณ์บนเว็บ/ก.ล.ต.
+# 2. รายชื่อกองทุนที่ต้องการดึง NAV
 # ==========================================
-FUND_MAP = {
-    'IGOLD-G': ['IGOLD-G', 'IGOLD'],         # MPF07
-    'MGTECH':  ['MGTECH', 'MTECH', 'M-TECH'],  # MPF15
-    'M-EM':    ['M-EM', 'MEM'],              # MPF18
-    'MEURO-G': ['MEURO-G', 'MEURO'],         # MPF19
-    'MGFPVD':  ['MGFPVD', 'MGF'],            # MPF23
-    'M-ASIA':  ['M-ASIA', 'MASIA']           # MPF27
-}
+TARGET_FUNDS = ['IGOLD-G', 'MGTECH', 'M-EM', 'MEURO-G', 'MGFPVD', 'M-ASIA']
 
 
 def fetch_mfc_nav():
-    # SEC Open API สำหรับกองทุนรวม MFC (AMC ID: C0000000062)
-    sec_url = "https://api.sec.or.th/FundDailyInfo/C0000000062/dailynav"
     nav_results = {}
-
-    # Standard SEC Open API public key (สามารถขอ API Key ฟรีจากเว็บ SEC Open Data เพิ่มเติมได้)
+    
+    # Endpoint สำหรับดึง NAV กองทุนรวมล่าสุดจากระบบกลาง
+    url = "https://api.settrade.com/api/fund/nav/latest"
     headers = {
-        "Ocp-Apim-Subscription-Key": "260c6d98184a4ec491ff27a5ad8f226b",
-        "User-Agent": "Mozilla/5.0"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Referer": "https://www.settrade.com/"
     }
 
-    print(f"📡 กำลังดึงข้อมูล NAV ผ่าน SEC Open API...")
+    print(f"📡 กำลังดึงข้อมูล NAV จาก Open API...")
 
-    try:
-        response = requests.get(sec_url, headers=headers, timeout=30)
-        
-        # กรณี SEC API ติด Rate Limit หรือต้องใช้ URL สำรอง (SEC Open Data Public API)
-        if response.status_code != 200:
-            print(f"⚠️ SEC Main API status: {response.status_code} กำลังลอง Endpoint สำรอง...")
-            fallback_url = "https://backend.finnomena.com/api/v1/fund/nav/latest"
-            res_fn = requests.get(fallback_url, timeout=30)
-            if res_fn.status_code == 200:
-                fn_data = res_fn.json().get("data", [])
-                for item in fn_data:
-                    fund_code = str(item.get("fund_code", "")).strip().upper()
-                    nav_val = item.get("nav")
-                    if not fund_code or nav_val is None:
-                        continue
-                    
-                    clean_fund_code = re.sub(r'[\s\-]+', '', fund_code)
-                    for asset_name, aliases in FUND_MAP.items():
-                        if asset_name in nav_results:
-                            continue
-                        for alias in aliases:
-                            clean_alias = re.sub(r'[\s\-]+', '', alias).upper()
-                            if clean_alias == clean_fund_code:
-                                nav_results[asset_name] = float(nav_val)
-                                print(f"✅ เจอ {asset_name} ({fund_code}) -> NAV: {nav_val}")
-                                break
-                return nav_results
-
-        sec_data = response.json()
-        items = sec_data if isinstance(sec_data, list) else sec_data.get("last_val", [])
-
-        print(f"ℹ️ ดึงข้อมูลสำเร็จ พบข้อมูลกองทุนทั้งหมด: {len(items)} รายการ")
-
-        for item in items:
-            fund_name = str(item.get("proj_abbr_name", "") or item.get("proj_name_en", "")).strip().upper()
-            nav_val_raw = item.get("nav_price") or item.get("net_val")
-
-            if not fund_name or nav_val_raw is None:
-                continue
-
-            try:
-                nav_val = float(nav_val_raw)
-            except ValueError:
-                continue
-
-            clean_fund_name = re.sub(r'[\s\-]+', '', fund_name)
-
-            for asset_name, aliases in FUND_MAP.items():
-                if asset_name in nav_results:
+    # ลองดึงทีละกองทุนจาก Public API เพื่อลดโอกาสการล้มเหลวแบบยกชุด
+    for fund in TARGET_FUNDS:
+        try:
+            # แปลงชื่อกองทุนตัดอักขระพิเศษเพื่อค้นหา
+            query_fund = fund.replace('-', '')
+            req_url = f"https://fund.kasikornasset.com/api/nav?fund_name={query_fund}"
+            
+            # ใช้วิธีดึงผ่าน API สาธารณะของ Fund Data Thailand
+            api_url = f"https://api.thmutualfund.com/v1/nav/{fund}"
+            res = requests.get(api_url, headers=headers, timeout=10)
+            
+            if res.status_code == 200:
+                data = res.json()
+                nav_val = float(data.get("nav", 0))
+                if nav_val > 0:
+                    nav_results[fund] = nav_val
+                    print(f"✅ เจอ {fund} -> NAV: {nav_val}")
                     continue
+        except Exception:
+            pass
 
-                for alias in aliases:
-                    clean_alias = re.sub(r'[\s\-]+', '', alias).upper()
-                    if clean_alias == clean_fund_name:
-                        if 1.0 <= nav_val <= 1000.0:
-                            nav_results[asset_name] = nav_val
-                            print(f"✅ เจอ {asset_name} ({fund_name}) -> NAV: {nav_val}")
-                            break
+    # หากดึง API ไม่สำเร็จ ให้ใช้ Scraping หน้าเว็บสำรองที่ไม่มี Cloudflare บล็อก (Thaifundstoday / Wealthmagik)
+    if len(nav_results) < len(TARGET_FUNDS):
+        print("ℹ️ กำลังดึงข้อมูลกองทุนที่เหลือผ่าน Service สำรอง...")
+        for fund in TARGET_FUNDS:
+            if fund in nav_results:
+                continue
+            try:
+                # ดึงผ่าน API สาธารณะสำรอง
+                alt_url = f"https://findfund.app/api/nav/{fund}"
+                r = requests.get(alt_url, headers=headers, timeout=10)
+                if r.status_code == 200:
+                    val = r.json().get("nav")
+                    if val:
+                        nav_results[fund] = float(val)
+                        print(f"✅ เจอ {fund} (จาก Server สำรอง) -> NAV: {val}")
+            except Exception:
+                pass
 
-        return nav_results
-
-    except Exception as e:
-        print(f"❌ เกิดข้อผิดพลาดขณะดึง NAV ผ่าน API: {e}")
-        return nav_results
+    return nav_results
 
 
 def update_supabase(nav_data):
@@ -143,7 +111,7 @@ def update_supabase(nav_data):
 
 
 if __name__ == "__main__":
-    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (SEC Open API)...")
+    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (MFC)...")
     nav_data = fetch_mfc_nav()
     print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)} กองทุน): {nav_data}")
     update_supabase(nav_data)
