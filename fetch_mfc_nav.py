@@ -108,7 +108,7 @@ def update_supabase_batch(nav_data):
     if batch_payload:
         try:
             supabase.table("user_portfolios").upsert(batch_payload).execute()
-            print(f"💾 อัปเดต Supabase สำเร็จทั้งหมด {len(batch_payload)} รายการ")
+            print(f"💾 อัปเดต Supabase แบบ Batch สำเร็จทั้งหมด {len(batch_payload)} รายการ")
         except Exception as e:
             print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
     else:
