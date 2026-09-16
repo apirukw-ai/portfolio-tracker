@@ -94,13 +94,16 @@ def update_supabase_batch(nav_data):
 
         if nav_val:
             units = float(item.get("units") or 0)
-            batch_payload.append({
-                "id": item["id"],
+            
+            # คัดลอกข้อมูลแถวเดิมเพื่อรักษาค่าคอลัมน์ NOT NULL ทั้งหมดไว้ (รวมถึง app_source)
+            updated_item = item.copy()
+            updated_item.update({
                 "current_nav": round(nav_val, 4),
                 "current_value": round(units * nav_val, 4),
                 "nav_date": today_str,
                 "updated_at": now_thai.isoformat()
             })
+            batch_payload.append(updated_item)
 
     if batch_payload:
         try:
