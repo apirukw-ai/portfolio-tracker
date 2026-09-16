@@ -23,11 +23,12 @@ def get_usd_thb_rate():
     except Exception as e:
         print(f"⚠️ Exchange Rate Fetch Error: {e}")
     
-    # Fallback rate if yfinance is down
-    return 33.00 
+    # Fallback rate หาก yfinance มีปัญหา
+    return 34.50 
 
 def save_daily_snapshot(app_source, total_thb):
     try:
+        # ดึงวันที่ปัจจุบันของไทย (UTC+7)
         today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime("%Y-%m-%d")
         app_upper = app_source.upper()
 
@@ -46,7 +47,7 @@ def save_daily_snapshot(app_source, total_thb):
             "total_value_thb": float(total_thb),
         }
 
-        # Persist historical percentages if they exist
+        # ดึงเปอร์เซ็นต์ย้อนหลังเดิมมาใส่เพื่อไม่ให้ค่าหาย
         if prev_res.data and len(prev_res.data) > 0:
             last_record = prev_res.data[0]
             for key in ["reported_ytd_pct", "reported_5y_pct", "reported_since_inception_pct"]:
@@ -66,7 +67,6 @@ def run_snapshot_process():
     db_res = supabase.table("user_portfolios").select("*").execute()
     latest_items = db_res.data or []
 
-    # Dynamically extract all unique apps present in the portfolio table
     all_apps = {str(i.get("app_source", "")).strip().upper() for i in latest_items if i.get("app_source")}
 
     for app in all_apps:
@@ -75,15 +75,22 @@ def run_snapshot_process():
             if str(i.get("app_source", "")).strip().upper() == app
         ]
 
-        # Calculate totals
-        if app == "DIME":
-            # DIME is stored in USD, so we convert to THB
-            total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
-            total_thb = total_usd * usd_rate
-        else:
-            total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+        # คำนวณยอดรวมโดยเช็คทั้ง current_value หรือคำนวณจาก (units * avg_nav/current_nav)
+        total_thb = 0.0
+        for item in app_items:
+            units = float(item.get("units") or 0)
+            nav = float(item.get("avg_nav") or item.get("current_nav") or 0)
+            
+            # หากมี current_value ให้ใช้ตรงๆ ถ้าไม่มีให้คิดจาก units * nav
+            val = float(item.get("current_value")) if item.get("current_value") is not None else (units * nav)
+            
+            if app == "DIME":
+                total_thb += (val * usd_rate)
+            else:
+                total_thb += val
 
-        if total_thb > 0:
+        # บันทึก snapshot (ยอมให้บันทึกกรณี >= 0 เพื่อเก็บประวัติแม้ยอดเป็น 0)
+        if total_thb >= 0:
             save_daily_snapshot(app, total_thb)
 
 if __name__ == "__main__":
