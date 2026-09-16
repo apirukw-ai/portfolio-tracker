@@ -33,11 +33,12 @@ def fetch_mfc_nav():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=60000)
-            page.wait_for_timeout(3000)
-
-            html_content = page.content()
-            browser.close()
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                page.wait_for_timeout(3000)
+                html_content = page.content()
+            finally:
+                browser.close()
 
         soup = BeautifulSoup(html_content, 'html.parser')
         rows = soup.find_all('tr')
@@ -90,12 +91,14 @@ def update_supabase_batch(nav_data):
     batch_payload = []
     for item in mfc_items:
         asset_name = item.get("asset_name", "").strip()
-        nav_val = nav_data.get(asset_name)
+        asset_code = item.get("asset_code", "").strip()
+        
+        # ตรวจสอบทั้ง asset_name และ asset_code
+        nav_val = nav_data.get(asset_name) or nav_data.get(asset_code)
 
         if nav_val:
             units = float(item.get("units") or 0)
             
-            # คัดลอกข้อมูลแถวเดิมเพื่อรักษาค่าคอลัมน์ NOT NULL ทั้งหมดไว้ (รวมถึง app_source)
             updated_item = item.copy()
             updated_item.update({
                 "current_nav": round(nav_val, 4),
@@ -112,13 +115,13 @@ def update_supabase_batch(nav_data):
         except Exception as e:
             print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
     else:
-        print("⚠️ ไม่พบข้อมูล asset_name ใน Supabase ที่จับคู่ตรงกัน")
+        print("⚠️ ไม่พบข้อมูล asset_name / asset_code ใน Supabase ที่จับคู่ตรงกัน")
 
 if __name__ == "__main__":
-    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (Playwright)...")
+    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (Playwright - MFC)...")
     nav_data = fetch_mfc_nav()
     print("-" * 40)
-    print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)}/6 กองทุน): {nav_data}")
+    print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)}/{len(FUND_MAP)} กองทุน): {nav_data}")
     print("-" * 40)
     update_supabase_batch(nav_data)
     print("✨ ทำงานเสร็จสิ้น!")
