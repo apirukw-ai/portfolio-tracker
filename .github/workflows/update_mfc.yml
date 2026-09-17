@@ -15,6 +15,6 @@ jobs:
         with:
           python-version: '3.11'
       - run: |
-          pip install requests pandas supabase playwright
+          pip install requests pandas supabase playwright beautifulsoup4
           playwright install --with-deps chromium
           python fetch_mfc_nav.py
