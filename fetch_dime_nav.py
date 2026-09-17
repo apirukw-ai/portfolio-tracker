@@ -1,127 +1,41 @@
 import os
-from datetime import datetime, timedelta, timezone
-import requests
-import pandas as pd
-from supabase import Client, create_client
+from supabase import create_client, Client
 import yfinance as yf
 
-# ==========================================
-# 1. ตั้งค่าการเชื่อมต่อ Supabase
-# ==========================================
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
+# 1. เชื่อมต่อ Supabase
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ Missing Supabase Credentials")
-    exit(1)
+def update_dime_stocks():
+    # 2. ดึงรายการหุ้น US ทั้งหมดจาก Supabase (ปรับ query ตามเงื่อนไขของคุณ)
+    # ตัวอย่าง: ดึงรายการทั้งหมดใน user_portfolios ที่เป็นหุ้น US หรือระบุชื่อ Ticker
+    response = supabase.table("user_portfolios").select("id, asset_name").execute()
+    portfolios = response.data
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-def get_usd_thb_rate():
-    try:
-        ticker = yf.Ticker("THB=X")
-        hist = ticker.history(period="1d")
-        if not hist.empty:
-            return float(hist["Close"].iloc[-1])
-    except Exception as e:
-        print(f"⚠️ Exchange Rate Fetch Error: {e}")
-    return 34.50
-
-def get_us_stock_price(symbol):
-    try:
-        # 1. Direct Yahoo v8 Chart API (จับคู่ Timestamp + Close และเรียงเวลาจริง)
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=7d&interval=1d"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=10)
+    for item in portfolios:
+        ticker_symbol = item['asset_name']
         
-        if res.status_code == 200:
-            data = res.json()
-            result = data.get("chart", {}).get("result", [])
-            if result:
-                timestamps = result[0].get("timestamp", [])
-                indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
-                closes = indicators.get("close", [])
-                
-                # จับคู่ timestamp กับ close แล้วกรองค่า None ออก
-                valid_pairs = [(ts, c) for ts, c in zip(timestamps, closes) if c is not None]
-                
-                # เรียงลำดับจากอดีตไปปัจจุบันตามเวลาจริง 100%
-                valid_pairs.sort(key=lambda x: x[0])
-                
-                if len(valid_pairs) >= 2:
-                    current_price = valid_pairs[-1][1]  # วันทำการล่าสุด (16 ก.ย.)
-                    prev_close = valid_pairs[-2][1]     # วันทำการก่อนหน้า (15 ก.ย.)
-                    return round(float(current_price), 4), round(float(prev_close), 4)
-    except Exception as e:
-        print(f"⚠️ Direct Yahoo API Error [{symbol}]: {e}")
-
-    # 2. Fallback: ดึงจาก yf.Ticker ย้อนหลัง 7 วัน
-    try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="7d", auto_adjust=False)
-        if not hist.empty and len(hist) >= 2:
-            return round(float(hist["Close"].iloc[-1]), 4), round(float(hist["Close"].iloc[-2]), 4)
-    except Exception:
-        pass
-
-    return None, None
-def run_dime_update():
-    thai_tz = timezone(timedelta(hours=7))
-    now_thai_dt = datetime.now(thai_tz)
-    now_thai_iso = now_thai_dt.isoformat()
-    today_date_str = now_thai_dt.strftime("%Y-%m-%d")
-
-    usd_rate = get_usd_thb_rate()
-    print(f"💵 อัตราแลกเปลี่ยน USD/THB ปัจจุบัน: {usd_rate:.4f}")
-
-    try:
-        db_res = supabase.table("user_portfolios").select("*").ilike("app_source", "DIME").execute()
-        dime_items = db_res.data or []
-    except Exception as e:
-        print(f"❌ ไม่สามารถดึงข้อมูลจาก Supabase ได้: {e}")
-        return
-
-    print(f"📦 พบรายการ DIME ในระบบ {len(dime_items)} รายการ")
-
-    batch_payload = []
-
-    for item in dime_items:
-        code = item.get("asset_code", "").strip()
-        units = float(item.get("units") or 0)
-
-        latest_nav, latest_prev_nav = get_us_stock_price(code)
-
-        if latest_nav and latest_nav > 0:
-            current_value_usd = round(units * latest_nav, 4)
-            
-            updated_item = item.copy()
-            updated_item.update({
-                "current_nav": round(latest_nav, 4),
-                "current_value": current_value_usd,
-                "nav_date": today_date_str,
-                "updated_at": now_thai_iso
-            })
-            
-            if latest_prev_nav and latest_prev_nav > 0:
-                updated_item["prev_nav"] = round(latest_prev_nav, 4)
-
-            batch_payload.append(updated_item)
-            print(f" ✅ [DIME] {code}: Price=${latest_nav:.2f} | Value=${current_value_usd:.2f} (฿{current_value_usd * usd_rate:,.2f})")
-        else:
-            print(f"⚠️ ไม่สามารถดึงราคาของ {code} ได้ในรอบนี้ (ข้ามการอัปเดตเพื่อรักษาข้อมูลเดิม)")
-
-    if batch_payload:
         try:
-            supabase.table("user_portfolios").upsert(batch_payload).execute()
-            print(f"💾 อัปเดต Supabase แบบ Batch สำเร็จทั้งหมด {len(batch_payload)} รายการ")
+            # 3. ดึงราคาประวัติย้อนหลัง 5 วันทำการจาก yfinance
+            ticker = yf.Ticker(ticker_symbol)
+            hist = ticker.history(period="5d")
+
+            # ตรวจสอบว่ามีข้อมูลอย่างน้อย 2 วันทำการหรือไม่
+            if len(hist) >= 2:
+                current_price = float(hist['Close'].iloc[-1]) # ราคาปิดวันล่าสุด
+                prev_price = float(hist['Close'].iloc[-2])    # ราคาปิดวันก่อนหน้า
+                
+                # 4. อัปเดตทั้ง current_nav และ prev_nav จาก Yahoo Finance โดยตรง
+                supabase.table("user_portfolios").update({
+                    "current_nav": round(current_price, 4),
+                    "prev_nav": round(prev_price, 4)
+                }).eq("id", item['id']).execute()
+
+                print(f"✅ {ticker_symbol}: Current={current_price:.4f}, Prev={prev_price:.4f}")
+
         except Exception as e:
-            print(f"❌ เกิดข้อผิดพลาดในการอัปเดตแบบ Batch: {e}")
-    else:
-        print("⚠️ ไม่พบข้อมูลหุ้น/สินทรัพย์ DIME ใน Supabase ที่สามารถดึงราคาได้")
+            print(f"❌ Error updating {ticker_symbol}: {e}")
 
 if __name__ == "__main__":
-    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (DIME US Stocks + Batch Upsert)...")
-    run_dime_update()
-    print("✨ ทำงานเสร็จสิ้น!")
+    update_dime_stocks()
