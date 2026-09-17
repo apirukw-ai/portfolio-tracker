@@ -1,20 +1,10 @@
 name: Auto Update Portfolio NAV
 
 on:
-  schedule:
-    # 1. Dime (หุ้น US): ตลาด US ปิด 04:00 น. รันช่วง 05:07 น. (UTC 22:07 จ.-ศ.)
-    - cron: '7 22 * * 1-5'
+  name: Auto Update Portfolio NAV
 
-    # 2. GPF: รัน 10:13 น. (UTC 03:13 จ.-ศ.)
-    - cron: '13 3 * * 1-5'
-
-    # 3. MFC & SCB (รอบแรก): ~19:30 น. (UTC 12:30 จ.-ศ.)
-    - cron: '30 12 * * 1-5'
-
-    # 4. MFC & SCB (รอบสอง เก็บตกคนอัปเดตเลท + Snapshot): ~21:00 น. (UTC 14:00 จ.-ศ.)
-    - cron: '0 14 * * 1-5'
-
-  workflow_dispatch:
+on:
+  workflow_dispatch: # เปิดรับการสั่งรันจาก cron-job.org หรือการกดรันด้วยตนเอง
 
 jobs:
   update-nav:
