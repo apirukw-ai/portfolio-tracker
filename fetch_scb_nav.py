@@ -21,11 +21,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # 2. จับคู่ asset_name -> คำค้นหาสัญลักษณ์กองทุน
 # ==========================================
 FUND_MAP = {
-    'SCBAXJ(E)':    ['SCBAXJ(E)', 'SCBAXJ-E', 'SCBAXJ'],
-    'SCBNDQ(E)':    ['SCBNDQ(E)', 'SCBNDQ-E', 'SCBNDQ'],
-    'SCBS&P500E':   ['SCBS&P500E', 'SCBS&P500(E)', 'SCBS&P500-E', 'SCBS&P500'],
-    'SCBSEMI(E)':   ['SCBSEMI(E)', 'SCBSEMI-E', 'SCBSEMI'],
-    'SCBWORLD(E)':  ['SCBWORLD(E)', 'SCBWORLD-E', 'SCBWORLD']
+    'SCBAXJ(E)':    ['SCBAXJ(E)', 'SCBAXJ-E', ' SCBAXJ(E) '],
+    'SCBNDQ(E)':    ['SCBNDQ(E)', 'SCBNDQ-E', ' SCBNDQ(E) '],
+    'SCBS&P500E':   ['SCBS&P500E', 'SCBS&P500(E)', 'SCBS&P500-E', ' SCBS&P500E '],
+    'SCBSEMI(E)':   ['SCBSEMI(E)', 'SCBSEMI-E', ' SCBSEMI(E) '],
+    'SCBWORLD(E)':  ['SCBWORLD(E)', 'SCBWORLD-E', ' SCBWORLD(E) ']
 }
 
 def clean_symbol(text):
