@@ -28,11 +28,9 @@ def get_usd_thb_rate():
     return 34.50
 
 def get_us_stock_price(symbol):
-    # -------------------------------------------------------------
-    # 1. Direct Yahoo v8 Chart API (อ่านจาก meta โดยตรง ป้องกันสลับช่อง 100%)
-    # -------------------------------------------------------------
     try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
+        # 1. Direct Yahoo v8 Chart API (จับคู่ Timestamp + Close และเรียงเวลาจริง)
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=7d&interval=1d"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
@@ -42,49 +40,33 @@ def get_us_stock_price(symbol):
             data = res.json()
             result = data.get("chart", {}).get("result", [])
             if result:
-                meta = result[0].get("meta", {})
-                current_price = meta.get("regularMarketPrice")
-                prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
-                
-                # หากมีค่าจาก meta ชัดเจน ให้ส่งกลับทันที (ไม่สลับช่องแน่นอน)
-                if current_price is not None and prev_close is not None:
-                    return round(float(current_price), 4), round(float(prev_close), 4)
-
-                # สำรอง: หาก meta ขาดหายไป ค่อยอ่านจากตารางราคาปิด (Closes Array)
+                timestamps = result[0].get("timestamp", [])
                 indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
-                raw_closes = indicators.get("close", [])
-                closes = [c for c in raw_closes if c is not None]
+                closes = indicators.get("close", [])
                 
-                if len(closes) >= 2:
-                    return round(float(closes[-1]), 4), round(float(closes[-2]), 4)
+                # จับคู่ timestamp กับ close แล้วกรองค่า None ออก
+                valid_pairs = [(ts, c) for ts, c in zip(timestamps, closes) if c is not None]
+                
+                # เรียงลำดับจากอดีตไปปัจจุบันตามเวลาจริง 100%
+                valid_pairs.sort(key=lambda x: x[0])
+                
+                if len(valid_pairs) >= 2:
+                    current_price = valid_pairs[-1][1]  # วันทำการล่าสุด (16 ก.ย.)
+                    prev_close = valid_pairs[-2][1]     # วันทำการก่อนหน้า (15 ก.ย.)
+                    return round(float(current_price), 4), round(float(prev_close), 4)
     except Exception as e:
         print(f"⚠️ Direct Yahoo API Error [{symbol}]: {e}")
 
-    # -------------------------------------------------------------
-    # 2. Fallback: yf.Ticker history
-    # -------------------------------------------------------------
+    # 2. Fallback: ดึงจาก yf.Ticker ย้อนหลัง 7 วัน
     try:
         ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="5d", auto_adjust=False)
+        hist = ticker.history(period="7d", auto_adjust=False)
         if not hist.empty and len(hist) >= 2:
             return round(float(hist["Close"].iloc[-1]), 4), round(float(hist["Close"].iloc[-2]), 4)
     except Exception:
         pass
 
-    # -------------------------------------------------------------
-    # 3. Fallback: yf.download
-    # -------------------------------------------------------------
-    try:
-        df_dl = yf.download(symbol, period="5d", auto_adjust=False, progress=False)
-        if not df_dl.empty and len(df_dl) >= 2:
-            close_data = df_dl["Close"]
-            close_series = close_data.iloc[:, 0] if isinstance(close_data, pd.DataFrame) else close_data
-            return round(float(close_series.iloc[-1]), 4), round(float(close_series.iloc[-2]), 4)
-    except Exception:
-        pass
-
     return None, None
-
 def run_dime_update():
     thai_tz = timezone(timedelta(hours=7))
     now_thai_dt = datetime.now(thai_tz)
