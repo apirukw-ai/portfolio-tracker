@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
+import pandas as pd
 from supabase import Client, create_client
 import yfinance as yf
 
@@ -23,18 +24,14 @@ def get_usd_thb_rate():
             return float(hist["Close"].iloc[-1])
     except Exception as e:
         print(f"⚠️ Exchange Rate Fetch Error: {e}")
-    
-    # Fallback rate สมเหตุสมผลหาก yfinance มีปัญหา
     return 34.50
 
 def get_us_stock_price(symbol):
     try:
+        # 1. ลองดึงผ่าน yf.Ticker (วิธีหลัก - Unadjusted Close)
         ticker = yf.Ticker(symbol)
-        
-        # 1. ดึงจาก history 5 วันย้อนหลังก่อน ( Unadjusted Close )
         hist = ticker.history(period="5d", auto_adjust=False)
         
-        # หากดึงไม่สำเร็จ หรือติดวันหยุดยาว ให้ขยายเป็น 10 วันย้อนหลัง
         if hist.empty or len(hist) < 2:
             hist = ticker.history(period="10d", auto_adjust=False)
             
@@ -42,8 +39,17 @@ def get_us_stock_price(symbol):
             current_price = float(hist["Close"].iloc[-1])
             prev_close = float(hist["Close"].iloc[-2])
             return round(current_price, 4), round(prev_close, 4)
-            
-        # 2. Fallback สำรองสุดท้าย: หาก history ดึงไม่ได้เลย ให้ใช้ ticker.info
+
+        # 2. Fallback ชั้นที่ 1: ใช้ yf.download() หาก Ticker คืนค่าว่าง (ใช้ Endpoint คนละตัวกัน)
+        df_dl = yf.download(symbol, period="5d", auto_adjust=False, progress=False)
+        if not df_dl.empty and len(df_dl) >= 2:
+            close_data = df_dl["Close"]
+            close_series = close_data.iloc[:, 0] if isinstance(close_data, pd.DataFrame) else close_data
+            current_price = float(close_series.iloc[-1])
+            prev_close = float(close_series.iloc[-2])
+            return round(current_price, 4), round(prev_close, 4)
+
+        # 3. Fallback ชั้นที่ 2: ดึงจาก ticker.info (สำรองสุดท้าย)
         info = ticker.info
         current_price = info.get('regularMarketPrice') or info.get('currentPrice')
         prev_close = info.get('regularMarketPreviousClose') or info.get('previousClose')
