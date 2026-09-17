@@ -1,0 +1,20 @@
+name: Update SCB NAV & Snapshot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-scb:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: |
+          pip install requests pandas supabase pythainav tenacity
+          python fetch_scb_nav.py
+          python daily_snapshot.py

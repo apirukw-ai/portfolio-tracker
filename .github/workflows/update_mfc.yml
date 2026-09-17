@@ -1,0 +1,20 @@
+name: Update MFC NAV
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-mfc:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: |
+          pip install requests pandas supabase playwright
+          playwright install --with-deps chromium
+          python fetch_mfc_nav.py
