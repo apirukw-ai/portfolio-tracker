@@ -31,17 +31,26 @@ def get_us_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
         
-        # ดึงราคาประวัติศาสตร์ 5 วันล่าสุด โดยปิด auto_adjust เพื่อเอาราคาตลาดปิดจริง (Unadjusted Close)
+        # 1. ดึงจาก history 5 วันย้อนหลังก่อน ( Unadjusted Close )
         hist = ticker.history(period="5d", auto_adjust=False)
         
-        if len(hist) >= 2:
+        # หากดึงไม่สำเร็จ หรือติดวันหยุดยาว ให้ขยายเป็น 10 วันย้อนหลัง
+        if hist.empty or len(hist) < 2:
+            hist = ticker.history(period="10d", auto_adjust=False)
+            
+        if not hist.empty and len(hist) >= 2:
             current_price = float(hist["Close"].iloc[-1])
             prev_close = float(hist["Close"].iloc[-2])
             return round(current_price, 4), round(prev_close, 4)
-        elif len(hist) == 1:
-            current_price = float(hist["Close"].iloc[-1])
-            return round(current_price, 4), round(current_price, 4)
             
+        # 2. Fallback สำรองสุดท้าย: หาก history ดึงไม่ได้เลย ให้ใช้ ticker.info
+        info = ticker.info
+        current_price = info.get('regularMarketPrice') or info.get('currentPrice')
+        prev_close = info.get('regularMarketPreviousClose') or info.get('previousClose')
+        
+        if current_price is not None and prev_close is not None:
+            return round(float(current_price), 4), round(float(prev_close), 4)
+
     except Exception as e:
         print(f"⚠️ yfinance Error [{symbol}]: {e}")
         
