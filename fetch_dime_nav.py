@@ -29,10 +29,10 @@ def get_usd_thb_rate():
 
 def get_us_stock_price(symbol):
     # -------------------------------------------------------------
-    # 1. Direct Yahoo v8 Chart API (ยิงตรงไม่ผ่าน yfinance - ทะลุการบล็อก 100%)
+    # 1. Direct Yahoo v8 Chart API (อ่านจาก meta โดยตรง ป้องกันสลับช่อง 100%)
     # -------------------------------------------------------------
     try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=10d&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         }
@@ -42,19 +42,21 @@ def get_us_stock_price(symbol):
             data = res.json()
             result = data.get("chart", {}).get("result", [])
             if result:
+                meta = result[0].get("meta", {})
+                current_price = meta.get("regularMarketPrice")
+                prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+                
+                # หากมีค่าจาก meta ชัดเจน ให้ส่งกลับทันที (ไม่สลับช่องแน่นอน)
+                if current_price is not None and prev_close is not None:
+                    return round(float(current_price), 4), round(float(prev_close), 4)
+
+                # สำรอง: หาก meta ขาดหายไป ค่อยอ่านจากตารางราคาปิด (Closes Array)
                 indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
                 raw_closes = indicators.get("close", [])
-                
-                # กรองค่า None/Null ออกจากอาร์เรย์ราคาปิด
                 closes = [c for c in raw_closes if c is not None]
                 
                 if len(closes) >= 2:
-                    current_price = closes[-1]
-                    prev_close = closes[-2]
-                    return round(float(current_price), 4), round(float(prev_close), 4)
-                elif len(closes) == 1:
-                    current_price = closes[-1]
-                    return round(float(current_price), 4), round(float(current_price), 4)
+                    return round(float(closes[-1]), 4), round(float(closes[-2]), 4)
     except Exception as e:
         print(f"⚠️ Direct Yahoo API Error [{symbol}]: {e}")
 
