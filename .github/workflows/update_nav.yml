@@ -1,9 +1,6 @@
 name: Auto Update Portfolio NAV
 
 on:
-  name: Auto Update Portfolio NAV
-
-on:
   workflow_dispatch: # เปิดรับการสั่งรันจาก cron-job.org หรือการกดรันด้วยตนเอง
 
 jobs:
@@ -19,46 +16,30 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright
-          restore-keys: |
-            ${ Sout runner.os }}-playwright-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install supabase requests beautifulsoup4 yfinance playwright pythainav tenacity
-          playwright install --with-deps chromium
+          pip install requests pandas supabase yfinance
 
-      # --- 1. Dime US Stock ---
+      # 1. Dime US Stock
       - name: Run Dime US Stock Price Fetch
-        if: github.event.schedule == '7 22 * * 1-5' || github.event_name == 'workflow_dispatch'
         run: python fetch_dime_nav.py
 
-      # --- 2. GPF ---
+      # 2. GPF
       - name: Run GPF NAV Fetch
-        if: github.event.schedule == '13 3 * * 1-5' || github.event_name == 'workflow_dispatch'
         run: python fetch_gpf_nav.py
 
-      # --- 3. Thai Mutual Funds (MFC & SCB) ---
-      # รันทั้งรอบ 19:30 น. และ 21:00 น. เพื่อป้องกันกรณีเว็บธนาคารประกาศ NAV ช้า
+      # 3. MFC & SCB
       - name: Run MFC NAV Fetch
-        if: contains(fromJSON('["30 12 * * 1-5", "0 14 * * 1-5"]'), github.event.schedule) || github.event_name == 'workflow_dispatch'
         run: python fetch_mfc_nav.py
 
       - name: Run SCB NAV Fetch
-        if: contains(fromJSON('["30 12 * * 1-5", "0 14 * * 1-5"]'), github.event.schedule) || github.event_name == 'workflow_dispatch'
         run: python fetch_scb_nav.py
 
-      # --- 4. Daily Snapshot ---
-      # ให้รัน Snapshot เฉพาะรอบดึกสุด (21:00 น.) เพื่อมั่นใจว่าได้ NAV ล่าสุดของทุกกองทุนแล้ว
+      # 4. Daily Snapshot
       - name: Save Daily Snapshot
-        if: github.event.schedule == '0 14 * * 1-5' || github.event_name == 'workflow_dispatch'
         run: python daily_snapshot.py
