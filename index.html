@@ -1367,16 +1367,16 @@ async function renderSnapshotDashboard() {
           .replace(/,/g, '');
 
         const { data: currentPort, error: fetchErr } = await supabaseClient
-          .from('user_portfolios')
-          .select('id, asset_code, app_source, units, avg_nav, last_transaction_date');
+            .from('user_portfolios')
+            .select('id, asset_name, asset_code, app_source, units, avg_nav, last_transaction_date');
 
         if (fetchErr) throw fetchErr;
 
         const planMappings = [
-          { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
-          { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
-          { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
-        ];
+    { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
+    { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] },                      // สลับขึ้นมาเป็นลำดับที่ 2
+    { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์', 'อสังหา'] } // สลับลงไปเป็นลำดับที่ 3
+];
 
         let slipDate = "";
         const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
@@ -1407,7 +1407,8 @@ async function renderSnapshotDashboard() {
           if (isNaN(newNav) || isNaN(addedUnits)) continue;
 
           const mapping = planMappings[i] || planMappings[0];
-          const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
+          // ✅ แก้เป็น (เช็กทั้ง asset_name และ asset_code):
+const targetAsset = currentPort.find(a => a.asset_name === mapping.code || a.asset_code === mapping.code);
 
           if (!targetAsset) continue;
 
