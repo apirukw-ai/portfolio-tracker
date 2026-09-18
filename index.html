@@ -1417,25 +1417,28 @@ const targetAsset = currentPort.find(a => a.asset_name === mapping.code || a.ass
             return;
           }
 
-          const oldUnits = parseFloat(targetAsset.units || 0);
-          const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
-          const totalNewUnits = oldUnits + addedUnits;
+        const oldUnits = parseFloat(targetAsset.units || 0);
+        const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
+        const totalNewUnits = oldUnits + addedUnits;
 
-          let calculatedAvgNav = newNav;
-          if (oldUnits > 0 && oldAvgNav > 0) {
-            const totalOldCost = oldUnits * oldAvgNav;
-            const totalNewCost = totalOldCost + (addedUnits * newNav);
-            calculatedAvgNav = totalNewCost / totalNewUnits;
-          }
+        // คำนวณต้นทุนรวมไว้ด้านนอก เพื่อให้ดึงไปใช้ใน update ได้เสมอ
+        const totalOldCost = oldUnits * oldAvgNav;
+        const totalNewCost = totalOldCost + (addedUnits * newNav);
 
-          const { error: updateErr } = await supabaseClient
+        let calculatedAvgNav = newNav;
+        if (totalNewUnits > 0) {
+            calculatedAvgNav = Number((totalNewCost / totalNewUnits).toFixed(4));
+        }
+
+        const { error: updateErr } = await supabaseClient
             .from('user_portfolios')
             .update({
-              units: totalNewUnits,
-              avg_nav: calculatedAvgNav,
-              current_nav: newNav,
-              last_transaction_date: slipDate,
-              updated_at: new Date().toISOString()
+                units: Number(totalNewUnits.toFixed(4)),
+                avg_nav: Number(calculatedAvgNav.toFixed(4)),
+                total_cost: Number(totalNewCost.toFixed(2)),
+                current_nav: newNav,
+                last_transaction_date: slipDate,
+                updated_at: new Date().toISOString()
             })
             .eq('id', targetAsset.id);
 
