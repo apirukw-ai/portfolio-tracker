@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3309/3309991.png">
   <title>Investment Portfolio Dashboard</title>
   
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="./style.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -1196,7 +1196,7 @@ async function renderSnapshotDashboard() {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
-    async function handleGpfPdfUpload(event) {
+    async function handlePdfUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
 
@@ -1367,16 +1367,16 @@ async function renderSnapshotDashboard() {
           .replace(/,/g, '');
 
         const { data: currentPort, error: fetchErr } = await supabaseClient
-            .from('user_portfolios')
-            .select('id, asset_name, asset_code, app_source, units, avg_nav, last_transaction_date');
+          .from('user_portfolios')
+          .select('id, asset_code, app_source, units, avg_nav, last_transaction_date');
 
         if (fetchErr) throw fetchErr;
 
         const planMappings = [
-    { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
-    { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] },                      // สลับขึ้นมาเป็นลำดับที่ 2
-    { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์', 'อสังหา'] } // สลับลงไปเป็นลำดับที่ 3
-];
+          { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
+          { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
+          { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
+        ];
 
         let slipDate = "";
         const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
@@ -1407,8 +1407,7 @@ async function renderSnapshotDashboard() {
           if (isNaN(newNav) || isNaN(addedUnits)) continue;
 
           const mapping = planMappings[i] || planMappings[0];
-          // ✅ แก้เป็น (เช็กทั้ง asset_name และ asset_code):
-const targetAsset = currentPort.find(a => a.asset_name === mapping.code || a.asset_code === mapping.code);
+          const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
 
           if (!targetAsset) continue;
 
@@ -1417,28 +1416,25 @@ const targetAsset = currentPort.find(a => a.asset_name === mapping.code || a.ass
             return;
           }
 
-        const oldUnits = parseFloat(targetAsset.units || 0);
-        const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
-        const totalNewUnits = oldUnits + addedUnits;
+          const oldUnits = parseFloat(targetAsset.units || 0);
+          const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
+          const totalNewUnits = oldUnits + addedUnits;
 
-        // คำนวณต้นทุนรวมไว้ด้านนอก เพื่อให้ดึงไปใช้ใน update ได้เสมอ
-        const totalOldCost = oldUnits * oldAvgNav;
-        const totalNewCost = totalOldCost + (addedUnits * newNav);
+          let calculatedAvgNav = newNav;
+          if (oldUnits > 0 && oldAvgNav > 0) {
+            const totalOldCost = oldUnits * oldAvgNav;
+            const totalNewCost = totalOldCost + (addedUnits * newNav);
+            calculatedAvgNav = totalNewCost / totalNewUnits;
+          }
 
-        let calculatedAvgNav = newNav;
-        if (totalNewUnits > 0) {
-            calculatedAvgNav = Number((totalNewCost / totalNewUnits).toFixed(4));
-        }
-
-        const { error: updateErr } = await supabaseClient
+          const { error: updateErr } = await supabaseClient
             .from('user_portfolios')
             .update({
-                units: Number(totalNewUnits.toFixed(4)),
-                avg_nav: Number(calculatedAvgNav.toFixed(4)),
-                total_cost: Number(totalNewCost.toFixed(2)),
-                current_nav: newNav,
-                last_transaction_date: slipDate,
-                updated_at: new Date().toISOString()
+              units: totalNewUnits,
+              avg_nav: calculatedAvgNav,
+              current_nav: newNav,
+              last_transaction_date: slipDate,
+              updated_at: new Date().toISOString()
             })
             .eq('id', targetAsset.id);
 
