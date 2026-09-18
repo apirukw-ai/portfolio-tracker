@@ -1196,7 +1196,7 @@ async function renderSnapshotDashboard() {
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     }
 
-    async function handlePdfUpload(event) {
+    async function handleGpfPdfUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
 
