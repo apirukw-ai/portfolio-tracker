@@ -94,8 +94,8 @@ def run_gpf_update():
         name = item.get("asset_name", "").strip() if item.get("asset_name") else ""
         units = float(item.get("units") or 0)
         
-        # ตรวจสอบจาก asset_code ก่อน หากไม่เจอให้ลองเช็คจาก asset_name
-        latest_nav = gpf_nav_data.get(code) or gpf_nav_data.get(name)
+        # แก้ไขบรรทัดที่ 98 (เปลี่ยนลำดับให้ดึงจาก name ก่อน):
+latest_nav = gpf_nav_data.get(name) or gpf_nav_data.get(code)
 
         if latest_nav and latest_nav > 0:
             updated_item = item.copy()
