@@ -275,42 +275,64 @@ async function renderSnapshotDashboard() {
     return;
   }
 
-  // 1. เรนเดอร์ข้อมูลลงตาราง
-  tableBody.innerHTML = data.map(row => {
-    let returnText = '-';
-    const appKey = (row.app_source || '').trim().toLowerCase();
-    const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default || { textClass: 'text-slate-300' };
+  // 1. วนลูปสร้างแถวตารางข้อมูล
+    tableBody.innerHTML = data.map((row, index) => {
+        let returnText = '-';
+        const appKey = (row.app_source || '').trim().toLowerCase();
+        const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default || { textClass: 'text-slate-300' };
 
-    if (appKey === 'gpf') {
-      const parts = [];
-      if (row.reported_5y_pct !== null && row.reported_5y_pct !== undefined) {
-        const c5y = row.reported_5y_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-        parts.push(`5 ปีย้อนหลัง: <span class="font-semibold ${c5y}">${row.reported_5y_pct}%</span>`);
-      }
-      if (row.reported_since_inception_pct !== null && row.reported_since_inception_pct !== undefined) {
-        const cIncep = row.reported_since_inception_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-        parts.push(`ตั้งแต่เริ่มส่ง: <span class="font-semibold ${cIncep}">${row.reported_since_inception_pct}%</span>`);
-      }
-      returnText = parts.length > 0 ? parts.join(' <span class="text-slate-600 mx-1.5">|</span> ') : '-';
-    } else {
-      const returnPct = row.reported_ytd_pct ?? row.reported_5y_pct ?? row.reported_since_inception_pct;
-      if (returnPct !== null && returnPct !== undefined) {
-        const colorClass = returnPct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-        const label = row.reported_ytd_pct !== null ? 'YTD: ' : '';
-        returnText = `${label}<span class="font-semibold ${colorClass}">${returnPct}%</span>`;
-      }
-    }
+        // หาข้อมูลสัปดาห์ก่อนหน้าของแอปเดียวกันเพื่อนำมาเปรียบเทียบ WoW
+        const prevRow = data.slice(index + 1).find(p => (p.app_source || '').trim().toLowerCase() === appKey);
 
-    return `
-      <tr class="hover:bg-slate-700/30 transition">
-        <td class="p-3 font-mono">${row.snapshot_date}</td>
-        <td class="p-3 font-bold uppercase ${appTheme.textClass}">${row.app_source}</td>
-        <td class="p-3 font-mono">${Number(row.total_value_thb).toLocaleString('th-TH', {minimumFractionDigits: 2})} ฿</td>
-        <td class="p-3 font-mono text-xs md:text-sm">${returnText}</td>
-      </tr>
-    `;
-  }).join('');
+        // ฟังก์ชันสร้างป้ายวงเล็บ (+/- %)
+        const getWoWBadge = (diffVal) => {
+            if (diffVal === null || diffVal === undefined || isNaN(diffVal) || diffVal === 0) return '';
+            const sign = diffVal > 0 ? '+' : '';
+            const colorClass = diffVal > 0 ? 'text-emerald-400' : 'text-rose-400';
+            return `<span class="${colorClass} text-xs font-normal ml-1">(${sign}${diffVal.toFixed(2)}%)</span>`;
+        };
 
+        // 1. คำนวณ % การเปลี่ยนแปลงมูลค่าเงินรวม WoW
+        const wowValPct = row.wow_return_pct || (prevRow && prevRow.total_value_thb > 0 
+            ? ((row.total_value_thb - prevRow.total_value_thb) / prevRow.total_value_thb) * 100 
+            : null);
+
+        // 2. จัดการ % ผลตอบแทนสะสม (พร้อมเทียบวงเล็บ WoW)
+        if (appKey === 'gpf') {
+            const parts = [];
+            if (row.reported_5y_pct !== null && row.reported_5y_pct !== undefined) {
+                const prev5y = prevRow ? prevRow.reported_5y_pct : null;
+                const diff5y = (prev5y !== null && prev5y !== undefined) ? (row.reported_5y_pct - prev5y) : null;
+                const c5y = row.reported_5y_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                parts.push(`5 ปีย้อนหลัง: <span class="font-semibold ${c5y}">${row.reported_5y_pct}%</span>${getWoWBadge(diff5y)}`);
+            }
+            if (row.reported_since_inception_pct !== null && row.reported_since_inception_pct !== undefined) {
+                const prevIncep = prevRow ? prevRow.reported_since_inception_pct : null;
+                const diffIncep = (prevIncep !== null && prevIncep !== undefined) ? (row.reported_since_inception_pct - prevIncep) : null;
+                const cIncep = row.reported_since_inception_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                parts.push(`ตั้งแต่เริ่มส่ง: <span class="font-semibold ${cIncep}">${row.reported_since_inception_pct}%</span>${getWoWBadge(diffIncep)}`);
+            }
+            if (parts.length > 0) returnText = parts.join(' <span class="text-slate-600 mx-1.5">|</span> ');
+        } else {
+            const returnPct = row.reported_ytd_pct ?? row.reported_5y_pct ?? row.reported_since_inception_pct;
+            if (returnPct !== null && returnPct !== undefined) {
+                const prevYtd = prevRow ? (prevRow.reported_ytd_pct ?? prevRow.reported_5y_pct ?? prevRow.reported_since_inception_pct) : null;
+                const diffYtd = (prevYtd !== null && prevYtd !== undefined) ? (returnPct - prevYtd) : null;
+                const colorClass = returnPct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const label = row.reported_ytd_pct !== null ? 'YTD: ' : '';
+                returnText = `${label}<span class="font-semibold ${colorClass}">${returnPct}%</span>${getWoWBadge(diffYtd)}`;
+            }
+        }
+
+        return `
+            <tr class="hover:bg-slate-700/30 transition">
+                <td class="p-3 font-mono">${row.snapshot_date}</td>
+                <td class="p-3 font-bold uppercase ${appTheme.textClass}">${row.app_source}</td>
+                <td class="p-3 font-mono">${Number(row.total_value_thb).toLocaleString('th-TH', {minimumFractionDigits: 2})} ฿ ${getWoWBadge(wowValPct)}</td>
+                <td class="p-3 font-mono text-xs md:text-sm">${returnText}</td>
+            </tr>
+        `;
+    }).join('');
   // 2. ดึงข้อมูลล่าสุดของแต่ละแอปพลิเคชันมาทำกราฟแท่งแนวนอน
   const latestByApp = {};
   // วนลูปตามลำดับ (data ถูกเรียง snapshot_date จากใหม่ไปเก่าแล้ว)
@@ -1635,7 +1657,7 @@ async function renderSnapshotDashboard() {
         try {
           const { data, error } = await supabaseClient
             .from('portfolio_snapshots')
-            .select('snapshot_date, app_source, total_value_thb')
+            .select('*')
             .order('snapshot_date', { ascending: true });
 
           if (!error && data && data.length > 0) {
