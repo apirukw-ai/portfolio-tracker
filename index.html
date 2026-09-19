@@ -334,99 +334,109 @@ async function renderSnapshotDashboard() {
         `;
     }).join('');
   // 2. ดึงข้อมูลล่าสุดของแต่ละแอปพลิเคชันมาทำกราฟแท่งแนวนอน
-  const latestByApp = {};
-  // วนลูปตามลำดับ (data ถูกเรียง snapshot_date จากใหม่ไปเก่าแล้ว)
-  data.forEach(row => {
-    const appKey = (row.app_source || '').trim().toUpperCase();
-    if (!latestByApp[appKey]) {
-      latestByApp[appKey] = parseFloat(row.total_value_thb) || 0;
-    }
-  });
+    const latestByApp = {};
+    data.forEach(row => {
+        const appKey = (row.app_source || '').trim().toUpperCase();
+        if (!latestByApp[appKey]) {
+            latestByApp[appKey] = parseFloat(row.total_value_thb) || 0;
+        }
+    });
 
-  // ลำดับแอปที่ต้องการแสดง
-  const appOrder = ['SCB', 'MFC', 'DIME', 'GPF'];
-  const labels = [];
-  const chartValues = [];
-  const barColors = [];
+    const appOrder = ['SCB', 'MFC', 'DIME', 'GPF'];
+    const labels = [];
+    const chartValues = [];
+    const barColors = [];
 
-  const colorMap = {
-    'SCB': '#8b5cf6',   // สีม่วง SCB
-    'MFC': '#f43f5e',   // สีชมพู/แดง MFC
-    'DIME': '#10b981',  // สีเขียว DIME
-    'GPF': '#2563eb'    // สีน้ำเงิน GPF
-  };
+    const colorMap = {
+        'SCB': '#8b5cf6',
+        'MFC': '#ef4444',
+        'DIME': '#10b981',
+        'GPF': '#2563eb'
+    };
 
-  appOrder.forEach(app => {
-    if (latestByApp[app] !== undefined) {
-      labels.push(app);
-      chartValues.push(latestByApp[app]);
-      barColors.push(colorMap[app] || '#64748b');
-    }
-  });
+    appOrder.forEach(app => {
+        if (latestByApp[app] !== undefined) {
+            labels.push(app);
+            chartValues.push(latestByApp[app]);
+            barColors.push(colorMap[app] || '#64748b');
+        }
+    });
 
-  // 3. วาดกราฟแท่งแนวนอน (Horizontal Bar Chart)
-  const ctx = document.getElementById('portfolioChart')?.getContext('2d');
-  if (ctx && typeof Chart !== 'undefined') {
-    if (window.mySnapshotChart) {
-      window.mySnapshotChart.destroy();
-    }
+    // คำนวณมูลค่าพอร์ตรวมสำหรับหา % สัดส่วน
+    const overallTotalWealth = chartValues.reduce((sum, val) => sum + val, 0);
 
-    window.mySnapshotChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          data: chartValues,
-          backgroundColor: barColors,
-          borderRadius: 8,
-          barThickness: 32
-        }]
-      },
-      options: {
-        indexAxis: 'y', // กำหนดเป็นแนวนอน
-        responsive: true,
-        plugins: {
-          legend: { display: false },
-          title: { 
-            display: true, 
-            text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)', 
-            color: '#94a3b8',
-            font: { family: 'Prompt', size: 13 }
-          },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` มูลค่า: ฿${ctx.parsed.x.toLocaleString('th-TH', {minimumFractionDigits: 2})}`
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: {
-              color: '#94a3b8',
-              callback: (val) => val.toLocaleString()
+    // 3. วาดกราฟแท่งแนวนอน (Horizontal Bar Chart)
+    const ctx = document.getElementById('portfolioChart')?.getContext('2d');
+    if (ctx && typeof Chart !== 'undefined') {
+        if (window.mySnapshotChart) {
+            window.mySnapshotChart.destroy();
+        }
+
+        window.mySnapshotChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: chartValues,
+                    backgroundColor: barColors,
+                    borderRadius: 8,
+                    barThickness: 28
+                }]
             },
-            grid: { color: 'rgba(51, 65, 85, 0.3)' }
-          },
-            y: {
-                ticks: {
-                    color: function(context) {
-                        const label = context.chart.data.labels[context.index];
-                        const colorMap = {
-                            'GPF': '#38BDF8',
-                            'DIME': '#00FF66',
-                            'MFC': '#FF9800',
-                            'SCB': '#C084FC'
-                        };
-                        return colorMap[label] || '#FFFFFF';
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)',
+                        color: '#94a3b8',
+                        font: { family: 'Prompt', size: 13 }
                     },
-                    font: { size: 13, family: 'Prompt', weight: 'bold' }
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.parsed.x || 0;
+                                const pct = overallTotalWealth > 0 ? ((val / overallTotalWealth) * 100).toFixed(1) : '0.0';
+                                return ` มูลค่า: ฿${val.toLocaleString('th-TH', {minimumFractionDigits: 2})} (${pct}%)`;
+                            }
+                        }
+                    }
                 },
-                grid: { display: false }
-              }
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#94a3b8',
+                            callback: function(val) {
+                                if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M ฿';
+                                if (val >= 1000) return (val / 1000).toFixed(0) + 'k ฿';
+                                return val.toLocaleString();
+                            }
+                        },
+                        grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                    },
+                    y: {
+                        ticks: {
+                            color: function(context) {
+                                const label = context.chart.data.labels[context.index];
+                                const cMap = {
+                                    'GPF': '#38BDF8',
+                                    'DIME': '#00FF66',
+                                    'MFC': '#FF9800',
+                                    'SCB': '#C084FC'
+                                };
+                                return cMap[label] || '#FFFFFF';
+                            },
+                            font: { size: 13, family: 'Prompt', weight: 'bold' }
+                        },
+                        grid: { display: false }
+                    }
+                }
             }
-          }
         });
-      }
+	}
     }
 
     document.addEventListener('DOMContentLoaded', renderSnapshotDashboard);
