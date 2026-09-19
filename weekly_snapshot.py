@@ -18,21 +18,20 @@ def get_usd_thb_rate():
         hist = ticker.history(period="1d")
         if not hist.empty:
             rate = float(hist["Close"].iloc[-1])
-            print(f"💵 อัตราแลกเปลี่ยน USD/THB ปัจจุบัน: {rate:.4f}")
             return rate
     except Exception as e:
         print(f"⚠️ Exchange Rate Fetch Error: {e}")
     return 33.00
 
-def save_weekly_snapshot(app_source, total_thb):
+def save_weekly_snapshot(app_source, total_thb, auto_pnl_pct=None):
     try:
         today_str = (datetime.now(timezone.utc) + timedelta(hours=7)).strftime("%Y-%m-%d")
         app_upper = app_source.upper()
 
-        # ดึงข้อมูล Snapshot สัปดาห์ล่าสุดเพื่อคำนวณเปรียบเทียบ WoW
+        # ดึง Snapshot สัปดาห์ล่าสุดเพื่อคำนวณเปรียบเทียบ WoW
         prev_res = (
             supabase.table("portfolio_snapshots")
-            .select("total_value_thb, reported_ytd_pct, reported_5y_pct, reported_since_inception_pct")
+            .select("*")
             .ilike("app_source", app_upper)
             .order("snapshot_date", desc=True)
             .limit(1)
@@ -58,8 +57,12 @@ def save_weekly_snapshot(app_source, total_thb):
             "wow_return_pct": wow_return_pct
         }
 
-        # เก็บประวัติ YTD และค่าเดิมถ้ามี
-        if prev_res.data and len(prev_res.data) > 0:
+        # จัดการค่าผลตอบแทน (%)
+        if auto_pnl_pct is not None:
+            # DIME & SCB: อัปเดต % กำไร/ขาดทุนสะสมที่คำนวณได้ใหม่อัตโนมัติ
+            data["reported_ytd_pct"] = round(auto_pnl_pct, 2)
+        elif prev_res.data and len(prev_res.data) > 0:
+            # MFC & GPF: คงค่าเดิมที่เคยกรอกไว้ใน DB
             last_record = prev_res.data[0]
             if last_record.get("reported_ytd_pct") is not None:
                 data["reported_ytd_pct"] = last_record["reported_ytd_pct"]
@@ -72,7 +75,7 @@ def save_weekly_snapshot(app_source, total_thb):
             data, on_conflict="snapshot_date,app_source"
         ).execute()
 
-        print(f"✅ [Weekly Snapshot] {app_upper}: ฿{total_thb:,.2f} | WoW: ฿{wow_change_thb:,.2f} ({wow_return_pct:+.2f}%)")
+        print(f"✅ [Weekly Snapshot] {app_upper}: ฿{total_thb:,.2f} | WoW: {wow_return_pct:+.2f}%")
     except Exception as e:
         print(f"⚠️ Failed to save weekly snapshot for {app_source}: {e}")
 
@@ -92,11 +95,24 @@ def run_weekly_snapshot():
         if app == "DIME":
             total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
             total_thb = total_usd * usd_rate
-        else:
-            total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+            
+            # คำนวณ % กำไรสะสมของ DIME
+            cost_usd = sum(float(i.get("units") or 0) * float(i.get("avg_cost") or i.get("cost_price") or 0) for i in app_items)
+            auto_pnl = ((total_usd - cost_usd) / cost_usd * 100) if cost_usd > 0 else 0.0
+            save_weekly_snapshot(app, total_thb, auto_pnl_pct=auto_pnl)
 
-        if total_thb > 0:
-            save_weekly_snapshot(app, total_thb)
+        elif app == "SCB":
+            total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+            
+            # คำนวณ % กำไรสะสมของ SCB
+            cost_thb = sum(float(i.get("units") or 0) * float(i.get("avg_cost") or i.get("avg_nav") or 0) for i in app_items)
+            auto_pnl = ((total_thb - cost_thb) / cost_thb * 100) if cost_thb > 0 else 0.0
+            save_weekly_snapshot(app, total_thb, auto_pnl_pct=auto_pnl)
+
+        else: # GPF & MFC
+            total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+            if total_thb > 0:
+                save_weekly_snapshot(app, total_thb)
 
 if __name__ == "__main__":
     run_weekly_snapshot()
