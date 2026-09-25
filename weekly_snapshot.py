@@ -80,37 +80,47 @@ def save_weekly_snapshot(app_source, total_thb, auto_pnl_pct=None):
         print(f"⚠️ Failed to save weekly snapshot for {app_source}: {e}")
 
 def run_weekly_snapshot():
-    usd_rate = get_usd_thb_rate()
-    db_res = supabase.table("user_portfolios").select("*").execute()
-    latest_items = db_res.data or []
+    # 1. ดึงข้อมูลจาก View v_app_allocation มาใช้เป็นหลัก
+    try:
+        alloc_res = supabase.table("v_app_allocation").select("*").execute()
+        app_allocations = alloc_res.data or []
+    except Exception as e:
+        print(f"⚠️ Failed to fetch v_app_allocation: {e}")
+        app_allocations = []
 
     all_apps = ["GPF", "DIME", "SCB", "MFC"]
 
     for app in all_apps:
-        app_items = [
-            i for i in latest_items
-            if str(i.get("app_source", "")).strip().upper() == app
-        ]
+        # หา data ของแอปนั้นๆ จาก view
+        app_data = next((item for item in app_allocations if str(item.get("app_source", "")).upper() == app), None)
+
+        if not app_data:
+            print(f"⚠️ No data found for {app} in v_app_allocation")
+            continue
 
         if app == "DIME":
-            total_usd = sum(float(i.get("current_value") or 0) for i in app_items)
-            total_thb = total_usd * usd_rate
+            # DIME เก็บมูลค่าตั้งต้นเป็น USD ไว้ในฟิลด์ที่ชื่อลงท้ายด้วย _thb
+            dime_usd_wealth = float(app_data.get("total_wealth_thb") or 0)
+            dime_usd_cost = float(app_data.get("total_cost_thb") or 0)
+            dime_fx_rate = float(app_data.get("fx_rate") or 33.0)
+
+            # คำนวณยอดเงินบาทรวมโดยใช้ fx_rate ของแอปเอง
+            total_thb = dime_usd_wealth * dime_fx_rate
             
-            # คำนวณ % กำไรสะสมของ DIME
-            cost_usd = sum(float(i.get("units") or 0) * float(i.get("avg_cost") or i.get("cost_price") or 0) for i in app_items)
-            auto_pnl = ((total_usd - cost_usd) / cost_usd * 100) if cost_usd > 0 else 0.0
+            # คำนวณ PnL % จากต้นทุน USD
+            auto_pnl = ((dime_usd_wealth - dime_usd_cost) / dime_usd_cost * 100) if dime_usd_cost > 0 else 0.0
+
             save_weekly_snapshot(app, total_thb, auto_pnl_pct=auto_pnl)
 
         elif app == "SCB":
-            total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+            total_thb = float(app_data.get("total_wealth_thb") or 0)
+            cost_thb = float(app_data.get("total_cost_thb") or 0)
             
-            # คำนวณ % กำไรสะสมของ SCB
-            cost_thb = sum(float(i.get("units") or 0) * float(i.get("avg_cost") or i.get("avg_nav") or 0) for i in app_items)
             auto_pnl = ((total_thb - cost_thb) / cost_thb * 100) if cost_thb > 0 else 0.0
             save_weekly_snapshot(app, total_thb, auto_pnl_pct=auto_pnl)
 
         else: # GPF & MFC
-            total_thb = sum(float(i.get("current_value") or 0) for i in app_items)
+            total_thb = float(app_data.get("total_wealth_thb") or 0)
             if total_thb > 0:
                 save_weekly_snapshot(app, total_thb)
 
