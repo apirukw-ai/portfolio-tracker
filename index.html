@@ -509,7 +509,7 @@ async function renderSnapshotDashboard() {
         let fxRate = window.currentFxRate;
         if (!fxRate || fxRate === 1) {
           try {
-            const res = await fetch('https://er-api.com');
+            const res = await fetch('https://er-api.com', { method: 'GET' });
             const data = await res.json();
             fxRate = data?.rates?.THB || 36.5;
             window.currentFxRate = fxRate;
