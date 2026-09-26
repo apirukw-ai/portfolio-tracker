@@ -509,13 +509,13 @@ async function renderSnapshotDashboard() {
         let fxRate = window.currentFxRate;
         if (!fxRate || fxRate === 1) {
           try {
-            const res = await fetch('https://exchangerate-api.com');
-            const data = await res.json();
-            fxRate = data?.rates?.THB || 36.5;
-            window.currentFxRate = fxRate;
-          } catch (e) {
-            fxRate = window.DEFAULT_FX_RATE || 36.5;
-          }
+                const res = await fetch('https://open.er-api.com/v6/latest/USD');
+                const data = await res.json();
+                fxRate = data?.rates?.THB || 36.5;
+                window.currentFxRate = fxRate;
+            } catch (e) {
+                fxRate = window.DEFAULT_FX_RATE || 36.5;
+            }
         }
 
         const { data: assets, error } = await supabaseClient.from('user_portfolios').select('*');
