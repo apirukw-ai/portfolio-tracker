@@ -8,9 +8,8 @@ key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
 def update_dime_stocks():
-    # 2. ดึงรายการหุ้น US ทั้งหมดจาก Supabase (ปรับ query ตามเงื่อนไขของคุณ)
-    # ตัวอย่าง: ดึงรายการทั้งหมดใน user_portfolios ที่เป็นหุ้น US หรือระบุชื่อ Ticker
-    response = supabase.table("user_portfolios").select("id, asset_name").execute()
+    # 2. ดึงเฉพาะรายการที่เป็นของแอป DIME
+    response = supabase.table("user_portfolios").select("id, asset_name").ilike("app_source", "DIME").execute()
     portfolios = response.data
 
     for item in portfolios:
