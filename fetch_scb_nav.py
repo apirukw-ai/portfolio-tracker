@@ -25,7 +25,7 @@ FUND_MAP = {
     'SCBNDQ(E)':    ['SCBNDQ(E)', 'SCBNDQ-E', ' SCBNDQ(E) '],
     'SCBS&P500E':   ['SCBS&P500E', 'SCBS&P500(E)', 'SCBS&P500-E', ' SCBS&P500E '],
     'SCBSEMI(E)':   ['SCBSEMI(E)', 'SCBSEMI-E', ' SCBSEMI(E) '],
-    'SCBGVALUE(E)':  [' SCBGVALUE(E) ']
+    'SCBGVALUE(E)': [' SCBGVALUE(E) '],
     'SCBWORLD(E)':  ['SCBWORLD(E)', 'SCBWORLD-E', ' SCBWORLD(E) ']
 }
 
