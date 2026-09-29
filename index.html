@@ -2111,7 +2111,17 @@ subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิ
         reader.onerror = error => reject(error);
         reader.readAsDataURL(file);
       });
-    }
+    async function handleGpfPdfUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    console.log("กำลังสแกนไฟล์ PDF ของ GPF...", file.name);
+    // ใส่โค้ด อ่าน/ดึงข้อมูล จาก PDF ของ GPF ตรงนี้
+}
+
+// ประกาศให้ HTML มองเห็นฟังก์ชันนี้
+window.handleGpfPdfUpload = handleGpfPdfUpload;
+	}
   </script>
   
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
