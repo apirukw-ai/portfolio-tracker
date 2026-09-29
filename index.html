@@ -2105,21 +2105,23 @@ subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิ
     }
 
     function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
         reader.readAsDataURL(file);
-      });
-    async function handleGpfPdfUpload(event) {
+    });
+} // 🟢 เพิ่มปีกกาปิดฟังก์ชัน fileToBase64 ตรงนี้
+
+async function handleGpfPdfUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     console.log("กำลังสแกนไฟล์ PDF ของ GPF...", file.name);
-    // ใส่โค้ด อ่าน/ดึงข้อมูล จาก PDF ของ GPF ตรงนี้
+    // โค้ดอ่าน PDF ...
 }
 
-// ประกาศให้ HTML มองเห็นฟังก์ชันนี้
+// 🟢 ประกาศ window scope นอกฟังก์ชัน
 window.handleGpfPdfUpload = handleGpfPdfUpload;
 	}
   </script>
