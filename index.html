@@ -121,11 +121,6 @@
     <!-- แถว 3: รายละเอียดของแต่ละพอร์ต -->
     <div id="app-tables-container" class="space-y-6"></div>
 
-    <div class="flex justify-end items-center text-[11px] sm:text-xs text-slate-400 mt-2 px-1">
-      <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-      🔄 Auto-Update ล่าสุด: <span id="last-updated-time" class="font-mono ml-1 text-slate-200">กำลังโหลด...</span>
-    </div>
-
     <!-- Snapshot History Section -->
     <section id="snapshot-history-section" class="mt-8 p-6 bg-slate-800/90 border border-sky-500/20 rounded-2xl shadow-[0_0_25px_rgba(56,189,248,0.04)]">
       <div class="flex items-center justify-between mb-4">
@@ -604,9 +599,15 @@ async function renderSnapshotDashboard() {
               }
               const subEl = document.getElementById('total-wealth-subtext');
               if (subEl) {
-                const pctSign = totalProfitPct >= 0 ? '▲' : '▼';
-                const pctColor = totalProfitPct >= 0 ? GREEN : RED;
-                subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิเคชัน (<span style="color:${pctColor}">${pctSign} ${Math.abs(totalProfitPct).toFixed(2)}%</span>)`;
+                // โค้ดเดิม (บรรทัด 602-604):
+// const pctSign = totalProfitPct >= 0 ? '▲' : '▼';
+// const pctColor = totalProfitPct >= 0 ? GREEN : RED;
+// subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิเคชัน (<span style="color:${pctColor}">${pctSign} ${Math.abs(totalProfitPct).toFixed(2)}%</span>)`;
+
+// 🟢 แก้ไขใหม่เป็น:
+const pctSign = dailyProfitPct >= 0 ? '▲' : '▼';
+const pctColor = dailyProfitPct >= 0 ? GREEN : RED;
+subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิเคชัน (<span style="color:${pctColor}">${pctSign} ${Math.abs(dailyProfitPct).toFixed(2)}%</span>)`;
               }
             }
             else if (t.includes('เงินลงทุนรวม') && !t.includes('กำไร/ขาดทุน')) {
@@ -832,12 +833,6 @@ async function renderSnapshotDashboard() {
       const container = document.getElementById('app-tables-container');
       if (!container) return;
       container.innerHTML = '';
-
-      if (allData && allData.length > 0) {
-        const rawTime = allData[0].updated_at || allData[0].nav_date || '-';
-        const timeEl = document.getElementById('last-updated-time');
-        if (timeEl) timeEl.innerText = formatThaiDateTime(rawTime);
-      }
 
       const fxRate = window.currentFxRate || DEFAULT_FX_RATE;
 
