@@ -1455,7 +1455,7 @@ async function parseMfcPdfStatement(fullText) {
   }
 }
 
-// --- แกะข้อมูล GPF (คำนวณแยกตามแผนในพอร์ตจริงแบบแม่นยำ 100%) ---
+// --- แกะข้อมูล GPF (เวอร์ชันยืดหยุ่น ยิงตรงตามแผนที่มีในพอร์ต) ---
 async function parseGpfPdfStatement(fullText) {
   try {
     showToast("กำลังประมวลผลสลิป กบข. ...", "info");
@@ -1465,7 +1465,7 @@ async function parseGpfPdfStatement(fullText) {
       .replace(/\|/g, ' ')
       .replace(/(\d+):(\d+)/g, '$1.$2')
       .replace(/(\d+)-(\d+)/g, '$1.$2')
-      .replace(/(\d+),(\d{3})/g, '$1$2'); // ลบ comma ในตัวเลข
+      .replace(/(\d+),(\d{3})/g, '$1$2');
 
     const { data: currentPort, error: fetchErr } = await supabaseClient
       .from('user_portfolios')
@@ -1473,18 +1473,13 @@ async function parseGpfPdfStatement(fullText) {
 
     if (fetchErr) throw fetchErr;
 
-    // 2. ดึงวันที่สลิป (แก้เรื่องภาษาไทย + เลขไทย + มี Fallback กันระบบค้าง)
+    // 2. ดึงวันที่สลิป (รองรับภาษาไทย + เลขไทย)
     let slipDate = "";
-    
-    // แปลงเลขไทยเป็นเลขอารบิก และรวมช่องว่าง/ขึ้นบรรทัดใหม่ให้เป็นบรรทัดเดียว
     let textForDate = cleanText
       .replace(/[๐-๙]/g, d => "๐๑๒๓๔๕๖๗๘๙".indexOf(d))
       .replace(/\s+/g, ' ');
 
-    // รายชื่อเดือนภาษาไทย (ตัด \b ออกทั้งหมด)
     const months = "มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|ม\\.ค|ก\\.พ|มี\\.ค|เม\\.ย|พ\\.ค|มิ\\.ย|ก\\.ค|ส\\.ค|ก\\.ย|ต\\.ค|พ\\.ย|ธ\\.ค";
-    
-    // ดักจับรูปแบบ: วันที่ + เดือน + ปีพ.ศ.
     const dateRegex1 = new RegExp(`(\\d{1,2})\\s*(${months})\\s*(\\d{2,4})`, "gi");
     const matches1 = [...textForDate.matchAll(dateRegex1)];
 
@@ -1492,66 +1487,92 @@ async function parseGpfPdfStatement(fullText) {
       const lastMatch = matches1[matches1.length - 1];
       slipDate = `${lastMatch[1]} ${lastMatch[2]} ${lastMatch[3]}`;
     } else {
-      // ตัวสำรอง: ดักจับรูปแบบตัวเลข เช่น 29/09/2569
       const numDateMatch = textForDate.match(/(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})/);
-      if (numDateMatch) {
-        slipDate = numDateMatch[1];
-      }
+      if (numDateMatch) slipDate = numDateMatch[1];
     }
 
-    // กรณีอ่านวันที่ไม่ได้จริงๆ ให้ใช้วันที่ปัจจุบันแทน (เพื่อไม่ให้ระบบยกเลิกการสแกน)
     if (!slipDate) {
       const now = new Date();
       const thMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
       slipDate = `${now.getDate()} ${thMonths[now.getMonth()]} ${now.getFullYear() + 543}`;
     }
 
-    // 🛡️ เช็กสแกนซ้ำ
+    // 🛡️ ป้องกันสแกนซ้ำ
     const isDuplicate = currentPort && currentPort.some(asset => asset.last_transaction_date === slipDate);
     if (isDuplicate) {
       showToast(`⚠️ สลิปประจำวันที่ [${slipDate}] เคยถูกบันทึกเข้าสู่ระบบแล้ว!`, "warning");
       return;
     }
 
-    // 3. รายการแผนทั้งหมดของ กบข.
+    // 3. กำหนดแผน + เงื่อนไขการค้นหาใน PDF และ DB
     const knownPlans = [
-      { name: 'แผนหุ้นต่างประเทศ', keywords: ['หุ้นต่างประเทศ'] },
-      { name: 'แผนหุ้นไทย', keywords: ['หุ้นไทย'] },
-      { name: 'แผนทองคำ', keywords: ['ทองคำ'] },
-      { name: 'แผนการลงทุนตามหลักชะรีอะฮ์', keywords: ['ชะรีอะฮ์'] },
-      { name: 'แผนกองทุนอสังหาริมทรัพย์ไทย', keywords: ['อสังหาริมทรัพย์'] }
+      {
+        name: 'หุ้นต่างประเทศ',
+        pdfRegex: /หุ้น\s*ต่างประเทศ/i,
+        dbKeywords: ['ต่างประเทศ', 'foreign']
+      },
+      {
+        name: 'หุ้นไทย',
+        pdfRegex: /หุ้น\s*ไทย/i,
+        dbKeywords: ['หุ้นไทย', 'thai'],
+        isThaiStock: true
+      },
+      {
+        name: 'อสังหาริมทรัพย์',
+        pdfRegex: /อสังหาริมทรัพย์/i,
+        dbKeywords: ['อสังหาริมทรัพย์', 'อสังหา', 'prop']
+      },
+      {
+        name: 'ทองคำ',
+        pdfRegex: /ทองคำ/i,
+        dbKeywords: ['ทองคำ', 'gold']
+      },
+      {
+        name: 'ชะรีอะฮ์',
+        pdfRegex: /ชะรีอะฮ์/i,
+        dbKeywords: ['ชะรีอะฮ์', 'sharia']
+      }
     ];
 
-    // 4. ค้นหาแผนที่มีอยู่ใน PDF และ *ต้องตรงกับพอร์ตในระบบของคุณเท่านั้น*
+    // 4. ตรวจหาแผนที่มีอยู่ใน PDF และจับคู่กับ Database
     const detectedPlans = [];
     for (const plan of knownPlans) {
-      const targetAsset = currentPort ? currentPort.find(a =>
-        a.asset_code && plan.keywords.some(k => a.asset_code.includes(k))
-      ) : null;
+      // ค้นหาตำแหน่งใน PDF (ใช้ Regex รองรับช่องว่าง)
+      const match = cleanText.match(plan.pdfRegex);
+      if (!match) continue;
 
-      if (!targetAsset) continue; // ถ้าพอร์ตไม่มีแผนนี้ ให้ข้ามทันทีเพื่อไม่ให้ Index คลาดเคลื่อน
-
-      let idx = cleanText.indexOf(plan.name);
-      if (idx === -1) {
-        idx = cleanText.search(new RegExp(plan.keywords[0]));
+      // กันกรณีค้นหา "หุ้นไทย" แล้วไปเจอในคำว่า "หุ้นต่างประเทศ"
+      if (plan.isThaiStock) {
+        const charBefore = cleanText.substring(Math.max(0, match.index - 10), match.index);
+        if (charBefore.includes('ต่างประเทศ')) continue;
       }
-      if (idx !== -1) {
-        detectedPlans.push({ ...plan, pos: idx, targetAsset });
+
+      // ค้นหา Asset ใน Database ที่ตรงกัน
+      const targetAsset = currentPort ? currentPort.find(a => {
+        const code = (a.asset_code || '').toLowerCase();
+        return plan.dbKeywords.some(k => code.includes(k.toLowerCase()));
+      }) : null;
+
+      if (targetAsset) {
+        detectedPlans.push({
+          ...plan,
+          pos: match.index,
+          targetAsset
+        });
       }
     }
 
-    // เรียงคอลัมน์จากซ้ายไปขวาตามลำดับใน PDF
+    // เรียงคอลัมน์ตามลำดับที่พบใน PDF (ซ้ายไปขวา)
     detectedPlans.sort((a, b) => a.pos - b.pos);
 
     if (detectedPlans.length === 0) {
-      showToast("ไม่พบหัวข้อแผนการลงทุน GPF ที่ตรงกับพอร์ตในระบบ", "warning");
+      showToast("❌ ไม่พบแผน GPF ในสลิปที่ตรงกับพอร์ตในระบบ", "warning");
       return;
     }
 
-    // 5. ดึงตัวเลขทศนิยมทั้งหมดจากสลิป
+    // 5. ดึงตัวเลขทศนิยมทั้งหมดจากตาราง
     const tableStartIndex = detectedPlans[0].pos;
     const tableText = cleanText.substring(tableStartIndex);
-
     const allDecimals = (tableText.match(/\b\d+\.\d{3,4}\b/g) || [])
       .map(n => parseFloat(n))
       .filter(n => !isNaN(n) && n < 1000000);
@@ -1559,30 +1580,22 @@ async function parseGpfPdfStatement(fullText) {
     const N = detectedPlans.length;
     let updatedCount = 0;
 
-    // 6. ตรวจสอบและแมตช์ตัวเลขแบบ Grouped (3 NAVs แรก + 3 หน่วยหลัง)
+    // จัดกลุ่มตัวเลข (NAV N ตัวแรก + หน่วย N ตัวหลัง)
     const groupedNavs = allDecimals.slice(0, N);
     const groupedUnits = allDecimals.slice(N, 2 * N);
 
     const isGrouped = allDecimals.length >= 2 * N &&
-                      groupedNavs.every(v => v > 0 && v < 300) &&
+                      groupedNavs.every(v => v > 0 && v < 500) &&
                       groupedUnits.every(v => v > 0);
 
     for (let i = 0; i < N; i++) {
       const plan = detectedPlans[i];
       const targetAsset = plan.targetAsset;
 
-      let newNav = null;
-      let addedUnits = null;
+      let newNav = isGrouped ? groupedNavs[i] : allDecimals[i * 2];
+      let addedUnits = isGrouped ? groupedUnits[i] : allDecimals[(i * 2) + 1];
 
-      if (isGrouped) {
-        newNav = groupedNavs[i];
-        addedUnits = groupedUnits[i];
-      } else if (allDecimals.length >= 2 * N) {
-        newNav = allDecimals[i * 2];
-        addedUnits = allDecimals[(i * 2) + 1];
-      }
-
-      if (newNav === null || addedUnits === null || isNaN(newNav) || isNaN(addedUnits)) continue;
+      if (!newNav || !addedUnits || isNaN(newNav) || isNaN(addedUnits)) continue;
 
       // คำนวณต้นทุนเฉลี่ยใหม่ (Weighted Average)
       const oldUnits = parseFloat(targetAsset.units || 0);
