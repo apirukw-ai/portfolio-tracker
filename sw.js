@@ -1,4 +1,4 @@
-const CACHE_NAME = 'portfolio-pwa-v2';
+const CACHE_NAME = 'portfolio-pwa-v3';
 
 // รายชื่อไฟล์โครงสร้างหน้าเว็บที่จะทำการ Cache ไว้ล่วงหน้า (Static Assets)
 const STATIC_ASSETS = [
