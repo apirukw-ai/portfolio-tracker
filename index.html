@@ -1455,17 +1455,17 @@ async function parseMfcPdfStatement(fullText) {
   }
 }
 
-// --- แกะข้อมูล GPF ---
+// --- แกะข้อมูล GPF (เรียงตามลำดับคอลัมน์ในตารางสลิป) ---
 async function parseGpfPdfStatement(fullText) {
   try {
     showToast("กำลังประมวลผลสลิป กบข. ...", "info");
 
+    // 1. ทำความสะอาดข้อความ
     let cleanText = fullText
       .replace(/\|/g, ' ')
       .replace(/(\d+):(\d+)/g, '$1.$2')
       .replace(/(\d+)-(\d+)/g, '$1.$2')
-      .replace(/(เงิน ละ|เงิน ลง|เดิน ลง)/g, 'เงินสะสม')
-      .replace(/(เงินนำส|เงินนำสง)/g, 'เงินนำส่ง');
+      .replace(/(\d+),(\d{3})/g, '$1$2'); // ลบ comma ในตัวเลข
 
     const { data: currentPort, error: fetchErr } = await supabaseClient
       .from('user_portfolios')
@@ -1473,67 +1473,110 @@ async function parseGpfPdfStatement(fullText) {
 
     if (fetchErr) throw fetchErr;
 
-    const planMappings = [
-      { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
-      { code: 'แผนกองทุนอสังหาริมทรัพย์ไทย', keywords: ['แผนกองทุนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
-      { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
-    ];
-
+    // 2. ดึงวันที่สลิป
     let slipDate = "";
     const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
     const dateMatches = [...cleanText.matchAll(dateRegex)];
-
-    let lastBlock = cleanText;
     if (dateMatches.length > 0) {
-      const lastMatch = dateMatches[dateMatches.length - 1];
-      slipDate = lastMatch[1].trim();
-      lastBlock = cleanText.substring(lastMatch.index);
+      slipDate = dateMatches[dateMatches.length - 1][1].trim();
     } else {
       slipDate = 'TX_' + Date.now();
     }
-
-    const cleanedBlock = lastBlock.replace(/(\d+),(\d{3})/g, '$1$2');
-    const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})/g;
-    let matches = [...cleanedBlock.matchAll(numberGroupRegex)];
-
-    let extractedPairs = [];
-    if (matches.length > 0) {
-      extractedPairs = matches.map(m => ({ nav: parseFloat(m[1]), units: parseFloat(m[2]) }));
-    } else {
-      const allDecimals = (cleanedBlock.match(/\d+\.\d+/g) || []).filter(n => n !== '2569' && n !== '2570');
-      for (let i = 0; i < allDecimals.length - 1; i += 3) {
-        extractedPairs.push({
-          nav: parseFloat(allDecimals[i]),
-          units: parseFloat(allDecimals[i + 1])
-        });
-      }
-    }
-
-    if (extractedPairs.length === 0) {
-      showToast("อ่านชุดตัวเลขจากสลิปไม่สำเร็จ", "error");
+	
+	// 🔴 === แทรกโค้ดป้องกันสแกนซ้ำตรงนี้ ===
+    if (!slipDate || slipDate.startsWith('TX_')) {
+      showToast("❌ ไม่สามารถระบุวันที่ในสลิปได้ ยกเลิกการบันทึกเพื่อป้องกันข้อมูลซ้ำ", "error");
       return;
     }
 
-    const recentMatches = extractedPairs.slice(-3);
+    const isDuplicate = currentPort && currentPort.some(asset => asset.last_transaction_date === slipDate);
+    if (isDuplicate) {
+      showToast(`⚠️ สลิปประจำวันที่ [${slipDate}] เคยถูกบันทึกเข้าสู่ระบบแล้ว!`, "warning");
+      return;
+    }
+    // 🔴 =================================
+	
+	
+    // 3. กำหนดแผนทั้งหมดตามลำดับที่อาจปรากฏในสลิป กบข.
+    const knownPlans = [
+      { name: 'แผนหุ้นต่างประเทศ', keywords: ['หุ้นต่างประเทศ'] },
+      { name: 'แผนหุ้นไทย', keywords: ['หุ้นไทย'] },
+      { name: 'แผนทองคำ', keywords: ['ทองคำ'] },
+      { name: 'แผนการลงทุนตามหลักชะรีอะฮ์', keywords: ['ชะรีอะฮ์'] },
+      { name: 'แผนกองทุนอสังหาริมทรัพย์ไทย', keywords: ['อสังหาริมทรัพย์'] }
+    ];
+
+    // 4. ตรวจหาคอลัมน์แผนที่มีอยู่ในสลิปฉบับนี้ และเรียงตามลำดับตำแหน่งที่พบ (ซ้ายไปขวา)
+    const detectedPlans = [];
+    for (const plan of knownPlans) {
+      let idx = cleanText.indexOf(plan.name);
+      if (idx === -1) {
+        idx = cleanText.search(new RegExp(plan.keywords[0]));
+      }
+      if (idx !== -1) {
+        detectedPlans.push({ ...plan, pos: idx });
+      }
+    }
+
+    // เรียงคอลัมน์จากซ้ายไปขวาตามตำแหน่ง Index ในข้อความ
+    detectedPlans.sort((a, b) => a.pos - b.pos);
+
+    if (detectedPlans.length === 0) {
+      showToast("ไม่พบหัวข้อแผนการลงทุน กบข. ในไฟล์", "warning");
+      return;
+    }
+
+    // 5. ตัดเฉพาะส่วนตารางข้อมูลหลัก (ช่วงหลังหัวข้อคอลัมน์แรก)
+    const tableStartIndex = detectedPlans[0].pos;
+    const tableText = cleanText.substring(tableStartIndex);
+
+    // ดึงตัวเลขทศนิยมทั้งหมดในส่วนตาราง (รองรับทั้งทศนิยม 3 และ 4 ตำแหน่ง)
+    const allDecimals = (tableText.match(/\b\d+\.\d{3,4}\b/g) || [])
+      .map(n => parseFloat(n))
+      .filter(n => !isNaN(n) && n < 1000000); // กรองตัวเลขขยะออก
+
     let updatedCount = 0;
 
-    for (let i = 0; i < recentMatches.length; i++) {
-      const match = recentMatches[i];
-      const newNav = match.nav;
-      const addedUnits = match.units;
+    // 6. วนลูปอัปเดตแต่ละแผนตามคอลัมน์ที่ตรวจพบ
+    for (let i = 0; i < detectedPlans.length; i++) {
+      const plan = detectedPlans[i];
 
-      if (isNaN(newNav) || isNaN(addedUnits)) continue;
-
-      const mapping = planMappings[i] || planMappings[0];
-      const targetAsset = currentPort.find(a => a.asset_code === mapping.code);
+      // ค้นหา Asset ใน Database ที่ตรงกับแผนนี้
+      const targetAsset = currentPort ? currentPort.find(a => 
+        a.asset_code && plan.keywords.some(k => a.asset_code.includes(k))
+      ) : null;
 
       if (!targetAsset) continue;
 
       if (targetAsset.last_transaction_date === slipDate) {
-        showToast(`สลิปวันที่ ${slipDate} เคยบันทึกแล้ว!`, "warning");
+        showToast(`⚠️ สลิปวันที่ ${slipDate} เคยบันทึกแล้ว!`, "warning");
         return;
       }
 
+      // ดึงค่า NAV และ Units ตามรูปแบบโครงสร้างตาราง
+      // ในสลิป กบข. ตัวเลข NAV และ Units ของแต่ละคอลัมน์จะจับคู่กันเรียงตามลำดับคอลัมน์
+      let newNav = null;
+      let addedUnits = null;
+
+      // กรณีที่ 1: ตัวเลขเรียงสลับกันเป็นคู่ๆ (NAV, Units, NAV, Units, ...)
+      const pairNavIdx = i * 2;
+      const pairUnitIdx = (i * 2) + 1;
+
+      // กรณีที่ 2: ตัวเลขเรียงแบบยกแถว (NAV ทั้งหมดอยู่แถวบน, Units ทั้งหมดอยู่แถวล่าง)
+      const rowNavIdx = i;
+      const rowUnitIdx = i + detectedPlans.length;
+
+      if (pairUnitIdx < allDecimals.length && allDecimals[pairNavIdx] < 500) {
+        newNav = allDecimals[pairNavIdx];
+        addedUnits = allDecimals[pairUnitIdx];
+      } else if (rowUnitIdx < allDecimals.length) {
+        newNav = allDecimals[rowNavIdx];
+        addedUnits = allDecimals[rowUnitIdx];
+      }
+
+      if (newNav === null || addedUnits === null || isNaN(newNav) || isNaN(addedUnits)) continue;
+
+      // คำนวณต้นทุนเฉลี่ยใหม่ (Weighted Average)
       const oldUnits = parseFloat(targetAsset.units || 0);
       const oldAvgNav = parseFloat(targetAsset.avg_nav || 0);
       const totalNewUnits = oldUnits + addedUnits;
@@ -1545,6 +1588,7 @@ async function parseGpfPdfStatement(fullText) {
         calculatedAvgNav = totalNewCost / totalNewUnits;
       }
 
+      // อัปเดตลง Supabase
       const { error: updateErr } = await supabaseClient
         .from('user_portfolios')
         .update({
@@ -1560,10 +1604,10 @@ async function parseGpfPdfStatement(fullText) {
     }
 
     if (updatedCount > 0) {
-      showToast(`บันทึกสลิปวันที่ ${slipDate} สำเร็จ ${updatedCount} แผน!`, "success");
+      showToast(`✅ บันทึกสลิป GPF วันที่ [${slipDate}] สำเร็จ ${updatedCount} แผน!`, "success");
       if (typeof refreshDashboard === 'function') refreshDashboard();
     } else {
-      showToast("ไม่สามารถอัปเดตรายการ GPF ได้", "error");
+      showToast("ไม่สามารถจับคู่ตัวเลขกับแผน GPF ได้", "warning");
     }
 
   } catch (err) {
@@ -1571,7 +1615,6 @@ async function parseGpfPdfStatement(fullText) {
     showToast("เกิดข้อผิดพลาดในการประมวลผลไฟล์ GPF", "error");
   }
 }
-
 
 // ==========================================
 // 4. CONFIGURATION FUNCTIONS
