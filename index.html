@@ -1469,13 +1469,14 @@ async function parseGpfPdfStatement(fullText) {
 
     if (fetchErr) throw fetchErr;
 
+    // 🔴 ปรับลำดับให้ตรงตามตารางใน PDF จริง (หุ้นต่างประเทศ -> หุ้นไทย -> อสังหาริมทรัพย์ไทย)
     const planMappings = [
-      { code: 'แผนหุ้นต่างประเทศ', keywords: ['แผนหุ้นต่างประเทศ', 'หุ้นต่างประเทศ'] },
-      { code: 'แผนอสังหาริมทรัพย์ไทย', keywords: ['แผนอสังหาริมทรัพย์ไทย', 'อสังหาริมทรัพย์ไทย'] },
-      { code: 'แผนหุ้นไทย', keywords: ['แผนหุ้นไทย', 'หุ้นไทย'] }
+      { code: 'แผนหุ้นต่างประเทศ' },
+      { code: 'แผนหุ้นไทย' },
+      { code: 'แผนอสังหาริมทรัพย์ไทย' }
     ];
 
-    // --- 1. ดึงวันที่สลิป (ปรับให้จับเดือนย่อ/เต็ม และไม่ติดปัญหา \b ภาษาไทย) ---
+    // --- 1. ดึงวันที่สลิป ---
     let slipDate = "";
     const monthsPattern = "มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|ม\\.ค|ก\\.พ|มี\\.ค|เม\\.ย|พ\\.ค|มิ\\.ย|ก\\.ค|ส\\.ค|ก\\.ย|ต\\.ค|พ\\.ย|ธ\\.ค";
     const dateRegex = new RegExp(`(\\d{1,2}\\s*(?:${monthsPattern})\\s*\\d{2,4})`, "gi");
@@ -1484,12 +1485,11 @@ async function parseGpfPdfStatement(fullText) {
     if (dateMatches.length > 0) {
       slipDate = dateMatches[dateMatches.length - 1][1].replace(/\s+/g, ' ').trim();
     } else {
-      // ตัวสำรองถ้าอ่านวันที่ไม่ได้จริงๆ ให้ใช้วันที่ปัจจุบันแทน เพื่อไม่ให้ค้างรหัส TX_
       const d = new Date();
       slipDate = `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear() + 543}`;
     }
 
-    // --- 2. ดึงกลุ่มตัวเลข NAV, Units, Amount (ใช้ Regex เดิมของคุณที่ทำงานได้ดี) ---
+    // --- 2. ดึงกลุ่มตัวเลข NAV, Units, Amount ---
     const numberGroupRegex = /(\d+\.\d{3,4})\s+(\d+\.\d{3,4})\s+(\d+\.\d{2})/g;
     const numberMatches = [...cleanText.matchAll(numberGroupRegex)];
 
@@ -1513,7 +1513,6 @@ async function parseGpfPdfStatement(fullText) {
 
       if (!targetAsset) continue;
 
-      // ระบบกันสแกนซ้ำประจำวัน
       if (targetAsset.last_transaction_date === slipDate) {
         showToast(`⚠️ สลิปวันที่ [${slipDate}] เคยถูกบันทึกไปแล้ว!`, "warning");
         return;
