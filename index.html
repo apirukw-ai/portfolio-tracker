@@ -2166,14 +2166,6 @@ function configureGeminiApiKey() {
     });
 } // 🟢 เพิ่มปีกกาปิดฟังก์ชัน fileToBase64 ตรงนี้
 
-async function handleGpfPdfUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    console.log("กำลังสแกนไฟล์ PDF ของ GPF...", file.name);
-    // โค้ดอ่าน PDF ...
-}
-
 // 🟢 ประกาศ window scope นอกฟังก์ชัน
 window.handleGpfPdfUpload = handleGpfPdfUpload;
 	
