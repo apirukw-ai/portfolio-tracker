@@ -1473,14 +1473,23 @@ async function parseGpfPdfStatement(fullText) {
 
     if (fetchErr) throw fetchErr;
 
-    // 2. ดึงวันที่สลิป
+    // 2. ดึงวันที่สลิป (รองรับทั้งเดือนเต็ม เดือนย่อ ก.ย. และตัวเลข / -)
     let slipDate = "";
-    const dateRegex = /\b(\d{1,2}\s+(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+\d{4})\b/g;
+    
+    // Regex รองรับทั้งเดือนเต็ม และ เดือนย่อ (มีจุด / ไม่มีจุด)
+    const monthPattern = "(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|ม\\.ค|ก\\.พ|มี\\.ค|เม\\.ย|พ\\.ค|มิ\\.ย|ก\\.ค|ส\\.ค|ก\\.ย|ต\\.ค|พ\\.ย|ธ\\.ค)";
+    const dateRegex = new RegExp(`\\b(\\d{1,2}\\s*${monthPattern}\\s*\\d{2,4})\\b`, "gi");
+
     const dateMatches = [...cleanText.matchAll(dateRegex)];
+
     if (dateMatches.length > 0) {
-      slipDate = dateMatches[dateMatches.length - 1][1].trim();
+      slipDate = dateMatches[dateMatches.length - 1][1].replace(/\s+/g, ' ').trim();
     } else {
-      slipDate = 'TX_' + Date.now();
+      // ตัวสำรอง: ค้นหาแบบตัวเลข เช่น 29/09/2569 หรือ 29-09-2569
+      const numDateMatch = cleanText.match(/\b(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\b/);
+      if (numDateMatch) {
+        slipDate = numDateMatch[1];
+      }
     }
 
     // 🛡️ ป้องกันการสแกนซ้ำ หรือกรณีระบุวันที่ไม่ได้
