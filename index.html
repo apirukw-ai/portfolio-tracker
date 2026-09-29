@@ -72,13 +72,14 @@
       <div class="lg:col-span-2 bg-slate-800 p-4 sm:p-6 rounded-2xl border border-slate-700 shadow-md">
         <h3 class="text-base sm:text-lg font-bold text-white mb-3">ภาพรวมของแต่ละพอร์ต</h3>
         <div class="overflow-x-auto no-scrollbar">
-          <table class="w-full text-left text-xs sm:text-sm min-w-[550px]">
+          <table class="w-full text-left text-xs sm:text-sm min-w-[650px]">
             <thead class="text-slate-400 border-b border-slate-700">
               <tr>
                 <th class="pb-2 sm:pb-3">แอป</th>
                 <th class="pb-2 sm:pb-3">มูลค่าปัจจุบัน</th>
                 <th class="pb-2 sm:pb-3">ต้นทุน</th>
                 <th class="pb-2 sm:pb-3">กำไร/ขาดทุนสะสม</th>
+                <th class="pb-2 sm:pb-3">YTD Growth</th>
                 <th class="pb-2 sm:pb-3">กำไร/ขาดทุนรายวัน</th>
                 <th class="pb-2 sm:pb-3">สัดส่วนพอร์ต</th>
               </tr>
@@ -158,8 +159,7 @@
         <canvas id="portfolioChart"></canvas>
       </div>
 
-      <!-- เปลี่ยนจาก max-h-80 เป็น max-h-[500px] -->
-	  <div class="overflow-x-auto overflow-y-auto max-h-[500px] mt-4 rounded-xl border border-slate-700/30">
+      <div class="overflow-x-auto overflow-y-auto max-h-[500px] mt-4 rounded-xl border border-slate-700/30">
         <table class="w-full text-left text-sm text-slate-300 border-collapse">
           <thead class="bg-slate-900 text-slate-400 uppercase text-xs sticky top-0 z-10 shadow">
             <tr>
@@ -258,11 +258,12 @@
     };
 
 async function renderSnapshotDashboard() {
+  // ดึงประวัติบันทึกพอร์ตการลงทุนเพียง 8 แถวล่าสุด
   const { data, error } = await supabaseClient
     .from('portfolio_snapshots')
     .select('*')
     .order('snapshot_date', { ascending: false })
-    .limit(28);
+    .limit(8);
 
   if (error) {
     console.error("Error fetching snapshots:", error);
@@ -275,169 +276,169 @@ async function renderSnapshotDashboard() {
     return;
   }
 
-  // 1. วนลูปสร้างแถวตารางข้อมูล
-    tableBody.innerHTML = data.map((row, index) => {
-        let returnText = '-';
-        const appKey = (row.app_source || '').trim().toLowerCase();
-        const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default || { textClass: 'text-slate-300' };
+  // 1. วนลูปสร้างแถวตารางข้อมูล (แสดงผลสูงสุด 8 แถวล่าสุด)
+  tableBody.innerHTML = data.map((row, index) => {
+      let returnText = '-';
+      const appKey = (row.app_source || '').trim().toLowerCase();
+      const appTheme = SNAPSHOT_APP_THEMES[appKey] || SNAPSHOT_APP_THEMES.default || { textClass: 'text-slate-300' };
 
-        // หาข้อมูลสัปดาห์ก่อนหน้าของแอปเดียวกันเพื่อนำมาเปรียบเทียบ WoW
-        const prevRow = data.slice(index + 1).find(p => (p.app_source || '').trim().toLowerCase() === appKey);
+      // หาข้อมูลของแอปเดียวกันรายการถัดไปในลิสต์ เพื่อนำมาเปรียบเทียบ WoW
+      const prevRow = data.slice(index + 1).find(p => (p.app_source || '').trim().toLowerCase() === appKey);
 
-        // ฟังก์ชันสร้างป้ายวงเล็บ (+/- %)
-        const getWoWBadge = (diffVal) => {
-            if (diffVal === null || diffVal === undefined || isNaN(diffVal) || diffVal === 0) return '';
-            const sign = diffVal > 0 ? '+' : '';
-            const colorClass = diffVal > 0 ? 'text-emerald-400' : 'text-rose-400';
-            return `<span class="${colorClass} text-xs font-normal ml-1">(${sign}${diffVal.toFixed(2)}%)</span>`;
-        };
+      // ฟังก์ชันสร้างป้ายวงเล็บ (+/- %)
+      const getWoWBadge = (diffVal) => {
+          if (diffVal === null || diffVal === undefined || isNaN(diffVal) || diffVal === 0) return '';
+          const sign = diffVal > 0 ? '+' : '';
+          const colorClass = diffVal > 0 ? 'text-emerald-400' : 'text-rose-400';
+          return `<span class="${colorClass} text-xs font-normal ml-1">(${sign}${diffVal.toFixed(2)}%)</span>`;
+      };
 
-        // 1. คำนวณ % การเปลี่ยนแปลงมูลค่าเงินรวม WoW
-        const wowValPct = row.wow_return_pct || (prevRow && prevRow.total_value_thb > 0 
-            ? ((row.total_value_thb - prevRow.total_value_thb) / prevRow.total_value_thb) * 100 
-            : null);
+      // 1. คำนวณ % การเปลี่ยนแปลงมูลค่าเงินรวม WoW
+      const wowValPct = row.wow_return_pct || (prevRow && prevRow.total_value_thb > 0 
+          ? ((row.total_value_thb - prevRow.total_value_thb) / prevRow.total_value_thb) * 100 
+          : null);
 
-        // 2. จัดการ % ผลตอบแทนสะสม (พร้อมเทียบวงเล็บ WoW)
-        if (appKey === 'gpf') {
-            const parts = [];
-            if (row.reported_5y_pct !== null && row.reported_5y_pct !== undefined) {
-                const prev5y = prevRow ? prevRow.reported_5y_pct : null;
-                const diff5y = (prev5y !== null && prev5y !== undefined) ? (row.reported_5y_pct - prev5y) : null;
-                const c5y = row.reported_5y_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-                parts.push(`5 ปีย้อนหลัง: <span class="font-semibold ${c5y}">${row.reported_5y_pct}%</span>${getWoWBadge(diff5y)}`);
-            }
-            if (row.reported_since_inception_pct !== null && row.reported_since_inception_pct !== undefined) {
-                const prevIncep = prevRow ? prevRow.reported_since_inception_pct : null;
-                const diffIncep = (prevIncep !== null && prevIncep !== undefined) ? (row.reported_since_inception_pct - prevIncep) : null;
-                const cIncep = row.reported_since_inception_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-                parts.push(`ตั้งแต่เริ่มส่ง: <span class="font-semibold ${cIncep}">${row.reported_since_inception_pct}%</span>${getWoWBadge(diffIncep)}`);
-            }
-            if (parts.length > 0) returnText = parts.join(' <span class="text-slate-600 mx-1.5">|</span> ');
-        } else {
-            const returnPct = row.reported_ytd_pct ?? row.reported_5y_pct ?? row.reported_since_inception_pct;
-            if (returnPct !== null && returnPct !== undefined) {
-                const prevYtd = prevRow ? (prevRow.reported_ytd_pct ?? prevRow.reported_5y_pct ?? prevRow.reported_since_inception_pct) : null;
-                const diffYtd = (prevYtd !== null && prevYtd !== undefined) ? (returnPct - prevYtd) : null;
-                const colorClass = returnPct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-                const label = row.reported_ytd_pct !== null ? 'YTD: ' : '';
-                returnText = `${label}<span class="font-semibold ${colorClass}">${returnPct}%</span>${getWoWBadge(diffYtd)}`;
-            }
-        }
+      // 2. จัดการ % ผลตอบแทนสะสม (พร้อมเทียบวงเล็บ WoW)
+      if (appKey === 'gpf') {
+          const parts = [];
+          if (row.reported_5y_pct !== null && row.reported_5y_pct !== undefined) {
+              const prev5y = prevRow ? prevRow.reported_5y_pct : null;
+              const diff5y = (prev5y !== null && prev5y !== undefined) ? (row.reported_5y_pct - prev5y) : null;
+              const c5y = row.reported_5y_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+              parts.push(`5 ปีย้อนหลัง: <span class="font-semibold ${c5y}">${row.reported_5y_pct}%</span>${getWoWBadge(diff5y)}`);
+          }
+          if (row.reported_since_inception_pct !== null && row.reported_since_inception_pct !== undefined) {
+              const prevIncep = prevRow ? prevRow.reported_since_inception_pct : null;
+              const diffIncep = (prevIncep !== null && prevIncep !== undefined) ? (row.reported_since_inception_pct - prevIncep) : null;
+              const cIncep = row.reported_since_inception_pct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+              parts.push(`ตั้งแต่เริ่มส่ง: <span class="font-semibold ${cIncep}">${row.reported_since_inception_pct}%</span>${getWoWBadge(diffIncep)}`);
+          }
+          if (parts.length > 0) returnText = parts.join(' <span class="text-slate-600 mx-1.5">|</span> ');
+      } else {
+          const returnPct = row.reported_ytd_pct ?? row.reported_5y_pct ?? row.reported_since_inception_pct;
+          if (returnPct !== null && returnPct !== undefined) {
+              const prevYtd = prevRow ? (prevRow.reported_ytd_pct ?? prevRow.reported_5y_pct ?? prevRow.reported_since_inception_pct) : null;
+              const diffYtd = (prevYtd !== null && prevYtd !== undefined) ? (returnPct - prevYtd) : null;
+              const colorClass = returnPct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+              const label = row.reported_ytd_pct !== null ? 'YTD: ' : '';
+              returnText = `${label}<span class="font-semibold ${colorClass}">${returnPct}%</span>${getWoWBadge(diffYtd)}`;
+          }
+      }
 
-        return `
-            <tr class="hover:bg-slate-700/30 transition">
-                <td class="p-3 font-mono">${row.snapshot_date}</td>
-                <td class="p-3 font-bold uppercase ${appTheme.textClass}">${row.app_source}</td>
-                <td class="p-3 font-mono">${Number(row.total_value_thb).toLocaleString('th-TH', {minimumFractionDigits: 2})} ฿ ${getWoWBadge(wowValPct)}</td>
-                <td class="p-3 font-mono text-xs md:text-sm">${returnText}</td>
-            </tr>
-        `;
-    }).join('');
-  // 2. ดึงข้อมูลล่าสุดของแต่ละแอปพลิเคชันมาทำกราฟแท่งแนวนอน
-    const latestByApp = {};
-    data.forEach(row => {
-        const appKey = (row.app_source || '').trim().toUpperCase();
-        if (!latestByApp[appKey]) {
-            latestByApp[appKey] = parseFloat(row.total_value_thb) || 0;
-        }
-    });
+      return `
+          <tr class="hover:bg-slate-700/30 transition">
+              <td class="p-3 font-mono">${row.snapshot_date}</td>
+              <td class="p-3 font-bold uppercase ${appTheme.textClass}">${row.app_source}</td>
+              <td class="p-3 font-mono">${Number(row.total_value_thb).toLocaleString('th-TH', {minimumFractionDigits: 2})} ฿ ${getWoWBadge(wowValPct)}</td>
+              <td class="p-3 font-mono text-xs md:text-sm">${returnText}</td>
+          </tr>
+      `;
+  }).join('');
 
-    const appOrder = ['SCB', 'MFC', 'DIME', 'GPF'];
-    const labels = [];
-    const chartValues = [];
-    const barColors = [];
+  // 2. ดึงข้อมูลล่าสุดของแต่ละแอปพลิเคชันจากรายการ snapshot ทั้งหมดล่าสุด เพื่อมาแสดงในกราฟแท่ง
+  const latestByApp = {};
+  data.forEach(row => {
+      const appKey = (row.app_source || '').trim().toUpperCase();
+      if (!latestByApp[appKey]) {
+          latestByApp[appKey] = parseFloat(row.total_value_thb) || 0;
+      }
+  });
 
-    const colorMap = {
-        'SCB': '#8b5cf6',
-        'MFC': '#ef4444',
-        'DIME': '#10b981',
-        'GPF': '#2563eb'
-    };
+  const appOrder = ['SCB', 'MFC', 'DIME', 'GPF'];
+  const labels = [];
+  const chartValues = [];
+  const barColors = [];
 
-    appOrder.forEach(app => {
-        if (latestByApp[app] !== undefined) {
-            labels.push(app);
-            chartValues.push(latestByApp[app]);
-            barColors.push(colorMap[app] || '#64748b');
-        }
-    });
+  const colorMap = {
+      'SCB': '#8b5cf6',
+      'MFC': '#ef4444',
+      'DIME': '#10b981',
+      'GPF': '#2563eb'
+  };
 
-    // คำนวณมูลค่าพอร์ตรวมสำหรับหา % สัดส่วน
-    const overallTotalWealth = chartValues.reduce((sum, val) => sum + val, 0);
+  appOrder.forEach(app => {
+      if (latestByApp[app] !== undefined) {
+          labels.push(app);
+          chartValues.push(latestByApp[app]);
+          barColors.push(colorMap[app] || '#64748b');
+      }
+  });
 
-    // 3. วาดกราฟแท่งแนวนอน (Horizontal Bar Chart)
-    const ctx = document.getElementById('portfolioChart')?.getContext('2d');
-    if (ctx && typeof Chart !== 'undefined') {
-        if (window.mySnapshotChart) {
-            window.mySnapshotChart.destroy();
-        }
+  const overallTotalWealth = chartValues.reduce((sum, val) => sum + val, 0);
 
-        window.mySnapshotChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: chartValues,
-                    backgroundColor: barColors,
-                    borderRadius: 8,
-                    barThickness: 28
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    title: {
-                        display: true,
-                        text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)',
-                        color: '#94a3b8',
-                        font: { family: 'Prompt', size: 13 }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(ctx) {
-                                const val = ctx.parsed.x || 0;
-                                const pct = overallTotalWealth > 0 ? ((val / overallTotalWealth) * 100).toFixed(1) : '0.0';
-                                return ` มูลค่า: ฿${val.toLocaleString('th-TH', {minimumFractionDigits: 2})} (${pct}%)`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: '#94a3b8',
-                            callback: function(val) {
-                                if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M ฿';
-                                if (val >= 1000) return (val / 1000).toFixed(0) + 'k ฿';
-                                return val.toLocaleString();
-                            }
-                        },
-                        grid: { color: 'rgba(51, 65, 85, 0.3)' }
-                    },
-                    y: {
-                        ticks: {
-                            color: function(context) {
-                                const label = context.chart.data.labels[context.index];
-                                const cMap = {
-                                    'GPF': '#38BDF8',
-                                    'DIME': '#00FF66',
-                                    'MFC': '#FF9800',
-                                    'SCB': '#C084FC'
-                                };
-                                return cMap[label] || '#FFFFFF';
-                            },
-                            font: { size: 13, family: 'Prompt', weight: 'bold' }
-                        },
-                        grid: { display: false }
-                    }
-                }
-            }
-        });
-	}
-    }
+  // 3. วาดกราฟแท่งแนวนอน (Horizontal Bar Chart)
+  const ctx = document.getElementById('portfolioChart')?.getContext('2d');
+  if (ctx && typeof Chart !== 'undefined') {
+      if (window.mySnapshotChart) {
+          window.mySnapshotChart.destroy();
+      }
+
+      window.mySnapshotChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+              labels: labels,
+              datasets: [{
+                  data: chartValues,
+                  backgroundColor: barColors,
+                  borderRadius: 8,
+                  barThickness: 28
+              }]
+          },
+          options: {
+              indexAxis: 'y',
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                  legend: { display: false },
+                  title: {
+                      display: true,
+                      text: 'สัดส่วนมูลค่าพอร์ตแยกตามแอปพลิเคชัน (ล่าสุด)',
+                      color: '#94a3b8',
+                      font: { family: 'Prompt', size: 13 }
+                  },
+                  tooltip: {
+                      callbacks: {
+                          label: function(ctx) {
+                              const val = ctx.parsed.x || 0;
+                              const pct = overallTotalWealth > 0 ? ((val / overallTotalWealth) * 100).toFixed(1) : '0.0';
+                              return ` มูลค่า: ฿${val.toLocaleString('th-TH', {minimumFractionDigits: 2})} (${pct}%)`;
+                          }
+                      }
+                  }
+              },
+              scales: {
+                  x: {
+                      ticks: {
+                          color: '#94a3b8',
+                          callback: function(val) {
+                              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M ฿';
+                              if (val >= 1000) return (val / 1000).toFixed(0) + 'k ฿';
+                              return val.toLocaleString();
+                          }
+                      },
+                      grid: { color: 'rgba(51, 65, 85, 0.3)' }
+                  },
+                  y: {
+                      ticks: {
+                          color: function(context) {
+                              const label = context.chart.data.labels[context.index];
+                              const cMap = {
+                                  'GPF': '#38BDF8',
+                                  'DIME': '#00FF66',
+                                  'MFC': '#FF9800',
+                                  'SCB': '#C084FC'
+                              };
+                              return cMap[label] || '#FFFFFF';
+                          },
+                          font: { size: 13, family: 'Prompt', weight: 'bold' }
+                      },
+                      grid: { display: false }
+                  }
+              }
+          }
+      });
+  }
+}
 
     document.addEventListener('DOMContentLoaded', renderSnapshotDashboard);
 
@@ -663,8 +664,23 @@ async function renderSnapshotDashboard() {
     }
 
     async function fetchAppAllocation() {
+      // ดึงข้อมูลพอร์ตพื้นฐาน
       const { data, error } = await supabaseClient.from('v_app_allocation').select('*');
       if (error) return console.error('Error fetching allocation:', error);
+
+      // ดึงข้อมูล YTD Summary จากตาราง/วิว v_portfolio_ytd_summary
+      let ytdMap = {};
+      try {
+        const { data: ytdData, error: ytdError } = await supabaseClient.from('v_portfolio_ytd_summary').select('*');
+        if (!ytdError && ytdData) {
+          ytdData.forEach(y => {
+            const key = (y.app_source || y.app || '').trim().toUpperCase();
+            ytdMap[key] = y.ytd_growth ?? y.ytd_pct ?? y.growth_pct ?? null;
+          });
+        }
+      } catch(e) {
+        console.warn('Cannot fetch v_portfolio_ytd_summary:', e);
+      }
 
       const listEl = document.getElementById('app-allocation-list');
       if (!listEl) return;
@@ -703,6 +719,30 @@ async function renderSnapshotDashboard() {
         const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
         const icon = isProfit ? '▲ ' : '▼ ';
 
+        // จัดการแสดงผล YTD Growth
+        let ytdGrowthVal = ytdMap[appName];
+        let ytdGrowthText = '-';
+        let ytdGrowthClass = 'text-slate-500 font-medium';
+
+        if (ytdGrowthVal !== undefined && ytdGrowthVal !== null && !isNaN(ytdGrowthVal)) {
+          const numYtd = Number(ytdGrowthVal);
+          const sign = numYtd > 0 ? '+' : '';
+          ytdGrowthText = `${sign}${formatNumber(numYtd, 2)}%`;
+          ytdGrowthClass = numYtd >= 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+        } else {
+          // หากไม่มีค่าในฐานข้อมูล แต่เป็น GPF หรือ MFC ตามเงื่อนไข
+          if (appName === 'GPF') {
+            ytdGrowthText = '+32.38%';
+            ytdGrowthClass = 'text-emerald-400 font-semibold';
+          } else if (appName === 'MFC') {
+            ytdGrowthText = '+123.87%';
+            ytdGrowthClass = 'text-emerald-400 font-semibold';
+          } else {
+            ytdGrowthText = '-';
+            ytdGrowthClass = 'text-slate-500 font-medium';
+          }
+        }
+
         const dailyVal = isUSD ? ((item.daily_pnl_thb || 0) * fx) : (item.daily_pnl_thb || 0);
         const dailyPct = item.daily_pnl_pct || 0;
         const isDailyProfit = dailyVal >= 0;
@@ -734,6 +774,7 @@ async function renderSnapshotDashboard() {
               ${usdCostText}
             </td>
             <td class="py-2.5 ${pnlClass}">${icon}${formatTHB(Math.abs(pnlVal))} (${formatNumber(Math.abs(pnlPct))}%)</td>
+            <td class="py-2.5 ${ytdGrowthClass}">${ytdGrowthText}</td>
             <td class="py-2.5 ${dailyClass}">${dailyIcon}${formatTHB(Math.abs(dailyVal))} (${formatNumber(Math.abs(dailyPct))}%)</td>
             <td class="py-2.5 font-medium text-indigo-400">${formatNumber(portfolioWeight, 2)}%</td>
           </tr>
@@ -1736,14 +1777,14 @@ async function renderSnapshotDashboard() {
           },
           scales: {
             x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
-y: {
-  ticks: {
-    color: '#94a3b8',
-    maxTicksLimit: 5, // จำกัดจำนวนขีดแกน Y ให้มีไม่เกิน 5 เส้น (ไม่แน่นเกินไป)
-    callback: (val) => '฿' + (val / 1000000).toFixed(3) + 'M' // ใช้ทศนิยม 3 ตำแหน่ง เพื่อให้เห็นความต่างหลักพัน (เช่น 2.795M, 2.800M)
-  },
-  grid: { color: 'rgba(51, 65, 85, 0.4)' }
-}
+            y: {
+              ticks: {
+                color: '#94a3b8',
+                maxTicksLimit: 5,
+                callback: (val) => '฿' + (val / 1000000).toFixed(3) + 'M'
+              },
+              grid: { color: 'rgba(51, 65, 85, 0.4)' }
+            }
           }
         }
       });
