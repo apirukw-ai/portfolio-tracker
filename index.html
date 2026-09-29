@@ -1558,54 +1558,60 @@ async function parseGpfPdfStatement(fullText) {
 // ==========================================
 // 4. CONFIGURATION FUNCTIONS
 // ==========================================
-function configureGeminiApiKey() {
-  const currentKey = localStorage.getItem('GEMINI_API_KEY') || '';
-  const newKey = prompt('กรุณากรอก Gemini API Key ของคุณ:', currentKey);
-  if (newKey !== null) {
-    const trimmedKey = newKey.trim();
-    if (trimmedKey) {
-      localStorage.setItem('GEMINI_API_KEY', trimmedKey);
-      showToast('บันทึก Gemini API Key เรียบร้อยแล้ว', 'success');
-    } else {
-      localStorage.removeItem('GEMINI_API_KEY');
-      showToast('ลบ Gemini API Key เรียบร้อยแล้ว', 'info');
+// --- Helper Function: ดึง/ขอ/บันทึก API Key จุดเดียวจบ ---
+function getGeminiApiKey(forcePrompt = false) {
+  let key = localStorage.getItem('GEMINI_API_KEY') || '';
+
+  if (!key || forcePrompt) {
+    const inputKey = prompt('กรอก GEMINI API Key ของคุณ:', key);
+    if (inputKey !== null) {
+      key = inputKey.trim();
+      if (key) {
+        localStorage.setItem('GEMINI_API_KEY', key);
+        showToast('บันทึก GEMINI API Key เรียบร้อยแล้ว', 'success');
+      } else {
+        localStorage.removeItem('GEMINI_API_KEY');
+        showToast('ลบ GEMINI API Key เรียบร้อยแล้ว', 'info');
+      }
     }
   }
+  return key;
 }
 
-    async function handleImageUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+// 1. ฟังก์ชันกดปุ่มตั้งค่า Key บน UI
+function configureGeminiApiKey() {
+  getGeminiApiKey(true);
+}
 
-      const label = event.target.closest('label');
-      const originalText = label ? label.innerHTML : '';
+// 2. ฟังก์ชันอัปโหลดและสแกนภาพ
+async function handleImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
 
-      let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || '';
-      if (!GEMINI_API_KEY) {
-        GEMINI_API_KEY = prompt('กรุณากรอก Gemini API Key ก่อนใช้งาน:');
-        if (GEMINI_API_KEY && GEMINI_API_KEY.trim()) {
-          GEMINI_API_KEY = GEMINI_API_KEY.trim();
-          localStorage.setItem('GEMINI_API_KEY', GEMINI_API_KEY);
-        } else {
-          showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
-          event.target.value = '';
-          return;
-        }
-      }
+  const label = event.target.closest('label');
+  const originalText = label ? label.innerHTML : '';
 
-      try {
-        if (label) {
-          label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกนด้วย Gemini...`;
-          label.style.pointerEvents = 'none';
-        }
+  const GEMINI_API_KEY = getGeminiApiKey();
+  if (!GEMINI_API_KEY) {
+    showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
+    event.target.value = '';
+    return;
+  }
 
-        const base64Image = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+  try {
+    if (label) {
+      label.innerHTML = `<span class="inline-block animate-spin mr-1">🌀</span> กำลังสแกนด้วย Gemini...`;
+      label.style.pointerEvents = 'none';
+    }
 
+    const base64Image = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+	
+		// --- สั่งงาน Gemini API ---
         const promptText = `คุณคือระบบอ่านข้อมูลการลงทุนจากภาพสลิปหรือตารางพอร์ต
 กรุณาอ่านข้อมูลรายการหุ้น/กองทุนทั้งหมดในรูปนี้ แล้วตอบกลับเป็น JSON Array ในรูปแบบนี้เท่านั้น (ห้ามใส่ Markdown หรือคำอธิบายเพิ่มเติม):
 [
@@ -1613,85 +1619,94 @@ function configureGeminiApiKey() {
     "code": "ชื่อหรือ Ticker เช่น NVDA, ABBV, SCBDV",
     "units": จำนวนหน่วยหรือหุ้น (number เท่านั้น),
     "avgNav": ต้นทุนเฉลี่ยหรือราคาซื้อต่อหน่วย (number เท่านั้น),
-    "currentNav": ราคาปัจจุบันต่อหน่วย (number เท่านั้น ถ้าไม่มีให้ใส่เท่ากับ avgNav),
     "currency": "USD หรือ THB"
   }
 ]`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`, {
 		  method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: promptText },
-                {
-                  inlineData: {
-                    mimeType: file.type || "image/png",
-                    data: base64Image
-                  }
-                }
-              ]
-            }],
-            generationConfig: {
-              response_mime_type: "application/json"
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: promptText },
+            {
+              inlineData: {
+                mimeType: file.type || "image/png",
+                data: base64Image
+              }
             }
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(`Gemini API Error (${response.status}): ${errData.error?.message || response.statusText}`);
+          ]
+        }],
+        generationConfig: {
+          response_mime_type: "application/json"
         }
+      })
+    });
 
-        const data = await response.json();
-        const resultText = data.candidates[0].content.parts[0].text;
-        const parsedItems = JSON.parse(resultText);
-
-        if (Array.isArray(parsedItems) && parsedItems.length > 0) {
-          await updateDatabaseUnitsAndCost(parsedItems);
-          showToast(`สแกนสำเร็จ! อัปเดต ${parsedItems.length} รายการเรียบร้อย`, "success");
-        } else {
-          showToast("ไม่พบข้อมูลรายการลงทุนในรูปภาพ", "error");
-        }
-
-      } catch (err) {
-        console.error("Gemini Scan Error:", err);
-        showToast(`สแกนไม่สำเร็จ: ${err.message}`, "error");
-      } finally {
-        if (label) {
-          label.innerHTML = originalText;
-          label.style.pointerEvents = 'auto';
-        }
-        event.target.value = '';
-      }
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(`Gemini API Error (${response.status}): ${errData.error?.message || response.statusText}`);
     }
 
+    const data = await response.json();
+    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    const parsedItems = JSON.parse(resultText);
+
+    if (Array.isArray(parsedItems) && parsedItems.length > 0) {
+      await updateDatabaseUnitsAndCost(parsedItems);
+    } else {
+      showToast("ไม่พบข้อมูลรายการลงทุนในภาพ", "error");
+    }
+
+  } catch (err) {
+    console.error("Gemini Scan Error:", err);
+    showToast(`สแกนไม่สำเร็จ: ${err.message}`, "error");
+  } finally {
+    if (label) {
+      label.innerHTML = originalText;
+      label.style.pointerEvents = 'auto';
+    }
+    event.target.value = '';
+  }
+}
+
+	// --- ฟังก์ชันอัปเดตลง Supabase (อัปเดตเฉพาะ units และ avg_nav) ---
     async function updateDatabaseUnitsAndCost(items) {
-      try {
-        for (const item of items) {
-          const { error } = await supabaseClient
-            .from('user_portfolios')
-            .update({
-              units: item.units,
-              avg_nav: item.avgNav,
-              updated_at: new Date().toISOString()
-            })
-            .eq('asset_code', item.code);
+  try {
+    let successCount = 0;
 
-          if (error) {
-            console.error(`Error updating ${item.code}:`, error);
-          }
-        }
-        showToast(`บันทึกข้อมูลสำเร็จ ${items.length} รายการ`, "success");
-        refreshDashboard();
-      } catch (err) {
-        console.error("Error updating database:", err);
-        showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
+    for (const item of items) {
+      const { error } = await supabaseClient
+        .from('user_portfolios')
+        .update({
+          units: item.units,
+          avg_nav: item.avgNav,
+          updated_at: new Date().toISOString()
+        })
+        .eq('asset_code', item.code);
+
+      if (error) {
+        console.error(`Error updating ${item.code}:`, error);
+      } else {
+        successCount++;
       }
     }
+
+    if (successCount > 0) {
+      showToast(`✅ บันทึกข้อมูลสำเร็จ ${successCount} รายการ`, "success");
+      if (typeof refreshDashboard === 'function') refreshDashboard();
+    } else {
+      showToast("ไม่สามารถอัปเดตข้อมูลลงฐานข้อมูลได้ (ไม่พบรหัสสินทรัพย์)", "warning");
+    }
+
+  } catch (err) {
+    console.error("Error updating database:", err);
+    showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
+  }
+}
 
     function switchChartView(view) {
       const allocView = document.getElementById('chart-view-allocation');
