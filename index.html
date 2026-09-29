@@ -1266,27 +1266,47 @@ subEl.innerHTML = `จากทั้งหมด ${appCount} แอปพลิ
     }
 
     // ==========================================
-// 1. HELPER FUNCTIONS (ฟังก์ชันกลางสำหรับอ่าน PDF)
+// 1. HELPER FUNCTIONS (พร้อมระบบแจ้ง Progress ชัดเจน)
 // ==========================================
 async function extractTextFromPdf(file) {
+  console.log(`[PDF Reader] เริ่มอ่านไฟล์: ${file.name}`);
+  showToast(`📂 เริ่มเปิดไฟล์ ${file.name}...`, "info");
+
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  
+  // โหลดเอกสาร PDF
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdf = await loadingTask.promise;
+  
+  console.log(`[PDF Reader] อ่านจำนวนหน้าสำเร็จ: ${pdf.numPages} หน้า`);
+  showToast(`📄 อ่านไฟล์สำเร็จ (${pdf.numPages} หน้า) กำลังถอดข้อความ...`, "info");
+
   let fullText = "";
 
   for (let i = 1; i <= pdf.numPages; i++) {
+    console.log(`[PDF Reader] กำลังถอดข้อความหน้า ${i}/${pdf.numPages}...`);
+    showToast(`⏳ กำลังสกัดข้อความหน้า ${i}/${pdf.numPages}...`, "info");
+
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    fullText += content.items.map(item => item.str).join(" ") + "\n";
+    
+    // ดึงตัวอักษร
+    const pageText = content.items.map(item => item.str).join(" ");
+    fullText += pageText + "\n";
   }
+
+  if (!fullText.trim()) {
+    throw new Error("ไม่สามารถถอดข้อความจาก PDF ได้ (อาจเป็นไฟล์สแกนรูปภาพหรือล็อกรหัส)");
+  }
+
+  console.log(`[PDF Reader] ถอดข้อความสำเร็จ ความยาว: ${fullText.length} ตัวอักษร`);
   return fullText;
 }
 
 
 // ==========================================
-// 2. UPLOAD HANDLERS (จัดการปุ่มกด และสถานะ UI)
+// 2. UPLOAD HANDLER (GPF)
 // ==========================================
-
-// --- ปุ่มสแกน GPF ---
 async function handleGpfPdfUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1296,16 +1316,20 @@ async function handleGpfPdfUpload(event) {
 
   try {
     if (label) {
-      label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังอ่านสลิป กบข. ...`;
+      label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังประมวลผล...`;
       label.style.pointerEvents = 'none';
     }
 
+    // 1. ดึงข้อความจาก PDF (มี Toast บอกทีละหน้า)
     const fullText = await extractTextFromPdf(file);
+
+    // 2. ส่งไปแกะข้อมูลลง DB
+    showToast("🔍 กำลังค้นหาข้อมูลแผนลงทุนในสลิป...", "info");
     await parseGpfPdfStatement(fullText);
 
   } catch (err) {
     console.error("GPF PDF Parsing Error:", err);
-    if (typeof showToast === 'function') showToast("เกิดข้อผิดพลาดในการอ่านไฟล์ PDF ของ GPF", "error");
+    showToast(`❌ ${err.message || "เกิดข้อผิดพลาดในการอ่านไฟล์ PDF"}`, "error");
   } finally {
     if (label) {
       label.innerHTML = originalText;
