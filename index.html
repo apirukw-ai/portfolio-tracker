@@ -1473,31 +1473,40 @@ async function parseGpfPdfStatement(fullText) {
 
     if (fetchErr) throw fetchErr;
 
-    // 2. ดึงวันที่สลิป (รองรับทั้งเดือนเต็ม เดือนย่อ ก.ย. และตัวเลข / -)
+    // 2. ดึงวันที่สลิป (แก้เรื่องภาษาไทย + เลขไทย + มี Fallback กันระบบค้าง)
     let slipDate = "";
     
-    // Regex รองรับทั้งเดือนเต็ม และ เดือนย่อ (มีจุด / ไม่มีจุด)
-    const monthPattern = "(?:มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|ม\\.ค|ก\\.พ|มี\\.ค|เม\\.ย|พ\\.ค|มิ\\.ย|ก\\.ค|ส\\.ค|ก\\.ย|ต\\.ค|พ\\.ย|ธ\\.ค)";
-    const dateRegex = new RegExp(`\\b(\\d{1,2}\\s*${monthPattern}\\s*\\d{2,4})\\b`, "gi");
+    // แปลงเลขไทยเป็นเลขอารบิก และรวมช่องว่าง/ขึ้นบรรทัดใหม่ให้เป็นบรรทัดเดียว
+    let textForDate = cleanText
+      .replace(/[๐-๙]/g, d => "๐๑๒๓๔๕๖๗๘๙".indexOf(d))
+      .replace(/\s+/g, ' ');
 
-    const dateMatches = [...cleanText.matchAll(dateRegex)];
+    // รายชื่อเดือนภาษาไทย (ตัด \b ออกทั้งหมด)
+    const months = "มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม|ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|ม\\.ค|ก\\.พ|มี\\.ค|เม\\.ย|พ\\.ค|มิ\\.ย|ก\\.ค|ส\\.ค|ก\\.ย|ต\\.ค|พ\\.ย|ธ\\.ค";
+    
+    // ดักจับรูปแบบ: วันที่ + เดือน + ปีพ.ศ.
+    const dateRegex1 = new RegExp(`(\\d{1,2})\\s*(${months})\\s*(\\d{2,4})`, "gi");
+    const matches1 = [...textForDate.matchAll(dateRegex1)];
 
-    if (dateMatches.length > 0) {
-      slipDate = dateMatches[dateMatches.length - 1][1].replace(/\s+/g, ' ').trim();
+    if (matches1.length > 0) {
+      const lastMatch = matches1[matches1.length - 1];
+      slipDate = `${lastMatch[1]} ${lastMatch[2]} ${lastMatch[3]}`;
     } else {
-      // ตัวสำรอง: ค้นหาแบบตัวเลข เช่น 29/09/2569 หรือ 29-09-2569
-      const numDateMatch = cleanText.match(/\b(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})\b/);
+      // ตัวสำรอง: ดักจับรูปแบบตัวเลข เช่น 29/09/2569
+      const numDateMatch = textForDate.match(/(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4})/);
       if (numDateMatch) {
         slipDate = numDateMatch[1];
       }
     }
 
-    // 🛡️ ป้องกันการสแกนซ้ำ หรือกรณีระบุวันที่ไม่ได้
-    if (!slipDate || slipDate.startsWith('TX_')) {
-      showToast("❌ ไม่สามารถระบุวันที่ในสลิปได้ ยกเลิกการบันทึกเพื่อป้องกันข้อมูลซ้ำ", "error");
-      return;
+    // กรณีอ่านวันที่ไม่ได้จริงๆ ให้ใช้วันที่ปัจจุบันแทน (เพื่อไม่ให้ระบบยกเลิกการสแกน)
+    if (!slipDate) {
+      const now = new Date();
+      const thMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+      slipDate = `${now.getDate()} ${thMonths[now.getMonth()]} ${now.getFullYear() + 543}`;
     }
 
+    // 🛡️ เช็กสแกนซ้ำ
     const isDuplicate = currentPort && currentPort.some(asset => asset.last_transaction_date === slipDate);
     if (isDuplicate) {
       showToast(`⚠️ สลิปประจำวันที่ [${slipDate}] เคยถูกบันทึกเข้าสู่ระบบแล้ว!`, "warning");
