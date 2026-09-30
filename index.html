@@ -1578,6 +1578,14 @@ function getGeminiApiKey(forcePrompt = false) {
   return key;
 }
 
+// ==========================================
+// ⚙️ ตั้งค่ากลางสำหรับ Gemini API
+// ==========================================
+const GEMINI_CONFIG = {
+  MODEL: 'gemini-3.8-flash',
+  API_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models'
+};
+
 // 1. ฟังก์ชันกดปุ่มตั้งค่า Key บน UI
 function configureGeminiApiKey() {
   getGeminiApiKey(true);
@@ -1623,7 +1631,7 @@ async function handleImageUpload(event) {
   }
 ]`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        const response = await fetch(`${GEMINI_CONFIG.API_BASE_URL}/${GEMINI_CONFIG.MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
 		  method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1640,9 +1648,10 @@ async function handleImageUpload(event) {
             }
           ]
         }],
-        generationConfig: {
-          response_mime_type: "application/json"
-        }
+        // ✅ ปรับเป็น camelCase (แนะนำ)
+generationConfig: {
+  responseMimeType: "application/json"
+}
       })
     });
 
@@ -1885,259 +1894,302 @@ async function handleImageUpload(event) {
     }
 	
     async function scanScbCard(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+  const file = event.target.files[0];
+  if (!file) return;
 
-      const label = event.target.closest('label');
+  const label = event.target.closest('label');
+  const originalText = label ? label.innerHTML : '';
 
-      let GEMINI_API_KEY = localStorage.getItem('GEMINI_API_KEY') || '';
+  // ดึง API Key จาก Helper Function ที่รวบไว้จุดเดียว
+  const GEMINI_API_KEY = getGeminiApiKey();
+  if (!GEMINI_API_KEY) {
+    showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
+    event.target.value = '';
+    return;
+  }
 
-      if (!GEMINI_API_KEY) {
-        GEMINI_API_KEY = prompt('กรุณากรอก Gemini API Key ก่อนใช้งาน:');
-        if (GEMINI_API_KEY && GEMINI_API_KEY.trim()) {
-          GEMINI_API_KEY = GEMINI_API_KEY.trim();
-          localStorage.setItem('GEMINI_API_KEY', GEMINI_API_KEY);
-        } else {
-          showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
-          event.target.value = '';
-          return;
-        }
-      }
+  try {
+    if (label) {
+      label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกน SCB...`;
+      label.style.pointerEvents = 'none';
+    }
 
-      try {
-        if (label) {
-          label.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span> กำลังสแกน SCB...`;
-          label.style.pointerEvents = 'none';
-        }
-        const base64Image = await fileToBase64(file);
-        const base64Data = base64Image.split(',')[1];
+    const base64Image = await fileToBase64(file);
+    const base64Data = base64Image.split(',')[1];
 
-        const MODEL_NAME = 'gemini-3.6-flash'; 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_API_KEY}`;
-        
-        const prompt = `วิเคราะห์ภาพหน้าจอพอร์ตการลงทุนนี้ ค้นหาข้อมูลกองทุนทั้งหมดที่ปรากฏในภาพ 
-        และคืนค่ากลับมาเป็นรูปแบบ JSON Array เท่านั้น โครงสร้าง:
-        [{"asset_code": "SCBAXJ(E)", "avg_nav": 15.1046, "units": 1746.4907}] 
-        ห้ามมีข้อความอื่นหรือแท็ก json ติดมาเด็ดขาด`;
+    const apiUrl = `${GEMINI_CONFIG.API_BASE_URL}/${GEMINI_CONFIG.MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: file.type, data: base64Data } }
-              ]
-            }]
-          })
-        });
+    const promptText = `วิเคราะห์ภาพหน้าจอพอร์ตการลงทุนนี้ ค้นหาข้อมูลกองทุนทั้งหมดที่ปรากฏในภาพ 
+และคืนค่ากลับมาเป็นรูปแบบ JSON Array เท่านั้น โครงสร้าง:
+[{"asset_code": "SCBAXJ(E)", "avg_nav": 15.1046, "units": 1746.4907}]`;
 
-        const result = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
-        }
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: promptText },
+            {
+              inlineData: { // 🔴 แก้จาก inline_data เป็น inlineData และ mime_type เป็น mimeType
+                mimeType: file.type || "image/png",
+                data: base64Data
+              }
+            }
+          ]
+        }],
+        // ✅ ปรับเป็น camelCase (แนะนำ)
+generationConfig: {
+  responseMimeType: "application/json"
+}
+      })
+    });
 
-        let textOutput = result.candidates[0].content.parts[0].text.trim();
-        textOutput = textOutput.replace(/```json|```/g, '').trim();
-        const extractedFunds = JSON.parse(textOutput);
+    const result = await response.json();
 
-        for (const fund of extractedFunds) {
-          const { error } = await supabaseClient
-            .from('user_portfolios')
-            .update({
-              avg_nav: fund.avg_nav,
-              units: fund.units
-            })
-            .eq('asset_code', fund.asset_code);
+    if (!response.ok) {
+      throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
+    }
 
-          if (error) console.error("Update Error:", error);
-        }
+    const resultText = result.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    const extractedFunds = JSON.parse(resultText);
 
-        alert("✅ สแกนและอัปเดตข้อมูลกองทุน SCB เรียบร้อยแล้ว!");
-        
-        if (typeof loadPortfolioData === 'function') {
-          loadPortfolioData();
-        } else {
-          location.reload();
-        }
+    if (!Array.isArray(extractedFunds) || extractedFunds.length === 0) {
+      showToast("ไม่พบข้อมูลกองทุนในภาพ", "error");
+      return;
+    }
 
-      } catch (err) {
-        console.error("Scan Error:", err);
-        alert("❌ เกิดข้อผิดพลาด: " + err.message);
-      } finally {
-        event.target.value = '';
+    let successCount = 0;
+    for (const fund of extractedFunds) {
+      const { error } = await supabaseClient
+        .from('user_portfolios')
+        .update({
+          avg_nav: fund.avg_nav,
+          units: fund.units,
+          updated_at: new Date().toISOString()
+        })
+        .eq('asset_code', fund.asset_code);
+
+      if (error) {
+        console.error(`Error updating ${fund.asset_code}:`, error);
+      } else {
+        successCount++;
       }
     }
+
+    if (successCount > 0) {
+      showToast(`✅ อัปเดตข้อมูลกองทุน SCB สำเร็จ ${successCount} รายการ!`, "success");
+      
+      if (typeof loadPortfolioData === 'function') {
+        loadPortfolioData();
+      } else if (typeof refreshDashboard === 'function') {
+        refreshDashboard();
+      }
+    } else {
+      showToast("ไม่สามารถอัปเดตข้อมูลได้ (ไม่พบรหัสกองทุนที่ตรงกันในระบบ)", "warning");
+    }
+
+  } catch (err) {
+    console.error("Scan Error:", err);
+    showToast(`❌ เกิดข้อผิดพลาด: ${err.message}`, "error");
+  } finally {
+    // 🔴 คืนค่าปุ่มให้กลับมาคลิกได้ตามปกติ
+    if (label) {
+      label.innerHTML = originalText;
+      label.style.pointerEvents = 'auto';
+    }
+    event.target.value = '';
+  }
+}
 
     async function scanDimePdfCard(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+  const file = event.target.files[0];
+  if (!file) return;
 
-      const apiKey = localStorage.getItem('GEMINI_API_KEY') || (typeof GEMINI_API_KEY !== 'undefined' ? GEMINI_API_KEY : '');
+  const label = event.target.closest('label');
+  const originalText = label ? label.innerHTML : '';
 
-      if (!apiKey) {
-        alert("🔑 กรุณาตั้งค่า Gemini API Key ก่อนใช้งาน (กดปุ่ม 🔑 Key ที่มุมขวาของการ์ด Dime)");
-        event.target.value = '';
-        return;
-      }
+  // 1. ดึง API Key ผ่าน Helper กลาง
+  const GEMINI_API_KEY = getGeminiApiKey();
+  if (!GEMINI_API_KEY) {
+    showToast('กรุณาระบุ API Key เพื่อใช้งาน Gemini AI', 'warning');
+    event.target.value = '';
+    return;
+  }
 
-      alert("🔍 AI กำลังอ่านข้อมูลเอกสาร PDF DIME กรุณารอสักครู่...");
-
-      try {
-        const base64Pdf = await fileToBase64(file);
-        const base64Data = base64Pdf.split(',')[1];
-
-        const MODEL_NAME = 'gemini-3.6-flash';
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
-
-        const prompt = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
-        ค้นหาและดึงรายการซื้อขายทั้งหมด (BUY หรือ SELL) ออกมาเป็น JSON Array เท่านั้น
-        โครงสร้าง JSON:
-        [
-          {
-            "order_id": "979038",
-            "asset_code": "AMZN",
-            "transaction_type": "BUY",
-            "units": 0.0595177,
-            "unit_price": 251.69
-          }
-        ]
-        เงื่อนไขสำคัญ:
-        1. order_id คือ เลขที่คำสั่ง เช่น 979038, 978689
-        2. asset_code คือ ชื่อย่อหุ้น เช่น AMZN, GOOGL
-        3. หากพบทศนิยมที่ใช้เครื่องหมายจุลภาค เช่น 0,0606622 ให้แปลงเป็นจุด 0.0606622
-        4. คืนค่าเฉพาะ JSON Array ห้ามมีข้อความอื่นเด็ดขาด`;
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: 'application/pdf', data: base64Data } }
-              ]
-            }]
-          })
-        });
-
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
-        }
-
-        let textOutput = result.candidates[0].content.parts[0].text.trim();
-        textOutput = textOutput.replace(/```json|```/g, '').trim();
-        const transactions = JSON.parse(textOutput);
-
-        let skippedCount = 0;
-        let successCount = 0;
-
-        for (const tx of transactions) {
-          const { order_id, asset_code, transaction_type, units, unit_price } = tx;
-          if (!asset_code || !units || !unit_price) continue;
-
-          if (order_id) {
-            const { data: existingOrder } = await supabaseClient
-              .from('dime_orders')
-              .select('order_id')
-              .eq('order_id', String(order_id))
-              .maybeSingle();
-
-            if (existingOrder) {
-              console.warn(`⚠️ ข้ามรายการซ้ำ Order ID: ${order_id} (${asset_code})`);
-              skippedCount++;
-              continue;
-            }
-          }
-
-          const numUnits = Number(units);
-          const numPrice = Number(unit_price);
-
-          const { data: portfolioItems } = await supabaseClient
-            .from('user_portfolios')
-            .select('*')
-            .eq('app_source', 'dime')
-            .eq('asset_code', asset_code);
-
-          if (!portfolioItems || portfolioItems.length === 0) {
-            if (transaction_type === 'BUY') {
-              const totalCost = Number((numUnits * numPrice).toFixed(4));
-              await supabaseClient.from('user_portfolios').insert({
-                app_source: 'dime',
-                asset_code: asset_code,
-                asset_name: asset_code,
-                units: Number(numUnits.toFixed(7)),
-                avg_nav: Number(numPrice.toFixed(4)),
-                total_cost: totalCost,
-                current_nav: Number(numPrice.toFixed(4)),
-                prev_nav: Number(numPrice.toFixed(4)),
-                current_value: totalCost
-              });
-            }
-          } else {
-            const item = portfolioItems[0];
-            const oldUnits = Number(item.units || 0);
-            const oldAvgNav = Number(item.avg_nav || 0);
-            const currentNav = Number(item.current_nav || numPrice);
-
-            let updatedUnits = 0;
-            let updatedAvgNav = 0;
-
-            if (transaction_type === 'BUY') {
-              updatedUnits = oldUnits + numUnits;
-              const updatedTotalCost = (oldUnits * oldAvgNav) + (numUnits * numPrice);
-              updatedAvgNav = updatedUnits > 0 ? (updatedTotalCost / updatedUnits) : 0;
-            } else {
-              updatedUnits = Math.max(0, oldUnits - numUnits);
-              updatedAvgNav = oldAvgNav;
-            }
-
-            updatedUnits = Number(updatedUnits.toFixed(7));
-            updatedAvgNav = Number(updatedAvgNav.toFixed(4));
-            const updatedTotalCost = Number((updatedUnits * updatedAvgNav).toFixed(4));
-            const updatedCurrentValue = Number((updatedUnits * currentNav).toFixed(4));
-
-            await supabaseClient.from('user_portfolios').update({
-              units: updatedUnits,
-              avg_nav: updatedAvgNav,
-              total_cost: updatedTotalCost,
-              current_value: updatedCurrentValue
-            }).eq('id', item.id);
-          }
-
-          if (order_id) {
-            await supabaseClient.from('dime_orders').insert({
-              order_id: String(order_id),
-              asset_code: asset_code,
-              units: numUnits
-            });
-          }
-
-          successCount++;
-        }
-
-        if (skippedCount > 0 && successCount === 0) {
-          alert("⚠️ เอกสาร PDF นี้เคยสแกนเข้าระบบไปแล้ว (พบ Order ID ซ้ำทั้งหมด)");
-        } else {
-          alert(`✅ สแกนสำเร็จ ${successCount} รายการ ${skippedCount > 0 ? `(ข้ามรายการซ้ำ ${skippedCount} รายการ)` : ''}`);
-        }
-
-        if (typeof loadPortfolioData === 'function') {
-          loadPortfolioData();
-        } else {
-          location.reload();
-        }
-
-      } catch (err) {
-        console.error("Dime PDF Scan Error:", err);
-        alert("❌ เกิดข้อผิดพลาดในการอ่าน PDF: " + err.message);
-      } finally {
-        event.target.value = '';
-      }
+  try {
+    if (label) {
+      label.innerHTML = `<span class="inline-block animate-spin mr-1">🔍</span> กำลังอ่าน PDF DIME...`;
+      label.style.pointerEvents = 'none';
     }
+
+    const base64Pdf = await fileToBase64(file);
+    const base64Data = base64Pdf.split(',')[1];
+
+    // 2. เรียกใช้ Config กลาง + Gemini 3.8
+    const apiUrl = `${GEMINI_CONFIG.API_BASE_URL}/${GEMINI_CONFIG.MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const promptText = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
+ค้นหาและดึงรายการซื้อขายทั้งหมด (BUY หรือ SELL) ออกมาเป็น JSON Array เท่านั้น
+โครงสร้าง JSON:
+[
+  {
+    "order_id": "979038",
+    "asset_code": "AMZN",
+    "transaction_type": "BUY",
+    "units": 0.0595177,
+    "unit_price": 251.69
+  }
+]
+เงื่อนไขสำคัญ:
+1. order_id คือ เลขที่คำสั่ง เช่น 979038, 978689
+2. asset_code คือ ชื่อย่อหุ้น เช่น AMZN, GOOGL
+3. หากพบทศนิยมที่ใช้เครื่องหมายจุลภาค เช่น 0,0606622 ให้แปลงเป็นจุด 0.0606622
+4. คืนค่าเฉพาะ JSON Array ห้ามมีข้อความอื่นเด็ดขาด`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: promptText },
+            {
+              // 3. ใช้ camelCase (inlineData และ mimeType)
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: base64Data
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || "Gemini API ตอบกลับล้มเหลว");
+    }
+
+    const resultText = result.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    const transactions = JSON.parse(resultText);
+
+    let skippedCount = 0;
+    let successCount = 0;
+
+    for (const tx of transactions) {
+      const { order_id, asset_code, transaction_type, units, unit_price } = tx;
+      if (!asset_code || !units || !unit_price) continue;
+
+      if (order_id) {
+        const { data: existingOrder } = await supabaseClient
+          .from('dime_orders')
+          .select('order_id')
+          .eq('order_id', String(order_id))
+          .maybeSingle();
+
+        if (existingOrder) {
+          console.warn(`ข้ามรายการเนื่องจาก Order ID: ${order_id} (${asset_code}) เคยบันทึกแล้ว`);
+          skippedCount++;
+          continue;
+        }
+      }
+
+      const numUnits = Number(units);
+      const numPrice = Number(unit_price);
+
+      const { data: portfolioItems } = await supabaseClient
+        .from('user_portfolios')
+        .select('*')
+        .eq('app_source', 'dime')
+        .eq('asset_code', asset_code);
+
+      if (!portfolioItems || portfolioItems.length === 0) {
+        if (transaction_type === 'BUY') {
+          const totalCost = Number((numUnits * numPrice).toFixed(4));
+          await supabaseClient.from('user_portfolios').insert({
+            app_source: 'dime',
+            asset_code: asset_code,
+            asset_name: asset_code,
+            units: Number(numUnits.toFixed(7)),
+            avg_nav: Number(numPrice.toFixed(4)),
+            total_cost: totalCost,
+            current_value: totalCost
+          });
+        }
+      } else {
+        const item = portfolioItems[0];
+        const oldUnits = Number(item.units || 0);
+        const oldAvgNav = Number(item.avg_nav || 0);
+        const currentNav = Number(item.current_nav || numPrice);
+
+        let updatedUnits = 0;
+        let updatedAvgNav = 0;
+
+        if (transaction_type === 'BUY') {
+          updatedUnits = oldUnits + numUnits;
+          const updatedTotalCost = (oldUnits * oldAvgNav) + (numUnits * numPrice);
+          updatedAvgNav = updatedUnits > 0 ? (updatedTotalCost / updatedUnits) : 0;
+        } else {
+          updatedUnits = Math.max(0, oldUnits - numUnits);
+          updatedAvgNav = oldAvgNav;
+        }
+
+        updatedUnits = Number(updatedUnits.toFixed(7));
+        updatedAvgNav = Number(updatedAvgNav.toFixed(4));
+        const updatedTotalCost = Number((updatedUnits * updatedAvgNav).toFixed(4));
+        const updatedCurrentValue = Number((updatedUnits * currentNav).toFixed(4));
+
+        await supabaseClient.from('user_portfolios').update({
+          units: updatedUnits,
+          avg_nav: updatedAvgNav,
+          total_cost: updatedTotalCost,
+          current_value: updatedCurrentValue
+        }).eq('id', item.id);
+      }
+
+      if (order_id) {
+        await supabaseClient.from('dime_orders').insert({
+          order_id: String(order_id),
+          asset_code: asset_code,
+          units: numUnits
+        });
+      }
+
+      successCount++;
+    }
+
+    // 4. เปลี่ยนแจ้งเตือนเป็น showToast
+    if (skippedCount > 0 && successCount === 0) {
+      showToast("เอกสาร PDF นี้เคยบันทึกข้อมูลไปแล้วทั้งหมด", "info");
+    } else {
+      showToast(`✅ สแกนสำเร็จ ${successCount} รายการ (ข้ามรายการซ้ำ ${skippedCount} รายการ)`, "success");
+    }
+
+    if (typeof loadPortfolioData === 'function') {
+      loadPortfolioData();
+    } else if (typeof refreshDashboard === 'function') {
+      refreshDashboard();
+    } else {
+      location.reload();
+    }
+
+  } catch (err) {
+    console.error("Dime PDF Scan Error:", err);
+    showToast(`❌ เกิดข้อผิดพลาดในการอ่าน PDF: ${err.message}`, "error");
+  } finally {
+    // 5. คืนค่าสถานะปุ่มกดเมื่อทำงานเสร็จ
+    if (label) {
+      label.innerHTML = originalText;
+      label.style.pointerEvents = 'auto';
+    }
+    event.target.value = '';
+  }
+}
 
     function handleSnapshotScan(event) {
       const files = event.target.files;
