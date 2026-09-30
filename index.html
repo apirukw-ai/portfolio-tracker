@@ -2058,7 +2058,7 @@ generationConfig: {
     const base64Pdf = await fileToBase64(file);
     const base64Data = base64Pdf.split(',')[1];
 
-    // 2. เรียกใช้ Config กลาง + Gemini 3.8
+    // 2. เรียกใช้ Config กลาง + Gemini
     const apiUrl = `${GEMINI_CONFIG.API_BASE_URL}/${GEMINI_CONFIG.MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
     const promptText = `วิเคราะห์เอกสาร PDF ยืนยันการซื้อขายหลักทรัพย์ของ Dime! นี้ 
@@ -2087,7 +2087,6 @@ generationConfig: {
           parts: [
             { text: promptText },
             {
-              // 3. ใช้ camelCase (inlineData และ mimeType)
               inlineData: {
                 mimeType: 'application/pdf',
                 data: base64Data
@@ -2117,77 +2116,88 @@ generationConfig: {
       const { order_id, asset_code, transaction_type, units, unit_price } = tx;
       if (!asset_code || !units || !unit_price) continue;
 
-      if (order_id) {
+      // จัดระเบียบตัวแปร ป้องกันปัญหาเรื่องช่องว่างและตัวพิมพ์เล็ก-ใหญ่
+      const cleanOrderId = order_id ? String(order_id).trim() : null;
+      const cleanAssetCode = String(asset_code).trim().toUpperCase();
+      const numUnits = Number(units);
+      const numPrice = Number(unit_price);
+
+      // ตรวจสอบ Order ID ซ้ำ
+      if (cleanOrderId) {
         const { data: existingOrder } = await supabaseClient
           .from('dime_orders')
           .select('order_id')
-          .eq('order_id', String(order_id))
+          .eq('order_id', cleanOrderId)
           .maybeSingle();
 
         if (existingOrder) {
-          console.warn(`ข้ามรายการเนื่องจาก Order ID: ${order_id} (${asset_code}) เคยบันทึกแล้ว`);
+          console.warn(`ข้ามรายการเนื่องจาก Order ID: ${cleanOrderId} (${cleanAssetCode}) เคยบันทึกแล้ว`);
           skippedCount++;
           continue;
         }
       }
 
-      const numUnits = Number(units);
-      const numPrice = Number(unit_price);
-
+      // ค้นหาหุ้นเดิมในพอร์ต (ใช้ ilike ป้องกัน Case-Sensitivity)
       const { data: portfolioItems } = await supabaseClient
         .from('user_portfolios')
         .select('*')
-        .eq('app_source', 'dime')
-        .eq('asset_code', asset_code);
+        .ilike('app_source', 'dime')
+        .ilike('asset_code', cleanAssetCode);
 
       if (!portfolioItems || portfolioItems.length === 0) {
+        // กรณีเป็นหุ้นใหม่
         if (transaction_type === 'BUY') {
           const totalCost = Number((numUnits * numPrice).toFixed(4));
           await supabaseClient.from('user_portfolios').insert({
             app_source: 'dime',
-            asset_code: asset_code,
-            asset_name: asset_code,
+            asset_code: cleanAssetCode,
+            asset_name: cleanAssetCode,
             units: Number(numUnits.toFixed(7)),
             avg_nav: Number(numPrice.toFixed(4)),
+            current_nav: Number(numPrice.toFixed(4)), // 👈 บันทึก current_nav ตอนสร้างใหม่
             total_cost: totalCost,
             current_value: totalCost
           });
         }
       } else {
+        // กรณีมีหุ้นเดิมอยู่แล้ว ให้รวมยอดเข้าด้วยกัน
         const item = portfolioItems[0];
         const oldUnits = Number(item.units || 0);
         const oldAvgNav = Number(item.avg_nav || 0);
-        const currentNav = Number(item.current_nav || numPrice);
+        const oldTotalCost = Number(item.total_cost || (oldUnits * oldAvgNav));
 
         let updatedUnits = 0;
+        let updatedTotalCost = 0;
         let updatedAvgNav = 0;
 
         if (transaction_type === 'BUY') {
           updatedUnits = oldUnits + numUnits;
-          const updatedTotalCost = (oldUnits * oldAvgNav) + (numUnits * numPrice);
+          updatedTotalCost = oldTotalCost + (numUnits * numPrice);
           updatedAvgNav = updatedUnits > 0 ? (updatedTotalCost / updatedUnits) : 0;
         } else {
           updatedUnits = Math.max(0, oldUnits - numUnits);
           updatedAvgNav = oldAvgNav;
+          updatedTotalCost = updatedUnits * updatedAvgNav;
         }
 
-        updatedUnits = Number(updatedUnits.toFixed(7));
-        updatedAvgNav = Number(updatedAvgNav.toFixed(4));
-        const updatedTotalCost = Number((updatedUnits * updatedAvgNav).toFixed(4));
+        // กำหนดราคาปัจจุบัน (ใช้ราคาจากบิลล่าสุดเป็น current_nav)
+        const currentNav = numPrice > 0 ? numPrice : Number(item.current_nav || oldAvgNav);
         const updatedCurrentValue = Number((updatedUnits * currentNav).toFixed(4));
 
         await supabaseClient.from('user_portfolios').update({
-          units: updatedUnits,
-          avg_nav: updatedAvgNav,
-          total_cost: updatedTotalCost,
+          units: Number(updatedUnits.toFixed(7)),
+          avg_nav: Number(updatedAvgNav.toFixed(4)),
+          current_nav: Number(currentNav.toFixed(4)), // 👈 เพิ่มอัปเดต current_nav ใน DB
+          total_cost: Number(updatedTotalCost.toFixed(4)),
           current_value: updatedCurrentValue
         }).eq('id', item.id);
       }
 
-      if (order_id) {
+      // บันทึก Order ID ลง dime_orders
+      if (cleanOrderId) {
         await supabaseClient.from('dime_orders').insert({
-          order_id: String(order_id),
-          asset_code: asset_code,
+          order_id: cleanOrderId,
+          asset_code: cleanAssetCode,
           units: numUnits
         });
       }
@@ -2195,7 +2205,6 @@ generationConfig: {
       successCount++;
     }
 
-    // 4. เปลี่ยนแจ้งเตือนเป็น showToast
     if (skippedCount > 0 && successCount === 0) {
       showToast("เอกสาร PDF นี้เคยบันทึกข้อมูลไปแล้วทั้งหมด", "info");
     } else {
@@ -2214,7 +2223,6 @@ generationConfig: {
     console.error("Dime PDF Scan Error:", err);
     showToast(`❌ เกิดข้อผิดพลาดในการอ่าน PDF: ${err.message}`, "error");
   } finally {
-    // 5. คืนค่าสถานะปุ่มกดเมื่อทำงานเสร็จ
     if (label) {
       label.innerHTML = originalText;
       label.style.pointerEvents = 'auto';
