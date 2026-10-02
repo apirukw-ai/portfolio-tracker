@@ -680,7 +680,7 @@ subEl.innerHTML = `จาก ${appCount} แอปพลิเคชัน (<spa
         if (!ytdError && ytdData) {
           ytdData.forEach(y => {
             const key = (y.app_source || y.app || '').trim().toUpperCase();
-            ytdMap[key] = y.ytd_growth ?? y.ytd_pct ?? y.growth_pct ?? null;
+            ytdMap[key] = y.ytd_growth_pct ?? y.ytd_growth ?? y.ytd_pct ?? y.growth_pct ?? null;
           });
         }
       } catch(e) {
@@ -739,28 +739,20 @@ subEl.innerHTML = `จาก ${appCount} แอปพลิเคชัน (<spa
       const pnlClass = isProfit ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium';
       const icon = isProfit ? '▲ ' : '▼ ';
 
-      // จัดการแสดงผล YTD Growth
-      let ytdGrowthVal = ytdMap[appName];
-      let ytdGrowthText = '-';
-      let ytdGrowthClass = 'text-slate-500 font-medium';
+      // Calculate YTD Growth
+let ytdGrowthVal = ytdMap[appName];
+let ytdGrowthText = '-';
+let ytdGrowthClass = 'text-slate-500 font-medium';
 
-      if (ytdGrowthVal !== undefined && ytdGrowthVal !== null && !isNaN(ytdGrowthVal)) {
-        const numYtd = Number(ytdGrowthVal);
-        const sign = numYtd > 0 ? '+' : '';
-        ytdGrowthText = `${sign}${formatNumber(numYtd, 2)}%`;
-        ytdGrowthClass = numYtd >= 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
-      } else {
-        if (appName === 'GPF') {
-          ytdGrowthText = '+32.38%';
-          ytdGrowthClass = 'text-emerald-400 font-semibold';
-        } else if (appName === 'MFC') {
-          ytdGrowthText = '+123.87%';
-          ytdGrowthClass = 'text-emerald-400 font-semibold';
-        } else {
-          ytdGrowthText = '-';
-          ytdGrowthClass = 'text-slate-500 font-medium';
-        }
-      }
+if (ytdGrowthVal !== undefined && ytdGrowthVal !== null && !isNaN(ytdGrowthVal)) {
+    const numYtd = Number(ytdGrowthVal);
+    const sign = numYtd > 0 ? '+' : '';
+    ytdGrowthText = `${sign}${formatNumber(numYtd, 2)}%`;
+    ytdGrowthClass = numYtd > 0 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold';
+} else {
+    ytdGrowthText = '-';
+    ytdGrowthClass = 'text-slate-500 font-medium';
+}
 
       const dailyPct = item.daily_pnl_pct || 0;
       const isDailyProfit = dailyVal >= 0;
