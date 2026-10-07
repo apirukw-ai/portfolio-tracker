@@ -120,27 +120,17 @@
     <!-- แถว 3: รายละเอียดของแต่ละพอร์ต -->
     <div id="app-tables-container" class="space-y-6"></div>
 
-    <!-- Snapshot History Section (YTD Line Chart & Accordion Data Logs) -->
+    <!-- Snapshot History Section (2 Split YTD Line Charts & Accordion Data Logs) -->
     <section id="snapshot-history-section" class="mt-8 p-6 bg-slate-800/90 border border-sky-500/20 rounded-2xl shadow-[0_0_25px_rgba(56,189,248,0.04)]">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             📈 แนวโน้มผลตอบแทน YTD รายสัปดาห์ (Snapshots History)
           </h2>
-          <p class="text-xs text-slate-400 mt-1">ประวัติบันทึกสแนปชอตรายสัปดาห์และการเติบโต YTD</p>
+          <p class="text-xs text-slate-400 mt-1">เปรียบเทียบประวัติการเติบโต YTD รายแอปพลิเคชัน</p>
         </div>
 
         <div class="flex items-center gap-3 self-end sm:self-auto">
-          <!-- Toggle Switch View -->
-          <div class="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-700/80 text-xs font-medium">
-            <button id="btn-snapshot-total" onclick="switchSnapshotView('total')" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition">
-              Total Portfolio YTD
-            </button>
-            <button id="btn-snapshot-breakdown" onclick="switchSnapshotView('breakdown')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
-              Breakdown by App
-            </button>
-          </div>
-
           <button 
             type="button"
             onclick="document.getElementById('file-input-snapshot').click()"
@@ -164,9 +154,33 @@
         </div>
       </div>
 
-      <!-- กราฟเส้น YTD -->
-      <div class="w-full h-72 sm:h-80 my-4 relative">
-        <canvas id="portfolioChart"></canvas>
+      <!-- แยกเป็น 2 การ์ดกราฟ (DIME // GPF + MFC + SCB) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 my-4">
+        <!-- การ์ดที่ 1: DIME YTD -->
+        <div class="bg-slate-900/60 p-4 sm:p-5 rounded-xl border border-slate-700/80 flex flex-col">
+          <div class="flex items-center justify-between mb-3 border-b border-slate-700/60 pb-2">
+            <h3 class="text-sm sm:text-base font-bold text-emerald-400 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> DIME Portfolio YTD
+            </h3>
+            <span class="text-[11px] text-slate-400 font-mono">DIME</span>
+          </div>
+          <div class="w-full h-64 sm:h-72 relative">
+            <canvas id="dimeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- การ์ดที่ 2: GPF + MFC + SCB YTD -->
+        <div class="bg-slate-900/60 p-4 sm:p-5 rounded-xl border border-slate-700/80 flex flex-col">
+          <div class="flex items-center justify-between mb-3 border-b border-slate-700/60 pb-2">
+            <h3 class="text-sm sm:text-base font-bold text-sky-400 flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> GPF, MFC & SCB Performance
+            </h3>
+            <span class="text-[11px] text-slate-400 font-mono">GPF | MFC | SCB</span>
+          </div>
+          <div class="w-full h-64 sm:h-72 relative">
+            <canvas id="otherAppsChart"></canvas>
+          </div>
+        </div>
       </div>
 
       <!-- Accordion: Secondary View (Data Logs Audit Table) -->
@@ -239,13 +253,13 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     let chartInstance = null;
     let trendChartInstance = null;
+    let dimeChartInstance = null;
+    let otherAppsChartInstance = null;
     let globalAssetDetails = [];
     let currentSortColumn = 'unrealized_pnl_pct';
     let isSortAsc = false;
     const DEFAULT_FX_RATE = 32.88;
 
-    // Snapshot Chart Variables
-    let currentSnapshotView = 'total';
     let rawSnapshotData = [];
 
     const formatTHB = (val) => `฿${formatNumber(Number(val) || 0, 2)}`;
@@ -298,22 +312,6 @@ function toggleSnapshotTableAccordion() {
     content.classList.add('hidden');
     if (arrow) arrow.style.transform = 'rotate(0deg)';
   }
-}
-
-function switchSnapshotView(view) {
-  currentSnapshotView = view;
-  const btnTotal = document.getElementById('btn-snapshot-total');
-  const btnBreakdown = document.getElementById('btn-snapshot-breakdown');
-
-  if (view === 'total') {
-    if (btnTotal) btnTotal.className = 'px-3 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition font-medium';
-    if (btnBreakdown) btnBreakdown.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition font-medium';
-  } else {
-    if (btnBreakdown) btnBreakdown.className = 'px-3 py-1.5 rounded-lg bg-sky-600 text-white shadow-sm transition font-medium';
-    if (btnTotal) btnTotal.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition font-medium';
-  }
-
-  renderSnapshotLineChart();
 }
 
 async function renderSnapshotDashboard() {
@@ -393,59 +391,50 @@ async function renderSnapshotDashboard() {
     }).join('');
   }
 
-  // 2. แสดงผลกราฟเส้น YTD
+  // 2. วาดกราฟเส้นทั้ง 2 การ์ด
   renderSnapshotLineChart();
 }
 
 function renderSnapshotLineChart() {
-  const ctx = document.getElementById('portfolioChart')?.getContext('2d');
-  if (!ctx || typeof Chart === 'undefined') return;
+  if (typeof Chart === 'undefined' || !rawSnapshotData || rawSnapshotData.length === 0) return;
 
-  if (window.mySnapshotChart) {
-    window.mySnapshotChart.destroy();
-  }
+  const dimeCtx = document.getElementById('dimeChart')?.getContext('2d');
+  const otherAppsCtx = document.getElementById('otherAppsChart')?.getContext('2d');
 
-  if (!rawSnapshotData || rawSnapshotData.length === 0) return;
+  // ทำลาย Instance เก่าหากมี
+  if (dimeChartInstance) dimeChartInstance.destroy();
+  if (otherAppsChartInstance) otherAppsChartInstance.destroy();
 
   // รวบรวมวันที่ทั้งหมด (เรียงตามลำดับเวลา)
   const uniqueDates = [...new Set(rawSnapshotData.map(item => item.snapshot_date))].sort();
 
-  if (currentSnapshotView === 'total') {
-    // === มุมมอง 1: Total Portfolio YTD (%) ===
-    // รวมมูลค่าทุกแอปในแต่ละสัปดาห์
-    const totalValueByDate = {};
-    uniqueDates.forEach(date => {
-      const records = rawSnapshotData.filter(d => d.snapshot_date === date);
-      const sumValue = records.reduce((acc, curr) => acc + (parseFloat(curr.total_value_thb) || 0), 0);
-      totalValueByDate[date] = sumValue;
+  // ==========================================
+  // 1. วาดกราฟ DIME Chart
+  // ==========================================
+  if (dimeCtx) {
+    const dimeRecords = rawSnapshotData.filter(d => (d.app_source || '').trim().toLowerCase() === 'dime');
+    const dimeDataPoints = uniqueDates.map(date => {
+      const record = dimeRecords.find(d => d.snapshot_date === date);
+      return record ? (record.reported_ytd_pct ?? 0) : null;
     });
 
-    // มูลค่าพอร์ตรวม ณ สัปดาห์แรกสุดของปี (BOY)
-    const boyTotalValue = totalValueByDate[uniqueDates[0]] || 1;
-
-    // คำนวณ % YTD สำหรับแต่ละสัปดาห์
-    const ytdDataPoints = uniqueDates.map(date => {
-      const currentVal = totalValueByDate[date] || 0;
-      const ytdPct = ((currentVal - boyTotalValue) / boyTotalValue) * 100;
-      return ytdPct.toFixed(2);
-    });
-
-    window.mySnapshotChart = new Chart(ctx, {
+    dimeChartInstance = new Chart(dimeCtx, {
       type: 'line',
       data: {
         labels: uniqueDates,
         datasets: [{
-          label: 'Total Portfolio YTD (%)',
-          data: ytdDataPoints,
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.12)',
+          label: 'DIME',
+          data: dimeDataPoints,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.12)',
           fill: true,
           tension: 0.35,
           pointRadius: 4,
           pointHoverRadius: 7,
-          pointBackgroundColor: '#0284c7',
-          pointBorderColor: '#38bdf8',
-          borderWidth: 2.5
+          pointBackgroundColor: '#059669',
+          pointBorderColor: '#10b981',
+          borderWidth: 2.5,
+          spanGaps: true
         }]
       },
       options: {
@@ -457,18 +446,19 @@ function renderSnapshotLineChart() {
             backgroundColor: '#0f172a',
             borderColor: '#334155',
             borderWidth: 1,
-            titleFont: { family: 'Prompt', size: 13, weight: 'bold' },
-            bodyFont: { family: 'Prompt', size: 12 },
-            padding: 12,
+            titleFont: { family: 'Prompt', size: 12, weight: 'bold' },
+            bodyFont: { family: 'Prompt', size: 11 },
+            padding: 10,
             callbacks: {
               label: function(context) {
                 const date = context.label;
-                const totalThb = totalValueByDate[date] || 0;
-                const ytdPct = context.parsed.y;
-                const sign = ytdPct >= 0 ? '+' : '';
+                const valPct = context.parsed.y;
+                const record = dimeRecords.find(d => d.snapshot_date === date);
+                const totalThb = record ? parseFloat(record.total_value_thb) || 0 : 0;
+                const sign = valPct >= 0 ? '+' : '';
                 return [
-                  ` มูลค่าพอร์ตรวม: ฿${totalThb.toLocaleString('th-TH', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
-                  ` ผลตอบแทน YTD: ${sign}${ytdPct}%`
+                  ` มูลค่า: ฿${totalThb.toLocaleString('th-TH', {minimumFractionDigits: 2})}`,
+                  ` ผลตอบแทน YTD: ${sign}${valPct}%`
                 ];
               }
             }
@@ -490,15 +480,17 @@ function renderSnapshotLineChart() {
         }
       }
     });
+  }
 
-  } else {
-    // === มุมมอง 2: Breakdown by App (Multi-line Chart) ===
-    const appList = ['SCB', 'MFC', 'GPF', 'DIME'];
+  // ==========================================
+  // 2. วาดกราฟ GPF + MFC + SCB Chart
+  // ==========================================
+  if (otherAppsCtx) {
+    const appList = ['GPF', 'MFC', 'SCB'];
     const appColors = {
-      'SCB': '#8b5cf6',
-      'MFC': '#f43f5e',
       'GPF': '#38bdf8',
-      'DIME': '#10b981'
+      'MFC': '#f43f5e',
+      'SCB': '#8b5cf6'
     };
 
     const datasets = appList.map(app => {
@@ -509,7 +501,6 @@ function renderSnapshotLineChart() {
         const record = appRecords.find(d => d.snapshot_date === date);
         if (!record) return null;
         
-        // สำหรับ GPF ใช้ 5Y% หรือ Inc% หากไม่มี YTD%
         if (appKey === 'gpf') {
           return record.reported_ytd_pct ?? record.reported_5y_pct ?? record.reported_since_inception_pct ?? 0;
         }
@@ -529,7 +520,7 @@ function renderSnapshotLineChart() {
       };
     });
 
-    window.mySnapshotChart = new Chart(ctx, {
+    otherAppsChartInstance = new Chart(otherAppsCtx, {
       type: 'line',
       data: {
         labels: uniqueDates,
@@ -542,15 +533,15 @@ function renderSnapshotLineChart() {
           legend: {
             display: true,
             position: 'top',
-            labels: { color: '#cbd5e1', font: { family: 'Prompt', size: 12 }, usePointStyle: true, boxWidth: 8 }
+            labels: { color: '#cbd5e1', font: { family: 'Prompt', size: 11 }, usePointStyle: true, boxWidth: 6 }
           },
           tooltip: {
             backgroundColor: '#0f172a',
             borderColor: '#334155',
             borderWidth: 1,
-            titleFont: { family: 'Prompt', size: 13, weight: 'bold' },
-            bodyFont: { family: 'Prompt', size: 12 },
-            padding: 12,
+            titleFont: { family: 'Prompt', size: 12, weight: 'bold' },
+            bodyFont: { family: 'Prompt', size: 11 },
+            padding: 10,
             callbacks: {
               label: function(context) {
                 const appName = context.dataset.label;
@@ -1489,7 +1480,7 @@ async function handleGpfPdfUpload(event) {
   } catch (err) {
     console.error("GPF PDF Parsing Error:", err);
     showToast(`❌ ${err.message || "เกิดข้อผิดพลาดในการอ่านไฟล์ PDF"}`, "error");
-  } finally {
+  } finally { // ✅ แก้ไขเป็น finally
     if (label) {
       label.innerHTML = originalText;
       label.style.pointerEvents = 'auto';
@@ -1531,7 +1522,7 @@ async function parseMfcPdfStatement(fullText) {
     showToast("กำลังประมวลผลสลิป MFC PVD...", "info");
 
     const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2')
+      .replace(/(\d+):(\d+)/g, '\$1.\$2')
       .replace(/,/g, '');
 
     const { data: currentPort, error: fetchErr } = await supabaseClient
@@ -1612,7 +1603,7 @@ async function parseGpfPdfStatement(fullText) {
     showToast("กำลังประมวลผลสลิป กบข....", "info");
 
     const cleanText = fullText
-      .replace(/(\d+):(\d+)/g, '$1.$2')
+      .replace(/(\d+):(\d+)/g, '\$1.\$2')
       .replace(/,/g, '');
 
     const { data: currentPort, error: fetchErr } = await supabaseClient
