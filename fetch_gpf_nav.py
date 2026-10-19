@@ -36,7 +36,7 @@ def get_gpf_nav_direct():
     try:
         gpf_url = "https://www.gpf.or.th/thai2019/About/main.php?page=memberfund&lang=th&size=n&pattern=n&menu=statistic"
         res = requests.get(gpf_url, headers=HEADERS, timeout=20)
-        res.encoding = "utf-8" if "utf-8" in res.text.lower() else "tis-620"
+        res.encoding = res.apparent_encoding or "tis-620"
 
         soup = BeautifulSoup(res.text, "html.parser")
         for row in soup.find_all("tr"):
