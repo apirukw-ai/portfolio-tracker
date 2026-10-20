@@ -24,7 +24,7 @@ FUND_MAP = {
 }
 
 def fetch_mfc_nav():
-    url = "https://mfcfund.com/unit-value/"
+    url = "https://mfcfund.com/funds/filtersets/prices/"
     nav_results = {}
 
     print(f"📡 กำลังเปิด Headless Browser เพื่อดึงข้อมูลจาก: {url}")
