@@ -24,7 +24,8 @@ FUND_MAP = {
 }
 
 def fetch_mfc_nav():
-    url = "https://mfcfund.com/funds/filtersets/prices/"
+    # 🔗 อัปเดต URL ไปยังหน้าใหม่
+    url = "https://mfcfund.com/funds/filtersets/prices"
     nav_results = {}
 
     print(f"📡 กำลังเปิด Headless Browser เพื่อดึงข้อมูลจาก: {url}")
@@ -36,9 +37,9 @@ def fetch_mfc_nav():
             try:
                 page.goto(url, wait_until="networkidle", timeout=60000)
                 
-                # 🛠️ เพิ่มคำสั่งรอดึง element ตารางหรือแถวข้อมูลให้แสดงผลก่อน
-                page.wait_for_selector("tr", timeout=15000)
-                page.wait_for_timeout(5000) # รอเพิ่มอีกนิดให้ JavaScript เรนเดอร์ข้อมูลจนครบ
+                # 🛠️ รอให้แถวตารางข้อมูลโหลดเสร็จสมบูรณ์
+                page.wait_for_selector("table tr, div[class*='table']", timeout=20000)
+                page.wait_for_timeout(3000) # รอเพิ่มเติมเพื่อให้ข้อมูลเรนเดอร์ครบถ้วน
                 
                 html_content = page.content()
             finally:
@@ -49,7 +50,11 @@ def fetch_mfc_nav():
         print(f"ℹ️ พบแถวตารางทั้งหมด: {len(rows)} แถว")
         
         for row in rows:
-            raw_text = row.get_text()
+            raw_text = row.get_text(separator=' ', strip=True)
+            if not raw_text:
+                continue
+
+            # ทำความสะอาดข้อความสำหรับการจับชื่อกองทุน
             clean_text = re.sub(r'[\s\-]+', '', raw_text).upper()
 
             for asset_name, aliases in FUND_MAP.items():
@@ -58,14 +63,32 @@ def fetch_mfc_nav():
 
                 for alias in aliases:
                     clean_alias = re.sub(r'[\s\-]+', '', alias).upper()
+                    
+                    # ตรวจสอบว่าชื่อ/อักษรย่อกองทุนอยู่ในแถวนี้หรือไม่
                     if clean_alias in clean_text:
-                        matches = re.findall(r'\d[\d\,]*\.\d{4}', raw_text)
+                        # ดึงตัวเลขทศนิยม 4 ตำแหน่ง (รูปแบบ NAV ของ MFC)
+                        matches = re.findall(r'\b\d{1,4}(?:\,\d{3})*\.\d{4}\b', raw_text)
+                        
+                        # ลองสกัดวันที่ NAV (ถ้ามีในแถว เช่น DD/MM/YYYY)
+                        date_match = re.search(r'\b(\d{1,2}/\d{1,2}/\d{4})\b', raw_text)
+                        parsed_date = None
+                        if date_match:
+                            try:
+                                d_str = date_match.group(1)
+                                parsed_date = datetime.strptime(d_str, "%d/%m/%Y").strftime("%Y-%m-%d")
+                            except ValueError:
+                                parsed_date = None
+
                         if matches:
                             try:
+                                # ค่าแรกของทศนิยม 4 ตำแหน่งในคอลัมน์ NAV per Unit
                                 nav_val = float(matches[0].replace(',', ''))
-                                if 1.0 <= nav_val <= 1000.0:
-                                    nav_results[asset_name] = nav_val
-                                    print(f"✅ เจอ {asset_name} -> NAV: {nav_val}")
+                                if 0.1 <= nav_val <= 5000.0:
+                                    nav_results[asset_name] = {
+                                        "nav": nav_val,
+                                        "nav_date": parsed_date
+                                    }
+                                    print(f"✅ เจอ {asset_name} -> NAV: {nav_val} (วันที่: {parsed_date or 'N/A'})")
                                     break
                             except ValueError:
                                 continue
@@ -98,16 +121,18 @@ def update_supabase_batch(nav_data):
         asset_code = item.get("asset_code", "").strip()
         
         # ตรวจสอบทั้ง asset_name และ asset_code
-        nav_val = nav_data.get(asset_name) or nav_data.get(asset_code)
+        nav_info = nav_data.get(asset_name) or nav_data.get(asset_code)
 
-        if nav_val:
+        if nav_info:
+            nav_val = nav_info["nav"]
+            nav_date = nav_info.get("nav_date") or today_str
             units = float(item.get("units") or 0)
             
             updated_item = item.copy()
             updated_item.update({
                 "current_nav": round(nav_val, 4),
                 "current_value": round(units * nav_val, 4),
-                "nav_date": today_str,
+                "nav_date": nav_date,
                 "updated_at": now_thai.isoformat()
             })
             batch_payload.append(updated_item)
@@ -122,7 +147,7 @@ def update_supabase_batch(nav_data):
         print("⚠️ ไม่พบข้อมูล asset_name / asset_code ใน Supabase ที่จับคู่ตรงกัน")
 
 if __name__ == "__main__":
-    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (Playwright - MFC)...")
+    print("🚀 เริ่มต้นกระบวนการ Auto Update NAV (Playwright - MFC Filtersets)...")
     nav_data = fetch_mfc_nav()
     print("-" * 40)
     print(f"📊 สรุปข้อมูลที่ดึงได้ ({len(nav_data)}/{len(FUND_MAP)} กองทุน): {nav_data}")
