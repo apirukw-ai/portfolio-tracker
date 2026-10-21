@@ -125,6 +125,13 @@ def run_gpf_update():
 
         if latest_nav and latest_nav > 0:
             updated_item = item.copy()
+
+            # นำ current_nav เดิมไปเก็บไว้ใน prev_nav เองจาก Python
+            if item.get("current_nav") and item.get("current_nav") != round(
+                latest_nav, 4
+            ):
+                updated_item["prev_nav"] = item.get("current_nav")
+
             updated_item.update(
                 {
                     "current_nav": round(latest_nav, 4),
